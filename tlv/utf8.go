@@ -11,7 +11,7 @@ import (
 // decodeUTF8 turns a UTF-8 string element's body into a Go string the way
 // matter.js reads it: DataReader.readUtf8String decodes with a default
 // (non-fatal) TextDecoder (packages/general/src/util/DataReader.ts:66-68
-// at b25ed960), so an ill-formed sequence does not fail the decode but
+// at db91886c), so an ill-formed sequence does not fail the decode but
 // becomes U+FFFD — one per maximal subpart, the WHATWG Encoding
 // Standard's UTF-8 decoder. A well-formed body is returned unchanged.
 func decodeUTF8(body []byte) string {

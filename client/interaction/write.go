@@ -57,6 +57,15 @@ type WriteOptions struct {
 	TimedTimeout time.Duration
 	// SuppressResponse asks the peer for no WriteResponse.
 	SuppressResponse bool
+	// OmitFalseFlags leaves a false TimedRequest out of every WriteRequest
+	// chunk (a false SuppressResponse is never written), whatever the
+	// revisions; without it a false flag is left out only when this node
+	// and the peer are both at Interaction Model revision 14 or later
+	// ([im.RequestFlagsForSending]). MoreChunkedMessages stays on the wire.
+	// Mirrors matter.js RequestFlagsOptions.omitFalseFlags
+	// (packages/protocol/src/action/client/RequestFlagsOptions.ts:10-22 at
+	// db91886c) on Write.Options (Write.ts:201).
+	OmitFalseFlags bool
 	// DisableListChunking writes a list value as one AttributeDataIB; by
 	// default a list is written as REPLACE-ALL with the empty list and one
 	// append per element (chunkLists = true, Write.ts:65, :155-177).
@@ -146,7 +155,11 @@ func (c *Interaction) Write(ctx context.Context, writes []WriteRequest, opts Wri
 	// provider's newest session. Mirrors matter.js
 	// InteractionMessenger.ts:1333 (`const { maxPayloadSize } =
 	// this.exchange`) (W4-ctlim-08).
-	chunks, err := chunkWrite(req, m.x.Session().MaxPayloadSize())
+	// The flags are decided once, before the write is chunked: the chunk
+	// sizes and every chunk's bytes use the same encoding (matter.js
+	// InteractionMessenger.ts:1330-1331 at db91886c).
+	how := m.requestEncoding(opts.OmitFalseFlags)
+	chunks, err := chunkWrite(req, m.x.Session().MaxPayloadSize(), how)
 	if err != nil {
 		return nil, err
 	}
@@ -161,7 +174,7 @@ func (c *Interaction) Write(ctx context.Context, writes []WriteRequest, opts Wri
 	}
 	c.log.Debug("matter.controller.interaction.write", slog.Int("attributes", len(req.Writes)), slog.Bool("timed", req.TimedRequest), slog.Int("chunks", len(chunks)))
 	if req.SuppressResponse {
-		payload, err := encodeWrite(chunks[0])
+		payload, err := encodeWrite(chunks[0], how)
 		if err != nil {
 			return nil, err
 		}
@@ -177,7 +190,7 @@ func (c *Interaction) Write(ctx context.Context, writes []WriteRequest, opts Wri
 	for _, chunk := range chunks {
 		sent := chunk.Writes
 		chunk.Writes = unversionReplacedAdds(chunk.Writes, replaced)
-		payload, err := encodeWrite(chunk)
+		payload, err := encodeWrite(chunk, how)
 		if err != nil {
 			return nil, err
 		}

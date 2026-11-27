@@ -36,7 +36,7 @@ import (
 	"thingfabric.dev/go-fabric/tlv"
 )
 
-// Parity with matter.js packages/model/test/logic/SecretRedactionTest.ts at b25ed960,
+// Parity with matter.js packages/model/test/logic/SecretRedactionTest.ts at db91886c,
 // ported by meaning: matter.js redacts a JavaScript value keyed by property
 // name, this module a TLV [spec.Node] keyed by field id, so a value is
 // written here as the JSON form of [spec.EncodeJSON] and the result read
@@ -91,7 +91,7 @@ func TestSecretRedactionParityMatterJS(t *testing.T) {
 	t.Parallel()
 	const p = `"(redacted)"`
 
-	// SecretRedactionTest.ts:28-37 at b25ed960
+	// SecretRedactionTest.ts:28-37 at db91886c
 	t.Run("replaces a secret field and keeps the others", func(t *testing.T) {
 		t.Parallel()
 		f := commandNamed(t, netcomm.Definition, "AddOrUpdateThreadNetwork")
@@ -100,7 +100,7 @@ func TestSecretRedactionParityMatterJS(t *testing.T) {
 			t.Errorf("got %s, want %s", got, want)
 		}
 	})
-	// SecretRedactionTest.ts:39-45 at b25ed960
+	// SecretRedactionTest.ts:39-45 at db91886c
 	t.Run("replaces a secret in a response", func(t *testing.T) {
 		t.Parallel()
 		f := commandNamed(t, wifinm.Definition, "NetworkPassphraseResponse")
@@ -109,7 +109,7 @@ func TestSecretRedactionParityMatterJS(t *testing.T) {
 			t.Errorf("got %s, want %s", got, want)
 		}
 	})
-	// SecretRedactionTest.ts:47-53 at b25ed960
+	// SecretRedactionTest.ts:47-53 at db91886c
 	t.Run("replaces a secret inside a struct and keeps a null secret", func(t *testing.T) {
 		t.Parallel()
 		f := commandNamed(t, gkm.Definition, "KeySetWrite")
@@ -122,7 +122,7 @@ func TestSecretRedactionParityMatterJS(t *testing.T) {
 			t.Errorf("got %s, want %s", got, want)
 		}
 	})
-	// SecretRedactionTest.ts:55-65 at b25ed960
+	// SecretRedactionTest.ts:55-65 at db91886c
 	t.Run("replaces secrets in list entries of a type from another cluster", func(t *testing.T) {
 		t.Parallel()
 		f := commandNamed(t, webrtcp.Definition, "SolicitOffer")
@@ -133,7 +133,7 @@ func TestSecretRedactionParityMatterJS(t *testing.T) {
 			t.Errorf("got %s, want %s", got, want)
 		}
 	})
-	// SecretRedactionTest.ts:67-73 at b25ed960
+	// SecretRedactionTest.ts:67-73 at db91886c
 	t.Run("does not modify its input", func(t *testing.T) {
 		t.Parallel()
 		f := commandNamed(t, netcomm.Definition, "AddOrUpdateThreadNetwork")
@@ -144,7 +144,7 @@ func TestSecretRedactionParityMatterJS(t *testing.T) {
 			t.Errorf("input modified: %s", untyped(t, in))
 		}
 	})
-	// SecretRedactionTest.ts:75-79 at b25ed960
+	// SecretRedactionTest.ts:75-79 at db91886c
 	t.Run("returns its input for a model without secrets", func(t *testing.T) {
 		t.Parallel()
 		f := commandNamed(t, onoff.Definition, "OffWithEffect")
@@ -153,7 +153,7 @@ func TestSecretRedactionParityMatterJS(t *testing.T) {
 			t.Errorf("got a new value %s", untyped(t, out))
 		}
 	})
-	// SecretRedactionTest.ts:81-85 at b25ed960
+	// SecretRedactionTest.ts:81-85 at db91886c
 	t.Run("returns its input without a model", func(t *testing.T) {
 		t.Parallel()
 		f := commandNamed(t, netcomm.Definition, "AddOrUpdateThreadNetwork")
@@ -162,7 +162,7 @@ func TestSecretRedactionParityMatterJS(t *testing.T) {
 			t.Errorf("got a new value %s", untyped(t, out))
 		}
 	})
-	// SecretRedactionTest.ts:104-118 at b25ed960
+	// SecretRedactionTest.ts:104-118 at db91886c
 	t.Run("replaces a field a custom cluster marks secret", func(t *testing.T) {
 		t.Parallel()
 		login := spec.CommandField(&spec.Command{ID: 0, Name: "Login", Fields: []spec.Field{
@@ -174,7 +174,7 @@ func TestSecretRedactionParityMatterJS(t *testing.T) {
 			t.Errorf("got %s, want %s", got, want)
 		}
 	})
-	// SecretRedactionTest.ts:120-138 at b25ed960
+	// SecretRedactionTest.ts:120-138 at db91886c
 	t.Run("replaces a secret in a self-referencing struct", func(t *testing.T) {
 		t.Parallel()
 		s := &spec.Struct{Name: "NodeStruct"}
@@ -188,7 +188,7 @@ func TestSecretRedactionParityMatterJS(t *testing.T) {
 			t.Errorf("got %s, want %s", got, want)
 		}
 	})
-	// SecretRedactionTest.ts:140-152 at b25ed960
+	// SecretRedactionTest.ts:140-152 at db91886c
 	t.Run("reports no secret in a self-referencing struct without one", func(t *testing.T) {
 		t.Parallel()
 		s := &spec.Struct{Name: "NodeStruct"}
@@ -198,7 +198,7 @@ func TestSecretRedactionParityMatterJS(t *testing.T) {
 			t.Error("ContainsSecret = true")
 		}
 	})
-	// SecretRedactionTest.ts:179-186 at b25ed960 — redactAttributes over
+	// SecretRedactionTest.ts:179-186 at db91886c — redactAttributes over
 	// a cluster's state keyed by property name has no Go counterpart (no
 	// property-named cluster state); its meaning, attribute by attribute,
 	// is Redact on each attribute's field, as the bridge logs it.
@@ -215,7 +215,7 @@ func TestSecretRedactionParityMatterJS(t *testing.T) {
 			t.Errorf("numberOfTotalUsersSupported: got %s, want 10", untyped(t, out))
 		}
 	})
-	// SecretRedactionTest.ts:188-191 at b25ed960, by meaning as above.
+	// SecretRedactionTest.ts:188-191 at db91886c, by meaning as above.
 	t.Run("redactAttributes: returns its input for a cluster without secrets", func(t *testing.T) {
 		t.Parallel()
 		for i := range onoff.Definition.Attributes {
@@ -230,7 +230,7 @@ func TestSecretRedactionParityMatterJS(t *testing.T) {
 		}
 	})
 
-	// SecretRedactionTest.ts:194-210 at b25ed960 (describe "redactEntry")
+	// SecretRedactionTest.ts:194-210 at db91886c (describe "redactEntry")
 	octstr := spec.Type{Name: "octstr", Kind: spec.KindBytes}
 	secretList := spec.AttributeField(&spec.Attribute{
 		ID: 0, Name: "SecretList", Secret: true,
@@ -249,21 +249,21 @@ func TestSecretRedactionParityMatterJS(t *testing.T) {
 		return encode(t, &spec.Field{Name: "entry", Type: octstr}, `"hex:01"`)
 	}
 
-	// SecretRedactionTest.ts:212-216 at b25ed960
+	// SecretRedactionTest.ts:212-216 at db91886c
 	t.Run("redactEntry: replaces an entry of a secret list", func(t *testing.T) {
 		t.Parallel()
 		if got := untyped(t, spec.RedactEntry(secretList, entry(t))); got != p {
 			t.Errorf("got %s, want %s", got, p)
 		}
 	})
-	// SecretRedactionTest.ts:218-222 at b25ed960
+	// SecretRedactionTest.ts:218-222 at db91886c
 	t.Run("redactEntry: replaces a secret entry", func(t *testing.T) {
 		t.Parallel()
 		if got := untyped(t, spec.RedactEntry(listOfSecrets, entry(t))); got != p {
 			t.Errorf("got %s, want %s", got, p)
 		}
 	})
-	// SecretRedactionTest.ts:224-226 at b25ed960
+	// SecretRedactionTest.ts:224-226 at db91886c
 	t.Run("redactEntry: keeps a null entry of a secret list", func(t *testing.T) {
 		t.Parallel()
 		null := encode(t, nil, `null`)
@@ -271,7 +271,7 @@ func TestSecretRedactionParityMatterJS(t *testing.T) {
 			t.Errorf("got %s, want null", got)
 		}
 	})
-	// SecretRedactionTest.ts:239-242 at b25ed960
+	// SecretRedactionTest.ts:239-242 at db91886c
 	t.Run("redactEntry: keeps an entry of a list without secrets", func(t *testing.T) {
 		t.Parallel()
 		in := entry(t)

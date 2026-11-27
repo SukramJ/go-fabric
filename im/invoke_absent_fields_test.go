@@ -32,7 +32,7 @@ func absentFieldsRequest(t *testing.T) []byte {
 // value the command's fields. Without a reader nothing is read. Mirrors
 // matter.js's reading of an absent request as {}
 // (packages/node/src/node/integration/ProtocolService.ts:624-625 at
-// b25ed960) and its answer to an explicit {} lacking a mandatory field,
+// db91886c) and its answer to an explicit {} lacking a mandatory field,
 // INVALID_COMMAND (packages/protocol/src/action/server/CommandInvokeResponse.ts:529-535).
 func TestAbsentCommandFieldsReadAsAnEmptyStructure(t *testing.T) {
 	t.Parallel()

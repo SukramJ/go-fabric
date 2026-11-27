@@ -15,7 +15,7 @@ import (
 // manager's socket: a TCP connection (a *transport/tcp.Conn satisfies it).
 // matter.js binds every session to a channel — the UDP socket's address or
 // a TcpChannel (packages/protocol/src/transport/tcp/TcpChannel.ts:43 at
-// b25ed960); here a session without one sends on the manager's [Conn].
+// db91886c); here a session without one sends on the manager's [Conn].
 type Channel interface {
 	// Send sends one framed message.
 	Send(msg []byte) error
@@ -204,7 +204,7 @@ func (s *Session) MaxPayloadSize() int {
 // MaxUDPMessageSize is the largest Matter message a UDP datagram carries:
 // the IPv6 minimum MTU less the IP and UDP headers. Every node accepts it,
 // so a peer's TCP limit is never taken below it. Mirrors matter.js
-// packages/general/src/net/udp/UdpSocket.ts:12 at b25ed960
+// packages/general/src/net/udp/UdpSocket.ts:12 at db91886c
 // (MAX_UDP_MESSAGE_SIZE = 1280 - 48).
 const MaxUDPMessageSize = 1280 - 48
 
@@ -228,7 +228,7 @@ func (s *Session) PeerMaxTCPMessageSize() int {
 // maxTCPMessageSize is the largest message the session sends on its TCP
 // channel: the channel's own limit, capped at what the peer accepts,
 // "because the peer closes the connection when it receives a larger
-// message" (MessageChannel.ts:77-92 maxPayloadSize at b25ed960).
+// message" (MessageChannel.ts:77-92 maxPayloadSize at db91886c).
 func (s *Session) maxTCPMessageSize() int {
 	return min(s.channel.MaxMessageSize(), s.PeerMaxTCPMessageSize())
 }
@@ -237,7 +237,7 @@ func (s *Session) maxTCPMessageSize() int {
 // sending it: the peer would close the connection, which ends every
 // exchange on it. A session without a channel is not checked here.
 // Mirrors matter.js MessageChannel.send (MessageChannel.ts:104-112 at
-// b25ed960).
+// db91886c).
 func (s *Session) checkSize(datagram []byte) error {
 	if s.channel == nil {
 		return nil

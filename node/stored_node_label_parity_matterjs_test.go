@@ -21,7 +21,7 @@ import (
 
 // TestStoredNodeLabelParityMatterJS ports
 // packages/node/test/behaviors/basic-information/StoredNodeLabelTest.ts at
-// b25ed960 (#4995): a NodeLabel stored while the bound counted UTF-16 code
+// db91886c (#4995): a NodeLabel stored while the bound counted UTF-16 code
 // units — 11 × "日", 33 bytes — starts the node, is served cut to the 32
 // bytes it may hold, and is stored cut with the next write.
 func TestStoredNodeLabelParityMatterJS(t *testing.T) {
@@ -54,7 +54,7 @@ func TestStoredNodeLabelParityMatterJS(t *testing.T) {
 // bytes) no longer stop node.New — the restore cuts the Label to its 16
 // bytes, as matter.js's datasource cuts a stored string at load
 // (packages/node/src/behavior/state/managed/Datasource.ts:149-165 at
-// b25ed960, #4995) — and the list is served cut.
+// db91886c, #4995) — and the list is served cut.
 func TestStoredOverlongUserLabelStartsShortened(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()

@@ -31,7 +31,7 @@ func (eventPathDispatcher) EventPathStatus(p im.ConcreteEventPath) im.StatusCode
 
 // TestAllowedEventPathsCountsExistingEvents (review II, R2-P4-imread-08)
 // ports matter.js packages/node/test/node/EventReadResponseTest.ts:299-326
-// at b25ed960, "reads non-existent concrete event": an event the cluster
+// at db91886c, "reads non-existent concrete event": an event the cluster
 // does not have is no existent event path (counts.existent 0), so it does
 // not establish a subscription on its own. Mirrors EventReadResponse.ts at
 // db021da0: #addConcrete answers UnsupportedEvent before it registers the

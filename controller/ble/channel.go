@@ -72,7 +72,7 @@ type DialOptions struct {
 // renegotiation (NobleBleChannel.ts:864-918 at b25ed960), an interop
 // workaround its session documents as having no basis in the
 // specification (packages/protocol/src/ble/BtpSessionHandler.ts:67-84 at
-// b25ed960). Every [Channel.Send] waits for a renegotiation in flight; a
+// db91886c). Every [Channel.Send] waits for a renegotiation in flight; a
 // renegotiation that fails closes the channel. See
 // BD-Matter-BTP-RenegotiationAfterStall.
 type Channel struct {
@@ -568,7 +568,7 @@ func (c *Channel) endLost() {
 // (packages/protocol/src/ble/BtpSessionHandler.ts:314, :323-331 at
 // db021da0) and states a BLE channel's payload bound as 1232 bytes
 // (packages/protocol/src/ble/Ble.ts:37, BleConsts.ts:79,
-// packages/general/src/net/udp/UdpSocket.ts:12 at b25ed960).
+// packages/general/src/net/udp/UdpSocket.ts:12 at db91886c).
 const maxInboundMessage = udp.MaxDatagramSize
 
 // deliver hands a reassembled Matter message to the exchange manager. A

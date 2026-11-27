@@ -55,7 +55,7 @@ func (n *Node) fabricStateServers(ts ...*endpoint.Topology) []contract.FabricSco
 // root, the Aggregator and every endpoint of the served topology drops
 // what it holds for fabricIndex (matter.js limitNodeDataToAllowedFabrics
 // on fabrics.events.deleting, node/server/ServerEnvironment.ts:188-196 at
-// b25ed960). An endpoint absent now is reconciled when it joins
+// db91886c). An endpoint absent now is reconciled when it joins
 // ([Node.reconcileFabricState]), and every server present when a fabric
 // is added drops what it holds for the new fabric's index before the
 // fabric is announced (observedFabricInstalled), so an index handed out
@@ -89,7 +89,7 @@ func (n *Node) dropFabricState(ctx context.Context, fabricIndex uint8) {
 // before the bridge serves t, at start and whenever the topology is
 // assembled again. Mirrors matter.js
 // limitEndpointAttributeDataToAllowedFabrics when an endpoint initialises
-// (node/server/ServerEndpointInitializer.ts:129-136 at b25ed960), which
+// (node/server/ServerEndpointInitializer.ts:129-136 at db91886c), which
 // skips a node without fabrics; this module also reconciles that case, as
 // it does not erase the node when its last fabric goes
 // (BD-Matter-LastFabricReopenWithoutErase).

@@ -4,7 +4,7 @@
 package device
 
 // A port of matter.js packages/node/test/behaviors/descriptor/DescriptorServerClientListTest.ts
-// at b25ed960: the Descriptor's ClientList of a device type's endpoint
+// at db91886c: the Descriptor's ClientList of a device type's endpoint
 // (DescriptorServer.ts #clientList :286-299, MutableEndpoint.ts:53-61).
 //
 // matter.js builds each device type on a MockEndpoint and reads

@@ -5,7 +5,7 @@
 // at b25ed960: describe("SetpointRaiseLower through the interaction
 // layer") (:490-530) — the request gate before the handler
 // (packages/node/src/node/integration/ProtocolService.ts:671-704 at
-// b25ed960): a member its conformance disallows only gets a warning and
+// db91886c): a member its conformance disallows only gets a warning and
 // the handler refuses it, a value the enum does not define is refused
 // before the handler. matter.js invokes over the wire of a MockServerNode;
 // the port invokes the server, whose request gate is the same.

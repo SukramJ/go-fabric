@@ -185,7 +185,7 @@ func wantEmitted(t *testing.T, got, want []faultEmitted) {
 
 // TestGeneralDiagnosticsFaultsParityMatterJS ports the five "faults"
 // cases of matter.js packages/node/test/behaviors/general-diagnostics/
-// GeneralDiagnosticsServerTest.ts at b25ed960 (:420-534) by meaning: the
+// GeneralDiagnosticsServerTest.ts at db91886c (:420-534) by meaning: the
 // host's register and clear become a FaultSource notification, and each
 // change of a list emits one change event with the current and the
 // previous list.

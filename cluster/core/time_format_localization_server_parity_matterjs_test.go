@@ -2,7 +2,7 @@
 // Copyright (C) 2026 SukramJ.
 
 // A port of matter.js packages/node/test/behaviors/time-format-localization/TimeFormatLocalizationServerTest.ts
-// at b25ed960. matter.js builds the root with
+// at db91886c. matter.js builds the root with
 // TimeFormatLocalizationServer.with("CalendarFormat") over the calendars
 // Buddhist, Chinese and Coptic, 24-hour format, Coptic active
 // (createEndpoint :57-71), and sets activeCalendarType inside an act; the
@@ -35,7 +35,7 @@ import (
 
 // TestTimeFormatLocalizationServerParityMatterJS ports the describe
 // "TimeFormatLocalizationServer" (TimeFormatLocalizationServerTest.ts:73-97
-// at b25ed960), the createEndpoint cases.
+// at db91886c), the createEndpoint cases.
 func TestTimeFormatLocalizationServerParityMatterJS(t *testing.T) {
 	t.Parallel()
 	create := func(t *testing.T) interface {
@@ -108,7 +108,7 @@ func TestTimeFormatLocalizationServerParityMatterJS(t *testing.T) {
 
 // TestTimeFormatLocalizationServerStartParityMatterJS ports the start-up,
 // write and restart cases of the describe "TimeFormatLocalizationServer"
-// (TimeFormatLocalizationServerTest.ts:99-316 at b25ed960) where they have
+// (TimeFormatLocalizationServerTest.ts:99-316 at db91886c) where they have
 // a Go subject. An unset ActiveCalendarType (nil) starts at the list's
 // first (decision 358), which is matter.js's start where its detected
 // calendar is not listed (:117-123, :160-168). Left: the replacement of a
@@ -313,7 +313,7 @@ func TestTimeFormatLocalizationServerStartParityMatterJS(t *testing.T) {
 
 	// Go's own: an empty, non-nil list is no configuration, as matter.js's
 	// `!supportedCalendarTypes?.length` (TimeFormatLocalizationServer.ts:24
-	// at b25ed960). Refused with ErrLocalizationConfig before (decision 296).
+	// at db91886c). Refused with ErrLocalizationConfig before (decision 296).
 	t.Run("seeds an empty SupportedCalendarTypes with the ActiveCalendarType", func(t *testing.T) {
 		t.Parallel()
 		cfg := detecting()

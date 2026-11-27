@@ -119,10 +119,13 @@ never removed — and the servers are built from what they keep.
 from the built servers through the function the dispatcher serves them
 with, and every decision. One policy is built in and judges first: the
 reference policy refuses an element a server declares as an *Ahead of
-matter.js* register row (`surface.AheadSet`; Thermostat MSCH and TEVT, the
+matter.js* register row (`surface.AheadSet`; Thermostat TEVT, the
 root's TimeSynchronization features, the Thread NetworkCommissioning
 variant) unless `surface.Policies.Extensions` enables that row
-(`surface.ErrExtensionNotEnabled`); otherwise the zero-value policies keep
+(`surface.ErrExtensionNotEnabled`). A row matter.js caught up with closes,
+and its ID is retired (`surface.RetiredExtensions`): accepted for the
+deprecation window, it selects nothing and is left out of the policies'
+digest and report; otherwise the zero-value policies keep
 everything, so a node that selects no ahead element composes as it did
 before. The second built-in policy composes at a specification level
 (`surface.Policies.Level`, the daemon's `--spec-level`): a Matter revision

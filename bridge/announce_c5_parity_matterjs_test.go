@@ -24,7 +24,7 @@ import (
 // carries the invoking subject's access check. Here that check refuses
 // every path; the subscriber still hears the new endpoint's OnOff. matter.js
 // packages/node/src/node/integration/ProtocolService.ts:290-296 at
-// b25ed960 takes the list from cluster.type.attributes and emits
+// db91886c takes the list from cluster.type.attributes and emits
 // attrsChanged — no requester decides it.
 func TestAnnounceIgnoresTheReassemblyCallersRequest(t *testing.T) {
 	t.Parallel()

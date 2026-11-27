@@ -10,7 +10,7 @@ import (
 )
 
 // TestTlvStringLengthFieldInBytesParityMatterJS ports the three encode
-// cases of packages/types/test/tlv/TlvStringTest.ts:40-64 at b25ed960
+// cases of packages/types/test/tlv/TlvStringTest.ts:40-64 at db91886c
 // (#4995): the width of a character string's length field follows its
 // length in UTF-8 bytes, not its character count. The encoder chose the
 // width by bytes already ([Encoder.PutUTF8] measures the encoded slice);

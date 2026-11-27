@@ -240,9 +240,14 @@ func TestIssue507_StaleOperationalAddress(t *testing.T) {
 	})
 }
 
-// i507BusyWait is the Busy delay of the node's 65535 ms answer with the
-// harness's jitter (DelayAfterNetworkError 15 s × 0.5).
-const i507BusyWait = 65535*time.Millisecond + 7500*time.Millisecond
+// i507BusyDelay is the minimum wait of the node's 65535 ms Busy answer,
+// the deadline it holds; i507BusyWait is that wait with the harness's
+// jitter (DelayAfterNetworkError 15 s × 0.5), which the attempt that
+// received it and every waiting attempt add.
+const (
+	i507BusyDelay = 65535 * time.Millisecond
+	i507BusyWait  = i507BusyDelay + 7500*time.Millisecond
+)
 
 // TestIssue507_BusyDeadline: the node's Busy holds every Sigma1 to the peer
 // until the deadline — across an abort of the attempt that received it
@@ -319,8 +324,8 @@ func TestIssue507_BusyDeadline(t *testing.T) {
 			p := r.peer(i507Host)
 			r.nodeOnly()
 			r.connect(p)
-			if d := p.busyRemaining(); d != i507BusyWait {
-				t.Fatalf("the Busy deadline in %v, want %v", d, i507BusyWait)
+			if d := p.busyRemaining(); d != i507BusyDelay {
+				t.Fatalf("the Busy deadline in %v, want the minimum wait %v", d, i507BusyDelay)
 			}
 			s := r.secureSession(t, 0x53, udpAddr(addr1))
 			r.set.Adopt(s)
@@ -452,10 +457,12 @@ func TestIssue507_SessionEndsAnchor(t *testing.T) {
 
 // TestBusyAtAnUnprovenAddressHoldsOnlyItsAttempt: a Busy answered from
 // an address no session proved to be the node's — another SRV target's,
-// here the router's — is waited out by the attempt that received it, as
-// matter.js waits it (PeerConnection.ts:700-701 at b25ed960), and holds no
+// here the router's — is waited out by the attempt that received it, for
+// at least the minimum wait it asked for (decision 743), and holds no
 // Sigma1 to the node's proven addresses; a Busy at the proven address
-// still holds the peer (review II, R2-P1-net-05).
+// still holds the peer (review II, R2-P1-net-05). matter.js holds every
+// address of the connection for it (PeerConnection.ts:536-545, :683 at
+// db91886c; BD-Matter-PeerBusyDeadline).
 func TestBusyAtAnUnprovenAddressHoldsOnlyItsAttempt(t *testing.T) {
 	t.Parallel()
 	for _, c := range []struct{ name, host string }{{"proven host", i507Host}, {"host never learned", ""}} {
@@ -494,9 +501,14 @@ func TestBusyAtAnUnprovenAddressHoldsOnlyItsAttempt(t *testing.T) {
 	}
 }
 
-// TestIssue507_BusyHoldsTheHandlersDelay: the error handler's replacement
-// of the Busy delay is the delay the peer's deadline holds.
-func TestIssue507_BusyHoldsTheHandlersDelay(t *testing.T) {
+// TestIssue507_BusyIgnoresTheHandlersDelay: the error handler's
+// replacement of the Busy delay neither sets nor shortens the deadline:
+// the peer's deadline is the minimum wait the node asked for, and the
+// attempt that received the Busy, after sleeping the handler's 2 s, waits
+// out the rest of it before its next Sigma1 (matter.js
+// PeerConnection.ts:683 before :686, the hook doc :845-846 at db91886c;
+// decision 734).
+func TestIssue507_BusyIgnoresTheHandlersDelay(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
 		r := newRig507(t, func(c *Context) {
@@ -508,8 +520,17 @@ func TestIssue507_BusyHoldsTheHandlersDelay(t *testing.T) {
 		p := r.peer(i507Host)
 		r.nodeOnly()
 		r.connect(p)
-		if d := p.busyRemaining(); d != 2*time.Second {
-			t.Fatalf("the Busy deadline in %v, want the handler's 2s", d)
+		if d := p.busyRemaining(); d != i507BusyDelay {
+			t.Fatalf("the Busy deadline in %v, want the node's minimum wait %v, not the handler's 2s", d, i507BusyDelay)
+		}
+		r.advance(i507BusyWait + time.Second)
+		if got := r.fresh(addr1, i507Step, i507BusyDelay); len(got) > 0 {
+			t.Fatalf("fresh Sigma1 at %v, inside the node's minimum wait %v; order: %s", got, i507BusyDelay, r.order())
+		}
+		// The handler's 2 s, then the rest of the minimum wait and the
+		// waiter's jitter.
+		if got := r.fresh(addr1, i507Step, time.Hour); len(got) == 0 || got[0] < i507BusyWait || got[0] > i507BusyWait+i507Step {
+			t.Fatalf("the next Sigma1 at %v, want at %v; order: %s", got, i507BusyWait, r.order())
 		}
 	})
 }

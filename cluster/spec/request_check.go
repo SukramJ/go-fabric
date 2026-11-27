@@ -28,7 +28,7 @@ import (
 // A nil payload is judged as a request without fields: a mandatory field
 // is missing (matter.js validates `data ?? {}`,
 // packages/node/src/node/integration/ProtocolService.ts:624-625 at
-// b25ed960). A command the definition does not state, a command without
+// db91886c). A command the definition does not state, a command without
 // fields, and a payload whose Go type does not carry every field the
 // definition states (a hand-written decoder's own form) are not judged.
 // It is the request's twin of the response check [Server.MatterInvoke]
@@ -44,7 +44,7 @@ func (i *Instance) CheckRequest(cmdID uint32, fields any, peers Peers) error {
 // request: with all, every one of every field, in the order matter.js
 // records them (matter.js
 // packages/node/src/behavior/state/validation/ValueValidator.ts:375-509 at
-// b25ed960, under a ValidationLocation.errors collector); else the first
+// db91886c, under a ValidationLocation.errors collector); else the first
 // alone.
 func (i *Instance) requestErrors(cmdID uint32, fields any, peers Peers, all bool) []error {
 	cmd, rv, ok := i.requestOf(cmdID, fields)

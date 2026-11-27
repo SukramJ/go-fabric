@@ -15,7 +15,7 @@ import (
 
 // collectorRequest is the record of
 // packages/node/test/behavior/state/validation/ValueValidatorTest.ts:51-80 at
-// b25ed960 ("with an error collector"): Num int8 "max 5", Mode enum8 of
+// db91886c ("with an error collector"): Num int8 "max 5", Mode enum8 of
 // A and B whose conformance names the feature F, Modes a list "max 1" of
 // that enum.
 type collectorRequest struct {
@@ -64,11 +64,11 @@ func errorClass(err error) string {
 
 // TestValueValidatorErrorCollectorParityMatterJS ports
 // packages/node/test/behavior/state/validation/ValueValidatorTest.ts:51-99 at
-// b25ed960 (describe "with an error collector"): the request gate's
+// db91886c (describe "with an error collector"): the request gate's
 // collector records the errors of every field, a field's conformance
 // error and its value's alike
 // (packages/node/src/behavior/state/validation/location.ts:64-80,
-// conformance.ts:44-56 at b25ed960), while the
+// conformance.ts:44-56 at db91886c), while the
 // public check stops at the first, as the validator throws it without a
 // collector.
 func TestValueValidatorErrorCollectorParityMatterJS(t *testing.T) {
@@ -136,7 +136,7 @@ func gateCluster() *spec.Cluster {
 
 // TestRequestGateParityMatterJS holds the request gate to matter.js's
 // decision over the collected errors (ProtocolService.ts:671-705 at
-// b25ed960): a command with its own refusal answers with it; else a
+// db91886c): a command with its own refusal answers with it; else a
 // value an enum does not define, wherever it sits among the errors, is
 // CONSTRAINT_ERROR and the handler does not run; else the errors are
 // logged and the handler runs. An enum without members accepts every
@@ -184,7 +184,7 @@ func TestRequestGateParityMatterJS(t *testing.T) {
 // TestEnumWithoutMembersAcceptsEveryValue: a written value of an enum
 // without members is held to its width only, as the request is
 // (packages/node/src/behavior/state/validation/ValueValidator.ts:171-172
-// at b25ed960, definesValues).
+// at db91886c, definesValues).
 func TestEnumWithoutMembersAcceptsEveryValue(t *testing.T) {
 	t.Parallel()
 	def := &spec.Cluster{

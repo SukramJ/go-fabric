@@ -227,7 +227,7 @@ func applyOverrideFrom(ctx context.Context) (applyOverride, bool) {
 
 // wholeSeconds is a delay as the response carries it: whole seconds rounded
 // up, at most a day (OtaSoftwareUpdateProviderServer.ts:346-351 at
-// b25ed960).
+// db91886c).
 func wholeSeconds(d time.Duration) time.Duration {
 	return min(maxApplyDelay, max(0, time.Duration(math.Ceil(d.Seconds()))*time.Second))
 }

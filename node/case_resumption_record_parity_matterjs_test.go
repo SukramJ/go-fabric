@@ -6,7 +6,7 @@ package node
 // The CASE responder's resumption record is saved for a session that
 // became established, never for one that did not (F-b25ed960-37). Ports by
 // meaning — the record half — of matter.js
-// packages/node/test/node/ServerSubscriptionSessionTest.ts at b25ed960,
+// packages/node/test/node/ServerSubscriptionSessionTest.ts at db91886c,
 // :340-383, :423-464, :466-495 and :497-532; the bridge's report of the
 // handshake's end is the caseEstablishment completion here. matter.js
 // saves after the initiator's Success on a resume and after the Success's

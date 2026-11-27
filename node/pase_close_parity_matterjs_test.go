@@ -12,7 +12,7 @@ import (
 // TestPASEClosedAfterCommissioningParity pins Matter §11.10.6.6 step 4 end
 // to end: once a commissioning completes, the device holds no PASE
 // session — the one AddNOC adopted onto the new fabric included. Mirrors
-// matter.js packages/protocol/src/common/FailsafeContext.ts:156-157 at b25ed960
+// matter.js packages/protocol/src/common/FailsafeContext.ts:156-157 at db91886c
 // (completeCommission → closePaseSession).
 func TestPASEClosedAfterCommissioningParity(t *testing.T) {
 	t.Parallel()

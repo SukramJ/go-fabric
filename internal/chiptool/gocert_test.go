@@ -83,7 +83,7 @@ import (
 // citations were read at: the snapshot's pin, whose case list
 // testdata/matterjs-cert-cases.json holds. A case with a readAt of its own
 // is read at that commit instead.
-const goCertReadAt = "b25ed960"
+const goCertReadAt = "db91886c"
 
 // goCertEnv narrows the leg to families or case ids ("IDM,SC/4.2"), or
 // leaves some out ("-CADMIN,-DD"); selectGoCert reads it, and an entry

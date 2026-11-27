@@ -13,7 +13,7 @@ import (
 )
 
 // The RFC 6762 §6 one-second rule as matter.js keeps it per interface
-// (packages/protocol/src/mdns/InterfaceResponder.ts at b25ed960, the class
+// (packages/protocol/src/mdns/InterfaceResponder.ts at db91886c, the class
 // description :48-84): a record goes out by multicast at most once a
 // second on an interface, counting the multicast answers to a query and
 // the goodbyes — not the announcements, which are never held, nor the
@@ -25,7 +25,7 @@ import (
 // record its service no longer publishes is dropped.
 
 // multicastInterval is MULTICAST_INTERVAL (InterfaceResponder.ts:34-35 at
-// b25ed960): one multicast of a record per second and interface.
+// db91886c): one multicast of a record per second and interface.
 const multicastInterval = time.Second
 
 // deferral is one record the rule held back (InterfaceResponder.ts

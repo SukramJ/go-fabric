@@ -10,7 +10,7 @@
 //   - sigma2_*         — CasePairingTest.ts:14-63 (Sigma2 key schedule + AES-CCM)
 //   - sigma3_*         — CasePairingTest.ts:75-129 (Sigma3 key schedule + AES-CCM)
 //   - session_keys_*   — CasePairingTest.ts:117-128 (final session-key derivation)
-//   - TestCasePairingSignature — CasePairingTest.ts:65-73 at b25ed960
+//   - TestCasePairingSignature — CasePairingTest.ts:65-73 at db91886c
 //     ("generates the right signature"), inline
 //
 // If any assertion fails that is a REAL drift against matter.js — stop,

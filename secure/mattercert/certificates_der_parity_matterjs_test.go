@@ -15,13 +15,13 @@ import (
 	"testing"
 )
 
-// The X.509 half of matter.js's CertificatesTest.ts at b25ed960:
+// The X.509 half of matter.js's CertificatesTest.ts at db91886c:
 // Rcac/Icac/Noc.fromAsn1 ([DecodeDER]), asSignedDer ([EncodeDER]) and
 // asUnsignedDer ([TBSToDER]) on the CERTIFICATE_SETS and on the external
 // certificates of TestCertificates.ts:215-249.
 
 // certificatesExternal is EXTERNAL_TEST_CERTIFICATES (TestCertificates.ts:215-249
-// at b25ed960): an RCAC, an ICAC and a NOC of an external PKI in DER.
+// at db91886c): an RCAC, an ICAC and a NOC of an external PKI in DER.
 var certificatesExternal = map[string]string{
 	"RCAC": "MIIBlzCCATygAwIBAgIBATAKBggqhkjOPQQDAjAiMSAwHgYKKwYBBAGConwBBAwQMDAwMDAwMDAwMDAwMDAwMTAeFw0yMTAxMDEwMDAwMDBaFw0zMDEyMzAwMDAwMDBaMCIxIDAeBgorBgEEAYKifAEEDBAwMDAwMDAwMDAwMDAwMDAxMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1Z8+sLnCFqRvBAr/39VYF8qKPckhqmJNpRaLqQdm1zvwjkgM0PXMlGU6ktd3GdmwBHR9X32jne22fsVPfLxq3qNjMGEwDwYDVR0TAQH/BAUwAwEB/zAOBgNVHQ8BAf8EBAMCAQYwHQYDVR0OBBYEFBkNojfgeCqcWP7LvV3UifbQAMrRMB8GA1UdIwQYMBaAFBkNojfgeCqcWP7LvV3UifbQAMrRMAoGCCqGSM49BAMCA0kAMEYCIQDDOq80q3nQa9/iT4hK7tBp4QUtlLvHGCDnSwDW7s0aWQIhANwRcs4MBcDq92J61vDDxosEg8m4lZkknpk+pirVnH79",
 	"ICAC": "MIIBlTCCATygAwIBAgIBATAKBggqhkjOPQQDAjAiMSAwHgYKKwYBBAGConwBBAwQMDAwMDAwMDAwMDAwMDAwMTAeFw0yMTAxMDEwMDAwMDBaFw0zMDEyMzAwMDAwMDBaMCIxIDAeBgorBgEEAYKifAEDDBAwMDAwMDAwMDAwMDAwMDAyMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEAQkkmAiPq0p7LlkgYMUSDzfWgjIcphuyDuqpETefdMAmXJJbzRc5iplD5fSQegPAKJdRKyn9oVeu71vYorDP16NjMGEwDwYDVR0TAQH/BAUwAwEB/zAOBgNVHQ8BAf8EBAMCAQYwHQYDVR0OBBYEFLcNxoI2fCA+E/TUT5N0AjIU+yLZMB8GA1UdIwQYMBaAFBkNojfgeCqcWP7LvV3UifbQAMrRMAoGCCqGSM49BAMCA0cAMEQCIH5Wh/Ne8O4aaFs8wR+QT4L508z0E8vm0DwqOS9YQzfgAiBN/iku1zBRGmBmUtOzWm/whEgIzCd8tXOkTaeZk463dg==",
@@ -48,7 +48,7 @@ func certificatesDecodeDER(t *testing.T, der []byte) *Certificate {
 
 // TestCertificatesParseFromASN1ParityMatterJS ports "parse root / intermediate /
 // operational certificate from ASN.1" (CertificatesTest.ts:125-187 at
-// b25ed960): fromAsn1(fromTlv(TLV).asSignedDer()) is the same certificate
+// db91886c): fromAsn1(fromTlv(TLV).asSignedDer()) is the same certificate
 // (here: encodes to the fixture TLV again), asUnsignedDer is the set's
 // ASN1 fixture, and the DER-parsed certificate verifies in its chain.
 func TestCertificatesParseFromASN1ParityMatterJS(t *testing.T) {
@@ -97,7 +97,7 @@ func TestCertificatesParseFromASN1ParityMatterJS(t *testing.T) {
 
 // TestCertificatesExternalParityMatterJS ports "parse and regenerate external
 // RCAC / ICAC / NOC certificate" and "external certificates form a valid
-// chain" (CertificatesTest.ts:197-255 at b25ed960) on
+// chain" (CertificatesTest.ts:197-255 at db91886c) on
 // EXTERNAL_TEST_CERTIFICATES: the DER of an external PKI parses, carries
 // its ids and CA flags, regenerates byte for byte (asSignedDer), and the
 // three form a chain whose key identifiers link and whose signatures
@@ -211,7 +211,7 @@ func TestCertificatesExtensionEdgesParityMatterJS(t *testing.T) {
 }
 
 // TestCertificatesTLVOrderParityMatterJS ports "validates TLV order
-// preserve" (CertificatesTest.ts:514-561 at b25ed960): a NOC whose subject
+// preserve" (CertificatesTest.ts:514-561 at db91886c): a NOC whose subject
 // lists its CATs before the fabric and node ids round-trips through the
 // TLV with that order kept, and its unsigned DER is the same bytes
 // whichever way it was built.
@@ -267,7 +267,7 @@ func TestCertificatesTLVOrderParityMatterJS(t *testing.T) {
 }
 
 // TestCertificatesCSRParityMatterJS ports "generates a valid CSR"
-// (CertificatesTest.ts:668-685 at b25ed960): the request is three DER
+// (CertificatesTest.ts:668-685 at db91886c): the request is three DER
 // elements, the algorithm ecdsa-with-SHA256, the CertificationRequestInfo
 // the fixture TEST_CSR_REQUEST_ASN1 (TestCertificates.ts:207-209) byte for
 // byte, and the signature verifies with the key's public half.

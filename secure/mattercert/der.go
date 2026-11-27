@@ -17,7 +17,7 @@ import (
 
 // MaxOperationalCertDERBytes caps a Matter operational certificate in its
 // X.509 DER form — §6.1.3; matter.js MAX_DER_CERTIFICATE_SIZE
-// (packages/protocol/src/certificate/kinds/common.ts:13 at b25ed960),
+// (packages/protocol/src/certificate/kinds/common.ts:13 at db91886c),
 // checked before a DER certificate is parsed
 // (Certificate.ts:672-677 parseAsn1Certificate).
 const MaxOperationalCertDERBytes = 600
@@ -138,7 +138,7 @@ func derVersion(field asn1.RawValue) error {
 }
 
 // EncodeDER is c as a signed X.509 DER certificate — asSignedDer
-// (Certificate.ts:174-182 at b25ed960): the TBSCertificate rebuilt from
+// (Certificate.ts:174-182 at db91886c): the TBSCertificate rebuilt from
 // the fields ([TBSToDER] without a kept TBSDER), the ecdsa-with-SHA256
 // algorithm and the signature as a DER ECDSA-Sig-Value; refused over 600
 // bytes.
@@ -362,7 +362,7 @@ func derDate(v asn1.RawValue) (uint64, error) {
 		return 0, fmt.Errorf("%w: date %v before the Matter epoch", ErrMalformed, t)
 	}
 	// The TLV form carries notBefore/notAfter as TlvUInt32
-	// (operational.ts:138-139 at b25ed960).
+	// (operational.ts:138-139 at db91886c).
 	if secs > math.MaxUint32 {
 		return 0, fmt.Errorf("%w: date %v exceeds 32 bits of Matter epoch seconds", ErrMalformed, t)
 	}
@@ -473,7 +473,7 @@ func derExtension(ext *CertificateExtensions, tag uint8, value []byte) error {
 		// Certificate.ts:400-406, called at :505-509 at db021da0): a
 		// negative INTEGER is its two's-complement bytes, never absent.
 		// The TLV form carries pathLen as TlvUInt8 (operational.ts:42 at
-		// b25ed960); a wider one is refused, not cut to its low byte.
+		// db91886c); a wider one is refused, not cut to its low byte.
 		if len(bc.PathLen.FullBytes) > 0 && bc.PathLen.Class == asn1.ClassUniversal && bc.PathLen.Tag == asn1.TagInteger {
 			if len(bc.PathLen.Bytes) == 0 {
 				return fmt.Errorf("%w: basic-constraints: pathLenConstraint is an INTEGER without content", ErrMalformed)
@@ -544,7 +544,7 @@ func derExtension(ext *CertificateExtensions, tag uint8, value []byte) error {
 // derECDSASignature reads the certificate's signature BIT STRING, a DER
 // ECDSA-Sig-Value, as the 64-byte r‖s the TLV carries.
 //
-// Mirrors matter.js EcdsaSignature (EcdsaSignature.ts:28-29 at b25ed960):
+// Mirrors matter.js EcdsaSignature (EcdsaSignature.ts:28-29 at db91886c):
 // r and s each through DerCodec.decodeBigUint(…, 32) (DerCodec.ts:288-318),
 // which takes the INTEGER's content bytes as they are — 32 of them, 33 with
 // a leading zero, fewer padded to 32 — and refuses anything wider ("Encoded
@@ -571,7 +571,7 @@ func derECDSASignature(v asn1.RawValue) ([]byte, error) {
 }
 
 // derSignatureInteger is DerCodec.decodeBigUint(value, 32) (DerCodec.ts:
-// 288-318 at b25ed960) for one ECDSA-Sig-Value component.
+// 288-318 at db91886c) for one ECDSA-Sig-Value component.
 func derSignatureInteger(v asn1.RawValue, name string) ([]byte, error) {
 	if v.Class != asn1.ClassUniversal || v.Tag != asn1.TagInteger || v.IsCompound {
 		return nil, fmt.Errorf("%w: signature is not an ECDSA-Sig-Value: %s is not an INTEGER", ErrMalformed, name)

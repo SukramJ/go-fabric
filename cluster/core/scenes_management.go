@@ -266,7 +266,7 @@ func LoadScenesState(data []byte, persist func([]byte)) (*ScenesState, error) {
 // the bound counted UTF-16 units can be longer. What it drops or cuts is
 // logged (review II, R2-P6-store-1212). The cut mirrors matter.js
 // packages/node/src/behavior/state/managed/Datasource.ts:124-163 at
-// b25ed960 (shortenStoredStrings, Bytes.truncateUtf8 at load, #4995).
+// db91886c (shortenStoredStrings, Bytes.truncateUtf8 at load, #4995).
 func (st *ScenesState) validTable(table []SceneEntry) []SceneEntry {
 	type key struct {
 		f uint8
@@ -1148,7 +1148,7 @@ func (s *ScenesManagement) addScene(ctx context.Context, fabric uint8, req AddSc
 	// A SceneName over 16 bytes in UTF-8 is refused with the SceneID and
 	// TransitionTime bounds. Mirrors matter.js
 	// packages/node/src/behaviors/scenes-management/ScenesManagementServer.ts:292
-	// at b25ed960 (`Bytes.utf8Length(sceneName) > 16`, CONSTRAINT_ERROR with
+	// at db91886c (`Bytes.utf8Length(sceneName) > 16`, CONSTRAINT_ERROR with
 	// the scene id, #4995), as connectedhomeip refuses it
 	// (src/app/clusters/scenes-server/ScenesManagementCluster.cpp:535-541
 	// at 6170af84); it used to be cut to 16 and stored with SUCCESS.

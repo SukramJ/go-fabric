@@ -513,7 +513,7 @@ func (g *GeneralCommissioning) SetFailSafeAttemptTracker(fn func(ctx context.Con
 // start ([GeneralCommissioning.SetFailSafeAttemptTracker]) — under g.mu, so
 // the start is recorded before any end of this context can run (matter.js
 // packages/protocol/src/protocol/DeviceCommissioner.ts:156-176 at
-// b25ed960, beginTimed, which GeneralCommissioningServer.ts:101-113 calls
+// db91886c, beginTimed, which GeneralCommissioningServer.ts:101-113 calls
 // only where it creates a new fail-safe context). Caller holds g.mu.
 func (g *GeneralCommissioning) setArmFabricLocked(ctx context.Context, fabric uint8, fresh bool) {
 	g.failSafeFabricIndex = fabric
@@ -569,7 +569,7 @@ func (g *GeneralCommissioning) failSafeExpiryHooksLocked(e FailSafeExpiry) expir
 // SetOnCommissioned wires what ends the commissioning window after a
 // successful CommissioningComplete — matter.js DeviceCommissioner listens on
 // failsafeContext.commissioned and calls endCommissioning
-// (DeviceCommissioner.ts:164 at b25ed960). The bridge wires it to its
+// (DeviceCommissioner.ts:164 at db91886c). The bridge wires it to its
 // CommissioningWindow; it fires after the host's OnCommissioningComplete
 // hook. Pass nil to detach.
 func (g *GeneralCommissioning) SetOnCommissioned(fn func()) {
@@ -1481,7 +1481,7 @@ func (g *GeneralCommissioning) armFailSafeFor(ctx context.Context, seconds uint3
 	}
 	// An arm for a session leaves a fail-safe another fabric armed alone,
 	// in the same lock hold as its check (matter.js extend refuses another
-	// fabric, FailsafeTimer.ts:53-57 at b25ed960; review II,
+	// fabric, FailsafeTimer.ts:53-57 at db91886c; review II,
 	// R2-P2-comm-08).
 	if forSession && g.failSafeArmed && g.failSafeFabricIndex != fabricIndex {
 		return nil

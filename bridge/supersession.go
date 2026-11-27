@@ -102,7 +102,7 @@ func (b *Bridge) sessionLive(sessionID uint16) bool {
 // A newerID the session lookup still holds is judged: it takes nothing when
 // it is a PASE session, resolves to no fabric, or resolves to subject node
 // 0 — matter.js supersedes only with a CASE session of the same peer
-// (packages/protocol/src/session/SessionManager.ts:1242-1250 at b25ed960:
+// (packages/protocol/src/session/SessionManager.ts:1242-1250 at db91886c:
 // !newer.isPase && newer.peerIs(older.peerAddress)), and a PASE session
 // the node facade adopted onto a fabric keeps peer node 0. Only what the bridge
 // cannot judge passes: a newerID the lookup no longer holds (what moves
@@ -210,7 +210,7 @@ func (b *Bridge) followMovedSessionLocked(m *subscription.Manager, subID uint32)
 	}
 	b.routing.subTargets.Store(subID, b.supersededTarget(target, current))
 	// Failures on the former session say nothing about the new one
-	// (matter.js ServerSubscription.ts:830-831 at b25ed960).
+	// (matter.js ServerSubscription.ts:830-831 at db91886c).
 	b.subSendErrorCount.Delete(subID)
 	return true
 }
@@ -220,7 +220,7 @@ func (b *Bridge) followMovedSessionLocked(m *subscription.Manager, subID uint32)
 // neither the bridge's count nor the subscription's — and the subscription
 // engine resends it at once on the session sub reports on now
 // ([subscription.Subscription.RequeueAbortedAttributes]). Mirrors matter.js
-// packages/node/src/node/server/ServerSubscription.ts:569-577 at b25ed960
+// packages/node/src/node/server/ServerSubscription.ts:569-577 at db91886c
 // (#requeueUpdate, #sendNextUpdateImmediately, no #sendUpdateErrorCounter).
 func (b *Bridge) requeueLeftSession(sub *subscription.Subscription, owed *owedReport, op string, err error) {
 	if b.logger != nil {
@@ -235,7 +235,7 @@ func (b *Bridge) requeueLeftSession(sub *subscription.Subscription, owed *owedRe
 // session one of its reports went out on, since that report was sent: a
 // failure there says nothing about the session the subscription reports
 // on now. Mirrors matter.js
-// packages/node/src/node/server/ServerSubscription.ts:569-577 at b25ed960
+// packages/node/src/node/server/ServerSubscription.ts:569-577 at db91886c
 // (sentOn !== this.session).
 func (b *Bridge) leftSession(subID uint32, sessionID uint16) bool {
 	raw, ok := b.routing.subTargets.Load(subID)

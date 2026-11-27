@@ -16,7 +16,7 @@ programs (MatterScheduleConfiguration) add a second port, the
 | LocalTemperatureNotExposed (LTNE) | yes | |
 | Occupancy (OCC) | yes | the host reports occupancy with `SetOccupied` |
 | Presets (PRES) | yes | presets and the atomic write, persisted through a `PresetStore` |
-| MatterScheduleConfiguration (MSCH) | yes | matter.js's, behind its forward feature; here behind the extension `BD-chip-Thermostat-Schedules`; see [Week programs](#week-programs-msch) |
+| MatterScheduleConfiguration (MSCH) | yes | matter.js's; see [Week programs](#week-programs-msch) |
 | ScheduleConfiguration, Setback | no | deprecated; matter.js refuses them |
 | Events (TEVT) | yes | ahead of matter.js, after connectedhomeip; see [Events](#events-tevt) |
 | ThermostatSuggestions | no | |
@@ -44,13 +44,16 @@ it.
 
 ## Week programs (MSCH)
 
-matter.js implements MatterScheduleConfiguration behind its forward
-feature `thermostat-msch` (`ThermostatServer.ts:267-271` at `b25ed960`).
+matter.js implements MatterScheduleConfiguration and released it in
+#5044 (the forward feature `thermostat-msch` is gone at `db91886c`).
 This server mirrors it — the write rules, the normalisation, the commit
-checks and the ScheduleTypes start checks — and serves it behind the
-extension `BD-chip-Thermostat-Schedules`, off by default
-(`surface.Policies.Extensions`; the reference bridge's
-`--thermostat-schedules`).
+checks and the ScheduleTypes start checks — and serves it when the host
+declares the feature; no extension is needed. The former extension
+`BD-chip-Thermostat-Schedules` is retired: `surface.Policies.Extensions`
+still accepts it for the deprecation window, and it selects nothing
+(`surface.RetiredExtensions`). The reference bridge serves MSCH on its
+demo thermostat with `--thermostat-schedules`, off by default (see
+*Ecosystems* below).
 
 **Configuration.** `ThermostatConfig`, or the declaration's `Initial`
 under the attribute names, holds:
@@ -119,15 +122,15 @@ With the Events feature (TEVT), `SetActiveScheduleRequest` emits
 ## Events (TEVT)
 
 The server follows matter.js, which emits all eight events behind its
-forward feature `thermostat-events` (`ThermostatServer.ts:2082-2259` at
-`b25ed960`): every event needs TEVT, and the EventList carries the events
+forward feature `thermostat-events` (`ThermostatServer.ts:2074-2251` at
+`db91886c`): every event needs TEVT, and the EventList carries the events
 of the selection (LocalTemperatureChange without LTNE, OccupancyChange
 with OCC, RunningModeChange with AUTO, ActiveScheduleChange with MSCH,
 ActivePresetChange with PRES). An event goes out after its change
 committed, and none for a value that did not change. Unlike matter.js,
 where the application enables each event, TEVT selects every event its
-conformance admits (`notes/parity/by_design.md`, the events paragraph of
-`BD-chip-Thermostat-Schedules`).
+conformance admits (`notes/parity/by_design.md`,
+`BD-chip-Thermostat-Events`).
 
 | Event | Emitted when | Payload |
 | --- | --- | --- |

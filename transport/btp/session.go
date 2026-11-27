@@ -91,7 +91,7 @@ type outgoing struct {
 }
 
 // Session is one BTP session — matter.js BtpSessionHandler
-// (packages/protocol/src/ble/BtpSessionHandler.ts:31-715) at b25ed960. It
+// (packages/protocol/src/ble/BtpSessionHandler.ts:31-715) at db91886c. It
 // is safe for concurrent use.
 type Session struct {
 	role         Role
@@ -214,7 +214,7 @@ func NewPeripheral(maxDataSize int, handshakeRequest []byte, cb Callbacks, opts 
 	// VerifyOrReturnError(req.mWindowSize > 0, CHIP_ERROR_INVALID_ARGUMENT),
 	// after which Receive releases the connection, :1162-1169, :1294-1297).
 	// matter.js answers it with window 0
-	// (packages/protocol/src/ble/BtpSessionHandler.ts:123 at b25ed960); a
+	// (packages/protocol/src/ble/BtpSessionHandler.ts:123 at db91886c); a
 	// peer that can never be sent a packet is no session (owner decision
 	// 2026-11-13, by_design).
 	if req.ClientWindowSize == 0 {
@@ -256,7 +256,7 @@ func NewCentral(handshakeResponse []byte, cb Callbacks, requestedSegmentSize int
 	// 6170af84, VerifyOrReturnError(resp.mWindowSize > 0,
 	// CHIP_ERROR_INVALID_ARGUMENT), which closes the end point, :1151-1152,
 	// :1294-1297); matter.js hands the value to the session unchecked
-	// (BtpSessionHandler.ts:180-191 at b25ed960).
+	// (BtpSessionHandler.ts:180-191 at db91886c).
 	if resp.WindowSize == 0 {
 		return nil, protocolError("BTP handshake response states a window size of 0")
 	}
@@ -335,7 +335,7 @@ func (s *Session) OnStall(f func(replay [][]byte)) {
 
 // Stalled reports whether the session was suspended by its stall report.
 // matter.js suspends and emits in one synchronous step
-// (BtpSessionHandler.ts:657-658 at b25ed960); here the observer runs
+// (BtpSessionHandler.ts:657-658 at db91886c); here the observer runs
 // after the lock is released, so a transport whose Send met the inactive
 // session in between asks this and waits for the renegotiation the
 // report starts.
@@ -422,7 +422,7 @@ func (s *Session) handleIncomingLocked(data []byte) error {
 		// while nothing is outstanding — connectedhomeip
 		// src/ble/BtpEngine.cpp:142-162 (IsValidAck) and :169
 		// (BLE_ERROR_INVALID_ACK) at 6170af84, where matter.js accepts
-		// the repeated one (BtpSessionHandler.ts:287-304 at b25ed960;
+		// the repeated one (BtpSessionHandler.ts:287-304 at db91886c;
 		// review II, R2-P3-ble-03).
 		ack := int(*p.AckNumber)
 		outstanding := modularDistance(s.prevIncomingAck, s.seq)

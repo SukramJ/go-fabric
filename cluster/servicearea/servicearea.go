@@ -393,7 +393,7 @@ func (s *Server) checkAreas(areas []Area) error {
 		// requires ("mapID SHALL be the ID of an entry from the
 		// SupportedMaps attribute", ServiceAreaCluster.cpp:506-512 at
 		// 6170af84); matter.js judges null or not null only
-		// (ServiceAreaServer.ts:137-143 at b25ed960; R2-P6-fsm-1593).
+		// (ServiceAreaServer.ts:137-143 at db91886c; R2-P6-fsm-1593).
 		for _, a := range areas {
 			if !s.mapHeld(a.MapId.Value) {
 				return invalid("Area %d's MapID %d is not in the supported maps list", a.AreaId, a.MapId.Value)
@@ -892,7 +892,7 @@ func (s *Server) report(changed []uint32) {
 // removed map (ServiceAreaCluster.cpp:970-995 at 6170af84), so no area
 // names a map that is gone (R2-P6-fsm-1593). matter.js removes the first
 // one only (removeSupportedMapsEntry, ServiceAreaServer.ts:276-289 at
-// b25ed960).
+// db91886c).
 func (s *Server) RemoveSupportedMapsEntry(mapID uint32) {
 	s.mu.Lock()
 	idx := slices.IndexFunc(s.maps, func(m Map) bool { return m.MapId == mapID })
@@ -924,5 +924,5 @@ var _ sa.Host = (*Server)(nil)
 // EstimatedEndTime throttle's deferred report ([cluster.Quieter.Stop]), the
 // one timer the server runs, so it does not report after the bridge let
 // the server go. matter.js stops a behaviour's timers on dispose
-// (SwitchServer.ts:379-384 at b25ed960 is the pattern; W3-club2-02).
+// (SwitchServer.ts:379-384 at db91886c is the pattern; W3-club2-02).
 func (s *Server) MatterQuiesce() { s.quiet.Stop() }

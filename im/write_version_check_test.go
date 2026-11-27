@@ -76,7 +76,7 @@ func TestWriteTransactionRelease(t *testing.T) {
 
 // TestWriteRequestSuppressResponseType: a SuppressResponse that is not a
 // boolean fails the decode, and the request is answered
-// (SuppressResponseTest.ts:399-403 at b25ed960, UNREADABLE_SUPPRESS_RESPONSE).
+// (SuppressResponseTest.ts:399-403 at db91886c, UNREADABLE_SUPPRESS_RESPONSE).
 func TestWriteRequestSuppressResponseType(t *testing.T) {
 	t.Parallel()
 	enc := tlv.NewEncoder()
@@ -134,7 +134,7 @@ func TestWriteRequestDecodeRefusals(t *testing.T) {
 		}, 2, true},
 		{"a field it does not know", func(enc *tlv.Encoder) {
 			enc.StartStruct(tlv.AnonymousTag())
-			enc.PutBool(tlv.ContextTag(1), false) // TimedRequest and WriteRequests are mandatory
+			enc.PutBool(tlv.ContextTag(1), false) // TimedRequest
 			enc.StartArray(tlv.ContextTag(2))
 			_ = enc.EndContainer()
 			enc.StartStruct(tlv.ContextTag(9))

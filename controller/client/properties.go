@@ -52,7 +52,7 @@ type Properties struct {
 
 // Medium is the part of the properties a peer's network profile is
 // selected by (client/peer.NetworkProfiles.ForPeer, NetworkProfile.ts:184-221
-// at b25ed960).
+// at db91886c).
 func (p Properties) Medium() peer.Medium {
 	m := peer.Medium{
 		SupportsThread: p.SupportsThread, SupportsWifi: p.SupportsWifi, SupportsEthernet: p.SupportsEthernet,
@@ -366,7 +366,7 @@ func intervalBounds(p Properties, reqFloor, reqCeiling *time.Duration, rand func
 		deviceCeiling = ceilingWifi
 	}
 	// Mirrors matter.js packages/protocol/src/peer/PhysicalDeviceProperties.ts:138-140
-	// at b25ed960 (subscriptionIntervalBoundsFor, isIcdCeiling): an ICD's
+	// at db91886c (subscriptionIntervalBoundsFor, isIcdCeiling): an ICD's
 	// IdleModeDuration below the device ceiling would only let it report more
 	// often, so it gets the device ceiling instead.
 	isICDCeiling := p.IntermittentlyConnected && p.IdleModeDuration != nil && *p.IdleModeDuration >= deviceCeiling

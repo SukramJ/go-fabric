@@ -112,21 +112,88 @@ func DataVersionFilterSize(f DataVersionFilter) int {
 	return len(b)
 }
 
-// MarshalTLV encodes w as a client sends it. Mirrors matter.js
-// packages/types/src/protocol/messages/TlvWriteRequest.ts:16-27 at
-// db021da0 with the request action/request/Write.ts:49-191 builds:
-// SuppressResponse (0) only when set, TimedRequest (1), WriteRequests (2)
+// MarshalTLV encodes w as a client sends it: [WriteRequest.MarshalTLVWith]
+// with the zero [RequestEncoding], every flag written.
+func (w WriteRequest) MarshalTLV(enc *tlv.Encoder, valueWriter AttributeValueWriter) {
+	w.MarshalTLVWith(enc, valueWriter, RequestEncoding{})
+}
+
+// RequestEncoding is how a client's Invoke or Write request flags go on
+// the wire. It is an encoder argument, not a field of [InvokeRequest] or
+// [WriteRequest]: those structs are shared with the server's decoders, and
+// matter.js keeps the option off the server's request types too (it lives
+// on the client's request options,
+// packages/protocol/src/action/client/RequestFlagsOptions.ts:10-22 at
+// db91886c).
+type RequestEncoding struct {
+	// OmitFalseFlags leaves out a SuppressResponse and a TimedRequest that
+	// are false; a true flag is written. Mirrors the copy
+	// InteractionClientMessenger.requestFlagsForSending returns when it
+	// omits (packages/protocol/src/interaction/InteractionMessenger.ts:1587-1611
+	// at db91886c, the copy :1603-1610). MoreChunkedMessages and InteractionModelRevision are
+	// untouched. Whether to omit is the sender's decision
+	// ([RequestFlagsForSending]), not the encoder's.
+	OmitFalseFlags bool
+}
+
+// FalseRequestFlagsOmittedFromRevision is the Interaction Model revision
+// from which a sender leaves out a SuppressResponse or TimedRequest that is
+// false — matter.js
+// InteractionClientMessenger.FALSE_REQUEST_FLAGS_OMITTED_FROM_REVISION
+// (packages/protocol/src/interaction/InteractionMessenger.ts:1569 at
+// db91886c).
+const FalseRequestFlagsOmittedFromRevision = 14
+
+// RequestFlagsForSending is the sender's rule for the flags of an Invoke
+// or Write request: a false flag is left out when omitFalseFlags is set
+// (the caller forces it), or when this module's revision
+// [MatterInteractionModelRevision] and the peer's revision peerRevision
+// are both at least [FalseRequestFlagsOmittedFromRevision] and the request
+// is not a group request (a group's members' revisions are unknown, so a
+// group request keeps both flags unless forced). Otherwise the flags go as
+// given. Every client sender of an Invoke or Write takes its
+// [RequestEncoding] from here — client/interaction for unicast, groups for
+// group requests — the Write before it is chunked, so chunk sizes and sent
+// bytes agree. One sender does not yet: the OTA requestor's invokes
+// (bridge.PeerSession.Invoke, bridge/ota_provider_link.go) write the zero
+// encoding, equal on the wire
+// while this module's revision is below 14, and must take the rule when
+// the revision is raised (TestRequestFlagsForSendingParityMatterJS fails
+// then). Mirrors matter.js InteractionClientMessenger.requestFlagsForSending
+// (packages/protocol/src/interaction/InteractionMessenger.ts:1587-1611 at
+// db91886c, the rule :1594-1598), whose own revision is a defaulted
+// parameter only tests set (:1592). With this module's revision (12) only
+// omitFalseFlags omits.
+func RequestFlagsForSending(omitFalseFlags, group bool, peerRevision uint16) RequestEncoding {
+	return requestFlagsForSending(omitFalseFlags, group, peerRevision, uint16(MatterInteractionModelRevision))
+}
+
+// requestFlagsForSending is [RequestFlagsForSending] at the revision own,
+// the seam of the parity rows.
+func requestFlagsForSending(omitFalseFlags, group bool, peer, own uint16) RequestEncoding {
+	return RequestEncoding{OmitFalseFlags: omitFalseFlags ||
+		(own >= FalseRequestFlagsOmittedFromRevision && !group && peer >= FalseRequestFlagsOmittedFromRevision)}
+}
+
+// MarshalTLVWith encodes w as a client sends it, its flags as how says.
+// Mirrors matter.js
+// packages/types/src/protocol/messages/TlvWriteRequest.ts:16-35 at
+// db91886c with the request action/request/Write.ts:51-198 at db91886c builds:
+// SuppressResponse (0) only when set, TimedRequest (1) unless how omits
+// it as false, WriteRequests (2)
 // of AttributeDataIB — DataVersion (0) when set, Path (1), Data (2)
 // through valueWriter (the attribute's own TLV schema, Write.ts:165-186
-// at db021da0) — MoreChunkedMessages (3),
-// which the request builder defaults to false (Write.ts:83), and
+// at db021da0) — MoreChunkedMessages (3), always written, false
+// when no chunk follows (Write.ts:86-88 at db91886c), and
 // InteractionModelRevision (0xFF).
-func (w WriteRequest) MarshalTLV(enc *tlv.Encoder, valueWriter AttributeValueWriter) {
+func (w WriteRequest) MarshalTLVWith(enc *tlv.Encoder, valueWriter AttributeValueWriter, how RequestEncoding) {
 	enc.StartStruct(tlv.AnonymousTag())
 	if w.SuppressResponse {
 		enc.PutBool(tlv.ContextTag(tagWriteReqSuppressResponse), true)
 	}
-	enc.PutBool(tlv.ContextTag(tagWriteReqTimedRequest), w.TimedRequest)
+	if w.TimedRequest || !how.OmitFalseFlags {
+		enc.PutBool(tlv.ContextTag(tagWriteReqTimedRequest), w.TimedRequest)
+	}
 	enc.StartArray(tlv.ContextTag(tagWriteReqWriteRequests))
 	for _, a := range w.Writes {
 		enc.StartStruct(tlv.AnonymousTag())
@@ -228,7 +295,7 @@ func UnmarshalWriteResponseTLV(dec *tlv.Decoder) (WriteResponse, error) {
 // readAttributeStatusFields reads an AttributeStatusIB after its opener,
 // with its path's EnableTagCompression flag.
 // Its path and its status are mandatory (matter.js TlvAttributeStatus.ts:
-// 16-17 at b25ed960, both TlvField; review II, R2-P1-req2-09).
+// 16-17 at db91886c, both TlvField; review II, R2-P1-req2-09).
 func readAttributeStatusFields(dec *tlv.Decoder) (st AttributeStatus, compressed bool, err error) {
 	sawPath, sawStatus := false, false
 	for {
@@ -361,7 +428,7 @@ type EventDataReader func(path ConcreteEventPath, el tlv.Element, dec *tlv.Decod
 
 // UnmarshalReportDataTLV decodes a ReportDataMessage as a client receives
 // it — matter.js packages/types/src/protocol/messages/TlvDataReport.ts:17-31
-// at b25ed960: SubscriptionId (0), AttributeReports (1), EventReports (2),
+// at db91886c: SubscriptionId (0), AttributeReports (1), EventReports (2),
 // MoreChunkedMessages (3), SuppressResponse (4). An AttributeReportIB is
 // a status (AttributeStatusIB) or data (AttributeDataIB: DataVersion (0,
 // optional), Path (1), Data (2), the value read through valueReader); an

@@ -452,68 +452,80 @@ func (g *generator) resolve(v *value, anonName string) (typeInfo, error) {
 		t.goType = "[]" + elem.goType()
 		return t, nil
 	case "object":
-		if d := g.lookupDatatype(v.Type); d == nil && v.Type != "struct" {
-			// A struct another cluster declares ("ContentLauncher.AdditionalInfoStruct")
-			// is declared here under its own name, as matter.js's model
-			// resolves the reference into the other cluster's datatype
-			// (channel.element.ts ExternalIdList at 0ceb202d).
-			if xd := g.crossClusterStruct(v.Type); xd != nil {
-				di, err := g.declare(xd)
-				if err != nil {
-					return t, err
-				}
-				t.kind, t.goType, t.dt = kindStruct, di.goName, di
-				return t, nil
+		return g.resolveObject(v, anonName, t)
+	case "enum", "bitmap", "integer":
+		return g.resolveInteger(v, t)
+	}
+	return t, fmt.Errorf("unsupported metatype %q", v.Metatype)
+}
+
+// resolveObject maps an object value: a struct this or another cluster
+// declares, or an anonymous struct stated inline under anonName.
+func (g *generator) resolveObject(v *value, anonName string, t typeInfo) (typeInfo, error) {
+	if d := g.lookupDatatype(v.Type); d == nil && v.Type != "struct" {
+		// A struct another cluster declares ("ContentLauncher.AdditionalInfoStruct")
+		// is declared here under its own name, as matter.js's model
+		// resolves the reference into the other cluster's datatype
+		// (channel.element.ts ExternalIdList at 0ceb202d).
+		if xd := g.crossClusterStruct(v.Type); xd != nil {
+			di, err := g.declare(xd)
+			if err != nil {
+				return t, err
 			}
+			t.kind, t.goType, t.dt = kindStruct, di.goName, di
+			return t, nil
 		}
-		if d := g.lookupDatatype(v.Type); d != nil && v.Type != "struct" {
+	}
+	if d := g.lookupDatatype(v.Type); d != nil && v.Type != "struct" {
+		di, err := g.declare(d)
+		if err != nil {
+			return t, err
+		}
+		if di != nil {
+			t.kind, t.goType, t.dt = kindStruct, di.goName, di
+			return t, nil
+		}
+	}
+	// An anonymous struct stated inline.
+	if err := g.claim(anonName, "anonymous struct"); err != nil {
+		return t, err
+	}
+	fields, err := g.fields(v.Fields, anonName)
+	if err != nil {
+		return t, err
+	}
+	di := &dataInfo{dt: &datatype{Name: v.Type, Metatype: "object"}, goName: anonName, kind: kindStruct, fields: fields}
+	g.anon = append(g.anon, &payload{goName: anonName, what: anonName, fields: fields})
+	t.kind, t.goType, t.dt = kindStruct, anonName, di
+	return t, nil
+}
+
+// resolveInteger maps an enum, bitmap or integer value: a declared enum or
+// bitmap datatype, else the plain integer of the primitive's width.
+func (g *generator) resolveInteger(v *value, t typeInfo) (typeInfo, error) {
+	bits := primitiveBits(v.Primitive)
+	if bits == 0 {
+		return t, fmt.Errorf("no integer width for primitive %q", v.Primitive)
+	}
+	t.bits = bits
+	if v.Metatype != "integer" {
+		if d := g.lookupDatatype(v.Type); d != nil {
 			di, err := g.declare(d)
 			if err != nil {
 				return t, err
 			}
 			if di != nil {
-				t.kind, t.goType, t.dt = kindStruct, di.goName, di
+				t.kind, t.goType, t.dt = di.kind, di.goName, di
 				return t, nil
 			}
 		}
-		// An anonymous struct stated inline.
-		if err := g.claim(anonName, "anonymous struct"); err != nil {
-			return t, err
-		}
-		fields, err := g.fields(v.Fields, anonName)
-		if err != nil {
-			return t, err
-		}
-		di := &dataInfo{dt: &datatype{Name: v.Type, Metatype: "object"}, goName: anonName, kind: kindStruct, fields: fields}
-		g.anon = append(g.anon, &payload{goName: anonName, what: anonName, fields: fields})
-		t.kind, t.goType, t.dt = kindStruct, anonName, di
-		return t, nil
-	case "enum", "bitmap", "integer":
-		bits := primitiveBits(v.Primitive)
-		if bits == 0 {
-			return t, fmt.Errorf("no integer width for primitive %q", v.Primitive)
-		}
-		t.bits = bits
-		if v.Metatype != "integer" {
-			if d := g.lookupDatatype(v.Type); d != nil {
-				di, err := g.declare(d)
-				if err != nil {
-					return t, err
-				}
-				if di != nil {
-					t.kind, t.goType, t.dt = di.kind, di.goName, di
-					return t, nil
-				}
-			}
-		}
-		if strings.HasPrefix(v.Primitive, "int") {
-			t.kind, t.goType = kindInt, goInt(bits, true)
-		} else {
-			t.kind, t.goType = kindUint, goInt(bits, false)
-		}
-		return t, nil
 	}
-	return t, fmt.Errorf("unsupported metatype %q", v.Metatype)
+	if strings.HasPrefix(v.Primitive, "int") {
+		t.kind, t.goType = kindInt, goInt(bits, true)
+	} else {
+		t.kind, t.goType = kindUint, goInt(bits, false)
+	}
+	return t, nil
 }
 
 // goType is the Go type of the field, nullable wrapping included.
@@ -1798,7 +1810,7 @@ func referenceOf(raw json.RawMessage) string {
 // string default on an untyped element is no numeric type and stays as
 // it was: DoorLock SecurityLevel's "0", a string in matter.js
 // packages/model/src/standard/elements/door-lock-cluster.element.ts:123
-// at b25ed960.
+// at db91886c.
 func typedDefault(t typeInfo, v *value) string {
 	if numericKinds[t.kind] && bytes.HasPrefix(bytes.TrimSpace(v.Default), []byte(`"`)) {
 		panic(renderError{fmt.Errorf("default %s on numeric type %q: a string where a number is due, as the extractor writes a bigint", compactJSON(v.Default), t.name)})
@@ -1815,7 +1827,7 @@ var numericKinds = map[kind]bool{
 // spec.NullDefault, and a temperature or percentage stated with its unit
 // ({"type":"celsius","value":26}) in the encoding units of the type that
 // carries it, as matter.js restates it (packages/model/src/logic/
-// DefaultValue.ts:37-59 castValue → EncodedValue.ts:21-43 at b25ed960; the
+// DefaultValue.ts:37-59 castValue → EncodedValue.ts:21-43 at db91886c; the
 // scale per type name is FieldValue.ts:227-256 numericValue); the empty
 // list as spec.EmptyListDefault; a reference, an octet string or a
 // non-empty list as spec.UnresolvedDefault. It returns "" only when no
@@ -1830,7 +1842,7 @@ var numericKinds = map[kind]bool{
 // (R2-P6-par-2703, wizard-6b §2 gen Q1). "none" is matter.js's "no
 // default" — FieldValue.cast answers undefined for it, so an override
 // can remove a default the specification states (FieldValue.ts:458-462 at
-// b25ed960; Fable fable-read-6b-gen) — and its rendering is then no
+// db91886c; Fable fable-read-6b-gen) — and its rendering is then no
 // default (""); none occurs at the pin, so it is refused until one does
 // and that rendering is decided with it.
 func defaultLiteral(raw json.RawMessage, typeName, metatype string) string {
@@ -1885,7 +1897,7 @@ func compactJSON(raw json.RawMessage) string {
 
 // encodedUnit is a celsius or percent field value in the encoding units of
 // typeName — matter.js FieldValue.numericValue (FieldValue.ts:227-256 at
-// b25ed960) — rounded to the unit an integer encoding counts
+// db91886c) — rounded to the unit an integer encoding counts
 // (EncodedValue.ts:27-40).
 func encodedUnit(fv map[string]any, typeName, metatype string) (float64, bool) {
 	value, ok := fv["value"].(float64)
@@ -2346,17 +2358,19 @@ func sortedClusterNames(s *snapshot) []string {
 // structDefault is the default of a struct-typed element that states none
 // of its own, built from the defaults its fields state. matter.js builds an
 // object's default from every conformant child that has one
-// (packages/model/src/logic/DefaultValue.ts:153-179 at b25ed960, reached
-// through ClusterDerivation.ts:144 and SelectDefaultValue.ts:144); for
-// OperationalError, whose ErrorStateStruct.ErrorStateId has `default: 0`
+// (packages/model/src/logic/DefaultValue.ts:153-179 at db91886c, reached
+// through ClusterDerivation.ts:178 and SelectDefaultValue.ts:143, the
+// DefaultValue call :155); for OperationalError, whose
+// ErrorStateStruct.ErrorStateId has `default: 0`
 // (operational-state.element.ts:110-111), that is {errorStateId: 0}. This
 // generator narrows it: the literal is the generated struct with each
 // mandatory, non-nullable field whose stated default is a number, a bool or
 // a string set to it; empty when the type is no struct or no such field
-// states a default. matter.js's wider rule also gives partial objects to
-// four nullable attributes (CommodityTariff CurrentDayEntry/NextDayEntry,
-// DeviceEnergyManagement Forecast, CommodityPrice CurrentPrice) that this
-// generator leaves without a default.
+// states a default. A nullable struct or bitmap attribute without a stated
+// default is null in matter.js, not built from its fields
+// (SelectDefaultValue.ts:145-152); no nullable attribute of the snapshot
+// gets a struct default here either, so the narrowing differs from
+// matter.js for a non-nullable struct only.
 func structDefault(t typeInfo) string {
 	if t.kind != kindStruct || t.dt == nil {
 		return ""

@@ -187,8 +187,8 @@ func (s *Server) HandleEnd(fn func(ctx context.Context, req EndRequest) (struct{
 // SessionKey identifies a tracked session. The session id alone is
 // not unique: each provider node allocates its own, so two peers, or
 // one peer on two fabrics, may use the same id at the same time.
-// Mirrors matter.js WebRtcTransportRequestorServer.ts:189-196
-// (SessionKey) and :185-187 (isSameSession).
+// Mirrors matter.js WebRtcTransportRequestorServer.ts:408
+// (SessionKey) and :397-399 (isSameSession).
 type SessionKey struct {
 	ID          uint16
 	FabricIndex uint8

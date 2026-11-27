@@ -59,7 +59,7 @@ type RebootArmerContext struct {
 	// older one then survives the return; set
 	// ClosePeerSessionsRegisteredBefore, which cuts by registration order,
 	// as matter.js deprecates the Timestamp form (SessionManager.ts:719-721
-	// at b25ed960). Removable in v0.26.0.
+	// at db91886c). Removable in v0.26.0.
 	ClosePeerSessionsBefore func(peer exchange.PeerAddress, t time.Time)
 	// ClosePeerSessionsRegisteredBefore closes the peer's sessions that
 	// registered before keep — the dead pre-reboot ones — and keeps keep
@@ -97,7 +97,7 @@ type armState struct {
 	// reportedBeforeReturn are the sessions that carried a report before
 	// the return: a returning device may send its priming report before
 	// its announcing session is established (RebootResubscribeArmer.ts:33-37
-	// at b25ed960).
+	// at db91886c).
 	reportedBeforeReturn []ArmerSession
 	graceTimer           clock.Timer
 	returnTimer          clock.Timer
@@ -244,7 +244,7 @@ func (a *RebootResubscribeArmer) SessionAdded(s ArmerSession) {
 // registered after the announcing one is the return's as matter.js adds
 // it on registration (#onSessionRegistered), read here from
 // SessionsRegisteredSince when it reports. Mirrors matter.js
-// packages/protocol/src/peer/RebootResubscribeArmer.ts:179-193 at b25ed960
+// packages/protocol/src/peer/RebootResubscribeArmer.ts:179-193 at db91886c
 // (#onReportStarted).
 func (a *RebootResubscribeArmer) ReportStarted(s ArmerSession) {
 	peer := s.Peer()

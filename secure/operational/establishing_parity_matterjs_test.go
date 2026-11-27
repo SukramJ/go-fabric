@@ -3,7 +3,7 @@
 
 package operational
 
-// Ports of matter.js at b25ed960 for the CASE responder's establishing
+// Ports of matter.js at db91886c for the CASE responder's establishing
 // session on the device side (#4882; findings F-b25ed960-23): the
 // establishing cases of packages/protocol/test/session/SessionManagerTest.ts
 // (describe "session supersession", the rows without supersession, which is
@@ -138,7 +138,7 @@ func TestSessionManagerEstablishing(t *testing.T) {
 			t.Fatal("the session whose handshake failed is listed")
 		}
 		// sessions.deleted never fires for it: DeviceAdvertiser does not
-		// react (DeviceAdvertiser.ts:132-138 at b25ed960).
+		// react (DeviceAdvertiser.ts:132-138 at db91886c).
 		if reannounced != 0 {
 			t.Fatalf("the close of a session that never established reannounced %d times", reannounced)
 		}
@@ -173,7 +173,7 @@ func TestSessionManagerEstablishing(t *testing.T) {
 		}
 	})
 	// The per-peer cap runs when a session becomes established, not when it
-	// is registered (SessionManager.ts:757-769 at b25ed960).
+	// is registered (SessionManager.ts:757-769 at db91886c).
 	t.Run("evicts the least recently used session when an establishing session is established", func(t *testing.T) {
 		t.Parallel()
 		m, clk := newEstablishingManager(t)
@@ -219,7 +219,7 @@ func sessionViews(t *testing.T) (m *Manager, clk *clocktest.Fake, establishing, 
 }
 
 // TestSessionViews ports the device-side rows of SessionViewsTest.ts at
-// b25ed960 that this table answers: which consumer sees the establishing
+// db91886c that this table answers: which consumer sees the establishing
 // session, the established one or both.
 func TestSessionViews(t *testing.T) {
 	t.Parallel()

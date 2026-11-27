@@ -333,6 +333,10 @@ func TestInvokeBatcherParity(t *testing.T) {
 			{"requireExistingSession", interaction.InvokeOptions{ClientRequest: interaction.ClientRequest{RequireExistingSession: true}}},
 			// Go only: ResponseArrived has no matter.js counterpart (issue 464).
 			{"responseArrived", interaction.InvokeOptions{ResponseArrived: func(interaction.Result) {}}},
+			// ClientInvokeTest.ts:553 at db91886c (#5069): omitFalseFlags is a
+			// blocking key of isBatchable (ClientInteraction.ts:204-235, the
+			// key :223).
+			{"omitFalseFlags", interaction.InvokeOptions{OmitFalseFlags: true}},
 		}
 		for _, row := range rows {
 			t.Run(row.name, func(t *testing.T) {
@@ -358,6 +362,9 @@ func TestInvokeBatcherParity(t *testing.T) {
 					}
 					if want := row.opts.DelayReportData; want != nil && (req.DelayReportData == nil || *req.DelayReportData != *want) {
 						t.Fatalf("DelayReportData %+v on the wire, want %+v", req.DelayReportData, want)
+					}
+					if tags := icmTopTags(t, m.payload); row.opts.OmitFalseFlags && (slices.Contains(tags, 0) || slices.Contains(tags, 1)) {
+						t.Fatalf("InvokeRequest fields %v: a false flag was sent", tags)
 					}
 					if req.SuppressResponse {
 						s.ack(t, m)

@@ -39,7 +39,7 @@ func TestQRCode_RefusesWhatMatterJSRefuses(t *testing.T) {
 }
 
 // TestManualCode_RefusesTrivialPasscode: ManualPairingCodeSchema.validate
-// runs assertValidPasscode (PairingCodeSchema.ts:429-430 at b25ed960). The
+// runs assertValidPasscode (PairingCodeSchema.ts:429-430 at db91886c). The
 // layout itself is unchanged: the unchecked encoder still writes the
 // vector the code had before.
 func TestManualCode_RefusesTrivialPasscode(t *testing.T) {
@@ -53,7 +53,7 @@ func TestManualCode_RefusesTrivialPasscode(t *testing.T) {
 }
 
 // TestManualCodeLong: the 21-digit form of ManualPairingCodeSchema.encodeInternal
-// (PairingCodeSchema.ts:440-454 at b25ed960) — VID_PID_PRESENT in the first
+// (PairingCodeSchema.ts:440-454 at db91886c) — VID_PID_PRESENT in the first
 // digit, five digits each of vendor and product, then the Verhoeff digit —
 // read back by DecodeManualCode.
 func TestManualCodeLong(t *testing.T) {

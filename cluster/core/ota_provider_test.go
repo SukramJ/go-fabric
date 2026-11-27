@@ -349,11 +349,11 @@ func TestOTAProvider_DownloadToApply(t *testing.T) {
 		t.Fatalf("states %v, want %v", got, want)
 	}
 	if f.p.mgr.AttemptFor(otaTestPeer, *r.UpdateToken) != nil {
-		t.Fatal("Done left the attempt running (SoftwareUpdateManager.ts:1978-1979 at b25ed960)")
+		t.Fatal("Done left the attempt running (SoftwareUpdateManager.ts:1978-1979 at db91886c)")
 	}
 	// The token's attempt ended, so a second apply under it is an apply
 	// under an unknown token, allowed for a version above 0
-	// (SoftwareUpdateManager.ts:1912-1915 at b25ed960).
+	// (SoftwareUpdateManager.ts:1912-1915 at db91886c).
 	if a := f.apply(t, *r.UpdateToken, 2); a.Action != provdef.ApplyUpdateActionProceed {
 		t.Fatalf("a second apply after Done: %+v", a)
 	}
@@ -425,7 +425,7 @@ func TestOTAProvider_Consent(t *testing.T) {
 		{"requestor can consent", nil, true, provdef.StatusUpdateAvailable, 0},
 	} {
 		// The requestor that can consent obtains it with the delegation on
-		// (SoftwareUpdateManager.ts:638-647 at b25ed960).
+		// (SoftwareUpdateManager.ts:638-647 at db91886c).
 		f := newOTAFixture(t, func(c *OTAProviderConfig) { c.DelegateConsentToRequestor = tc.can })
 		f.p.cfg.Consent = tc.consent
 		f.src.img.ConsentRequired = true
@@ -447,7 +447,7 @@ func TestOTAProvider_Consent(t *testing.T) {
 		}
 		if tc.can {
 			// The requestor obtains the consent itself: the offer allows
-			// the apply (OtaUpdateAttempts.ts:81 at b25ed960).
+			// the apply (OtaUpdateAttempts.ts:81 at db91886c).
 			if a := f.apply(t, *r.UpdateToken, 2); a.Action != provdef.ApplyUpdateActionProceed {
 				t.Errorf("%s: apply %+v, want Proceed", tc.name, a)
 			}

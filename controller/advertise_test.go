@@ -17,7 +17,7 @@ import (
 
 // TestControllerAdvertisesItsCommissionerRecord: Config.Advertise
 // publishes the `_matterd._udp` record (matter.js
-// CommissionerMdnsAdvertisement.ts:20-71 at b25ed960) on the controller's
+// CommissionerMdnsAdvertisement.ts:20-71 at db91886c) on the controller's
 // port, the vendor defaulting to the fabric's, and Close withdraws it.
 func TestControllerAdvertisesItsCommissionerRecord(t *testing.T) {
 	t.Parallel()

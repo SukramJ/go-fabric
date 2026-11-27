@@ -69,7 +69,7 @@ func TestProductIDsOfReadsTheOIDsElseTheCommonName(t *testing.T) {
 
 // TestProductIDsAcceptMalformed: the cases of matter.js
 // AttestationCertificateProfileTest.ts describe "VendorID and ProductID in
-// the distinguished name" (:427-644 at b25ed960) that parse with
+// the distinguished name" (:427-644 at db91886c) that parse with
 // acceptMalformedVidPid, the option the device's read of its own DAC and
 // PAI sets (DeviceCertification.ts:116-120): a malformed or repeated
 // VendorID or ProductID reads as absent, still turns the commonName
@@ -133,10 +133,10 @@ func TestProductIDsAcceptMalformed(t *testing.T) {
 
 // TestValidateProductOverAMalformedVendorID: "starts a device whose own
 // DAC has a malformed VendorID" (AttestationCertificateProfileTest.ts
-// :610-624 at b25ed960) — the malformed VendorID is not judged, the
+// :610-624 at db91886c) — the malformed VendorID is not judged, the
 // ProductID still is; a malformed fallback prefix in the DAC's issuer
 // refuses the chain, as Dac.fromAsn1 reads the issuer too
-// (Certificate.ts:729 at b25ed960).
+// (Certificate.ts:729 at db91886c).
 func TestValidateProductOverAMalformedVendorID(t *testing.T) {
 	t.Parallel()
 	chain, err := BuildTestChain(0xfff1, 0x8000)

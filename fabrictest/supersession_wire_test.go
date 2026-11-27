@@ -20,7 +20,7 @@ import (
 
 // errDroppedOnController is the cause the controller drops its sessions
 // with — matter.js's dropSessionsOnController (ServerSubscriptionSessionTest.ts
-// at b25ed960), which closes them without telling the device.
+// at db91886c), which closes them without telling the device.
 var errDroppedOnController = errors.New("test: dropped on the controller")
 
 // dropSessionsOnController closes the controller's sessions with the
@@ -88,7 +88,7 @@ func newestListed(ctx context.Context, t *testing.T, site *fabrictest.Site, p *f
 }
 
 // TestServerSubscriptionSessionSupersessionOverTheWire ports by meaning, over
-// the site's wire, two cases of matter.js at b25ed960 where a subscription
+// the site's wire, two cases of matter.js at db91886c where a subscription
 // meets a newer CASE session of its subscriber: it moves onto it
 // (SessionManager.ts:750-769, ServerSubscription.ts:819-834) — and so
 // survives the eviction of the session it was set up on.

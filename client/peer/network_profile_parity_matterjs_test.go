@@ -4,7 +4,7 @@
 package peer
 
 // A port of matter.js packages/protocol/test/peer/NetworkProfileTest.ts at
-// b25ed960 (12 cases), plus the medium selection of NetworkProfiles.forPeer
+// db91886c (12 cases), plus the medium selection of NetworkProfiles.forPeer
 // (packages/protocol/src/peer/NetworkProfile.ts:184-221) and the
 // Semaphore's cooldown and timeout (packages/general/src/util/Semaphore.ts)
 // the profiles throttle with.

@@ -3,7 +3,7 @@
 
 // ZoneManagement: a port of matter.js
 // packages/node/test/behaviors/zone-management/ZoneManagementServerTest.ts
-// at b25ed960, by meaning. Its 46 `it` cases (67 with the polygon table,
+// at db91886c, by meaning. Its 46 `it` cases (67 with the polygon table,
 // the refused updates, the durations and the sensitivities expanded) are
 // the subtests below, named as the `it`s. matter.js's MockEndpoint with
 // UserZoneServer.set(ATTRIBUTES) (:87-117) is camera.NewZones with the
@@ -617,7 +617,7 @@ func TestParityMatterJS_ZoneManagementServerTestInteraction(t *testing.T) {
 // TestZonesLastZoneIDNilContinuesAfterTheHighest is the host that kept
 // the zones but not LastZoneID (ZonesConfig.LastZoneID nil): the server
 // continues after the highest ID in use, as matter.js before its first
-// assignment (ZoneManagementServer.ts:245 at b25ed960) — so the ID of a
+// assignment (ZoneManagementServer.ts:245 at db91886c) — so the ID of a
 // removed highest zone comes back, which LastZoneID set prevents
 // ("does not reuse the ID of a removed zone after a restart").
 func TestZonesLastZoneIDNilContinuesAfterTheHighest(t *testing.T) {
@@ -632,7 +632,7 @@ func TestZonesLastZoneIDNilContinuesAfterTheHighest(t *testing.T) {
 
 // TestZonesRefusedCreateKeepsTheLastID: a create the port refuses does not
 // advance the ID sequence, also after IDs were assigned (matter.js
-// ZoneManagementServer.ts:61-63 at b25ed960: the state super wrote is
+// ZoneManagementServer.ts:61-63 at db91886c: the state super wrote is
 // discarded).
 func TestZonesRefusedCreateKeepsTheLastID(t *testing.T) {
 	z, m := createEndpoint(t)
@@ -663,7 +663,7 @@ func (k keepingZones) LastZoneID() (uint16, bool) { return k.last, k.known }
 // LastZoneID takes the port's (owner decision O-7) and continues after
 // it, as matter.js after a restart ("does not reuse the ID of a removed
 // zone after a restart", ZoneManagementServerTest.ts:272-292 at
-// b25ed960); an explicit LastZoneID wins over the port's; a port that
+// db91886c); an explicit LastZoneID wins over the port's; a port that
 // knows none continues after the highest ID in use.
 func TestZonesLastZoneIDFromThePort(t *testing.T) {
 	zones := []camera.Zone{userZone(0, shiftedZone(0)), userZone(1, shiftedZone(1))}

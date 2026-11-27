@@ -9,7 +9,7 @@
 // (packages/node/src/behaviors/wi-fi-network-management/
 // WiFiNetworkManagementServer.ts:14 and packages/node/src/behaviors/
 // thread-network-directory/ThreadNetworkDirectoryServer.ts:14 at
-// b25ed960, `export class …Server extends …Behavior {}`), so the rules
+// db91886c, `export class …Server extends …Behavior {}`), so the rules
 // here follow connectedhomeip at the harness image's CHIP commit 6170af84:
 // src/app/clusters/wifi-network-management-server/
 // WiFiNetworkManagementCluster.cpp and src/app/clusters/

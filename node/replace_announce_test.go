@@ -27,7 +27,7 @@ import (
 // endpoint a new DataVersion and announces every readable attribute to the
 // running subscriptions, as matter.js does for a re-added endpoint (a new
 // Datasource per behaviour, Datasource.ts:763; addCluster emits every
-// readable attribute, ProtocolService.ts:290-296, at b25ed960). The
+// readable attribute, ProtocolService.ts:290-296, at db91886c). The
 // key-scoped state a controller wrote stays with the key.
 
 // announcePlug builds the plug of the issue's reproduction under key.

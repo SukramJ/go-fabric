@@ -194,7 +194,7 @@ func (groupKeyExhaustedErr) MatterStatusCode() im.StatusCode { return im.StatusR
 var _ im.StatusCodeError = groupKeyExhaustedErr{}
 
 // GroupKeyMgmtConfig drives [NewGroupKeyManagement]. Defaults mirror
-// matter.js GroupKeyManagementServer.ts:613-614 at b25ed960
+// matter.js GroupKeyManagementServer.ts:613-614 at db91886c
 // (maxGroupKeysPerFabric = 20, maxGroupsPerFabric = 22). Spec floors
 // per Matter §11.2.4 are maxGroupKeysPerFabric ≥ 3 and
 // maxGroupsPerFabric ≥ 4.
@@ -223,7 +223,7 @@ const (
 	staleRetryMax   = time.Minute
 )
 
-// matter.js defaults — see GroupKeyManagementServer.ts:613-614 at b25ed960 (the
+// matter.js defaults — see GroupKeyManagementServer.ts:613-614 at db91886c (the
 // server overrides the schema minimums: maxGroupKeysPerFabric = 20,
 // maxGroupsPerFabric = 22, "aligned with Groupcast quota=floor(44/2)").
 const (
@@ -475,7 +475,7 @@ func (g *GroupKeyManagement) dropMappingsToKeySet0(ctx context.Context) {
 // matter.js derives the group state inside the command, after the state
 // assignment and before the transaction commits
 // (GroupKeyManagementServer.ts:368-385, FabricGroups.ts:140-170 at
-// b25ed960), so it has no "stored but not derived" outcome; here the store
+// db91886c), so it has no "stored but not derived" outcome; here the store
 // has already taken the write, so the command succeeds and the stale group
 // state is reloaded.
 //
@@ -932,7 +932,7 @@ func (g *GroupKeyManagement) readFabrics(ctx context.Context) ([]uint8, error) {
 // and never a scope. Mirrors chip src/app/WriteHandler.cpp:805-811 at
 // 6170af84 ("a fabric-scoped list and there is no accessing fabric →
 // UNSUPPORTED_ACCESS") and matter.js
-// packages/protocol/src/action/server/AccessControl.ts:358-365 at b25ed960
+// packages/protocol/src/action/server/AccessControl.ts:358-365 at db91886c
 // (authorizeWrite: "Permission denied: No accessing fabric",
 // Status.UnsupportedAccess).
 func (g *GroupKeyManagement) writeFabric(ctx context.Context) (uint8, error) {
@@ -1249,7 +1249,7 @@ func (g *GroupKeyManagement) MatterInvoke(ctx context.Context, cmdID uint32, fie
 		// A fabric-scoped operation without an accessing fabric is
 		// UNSUPPORTED_ACCESS, matter.js's AccessDeniedError
 		// (packages/protocol/src/interaction/FabricAccessControl.ts:59-63 at
-		// b25ed960); the dispatcher's ACL gate refuses such a request
+		// db91886c); the dispatcher's ACL gate refuses such a request
 		// before the server sees it (endpoint/dispatcher.go CheckACL), so
 		// this is the server's own answer on a direct call.
 		return nil, spec.Errorf(im.StatusUnsupportedAccess, "core: GroupKeyManagement command without active fabric")
@@ -1365,7 +1365,7 @@ func (g *GroupKeyManagement) handleKeySetWrite(ctx context.Context, fabric uint8
 	}
 
 	// Mirrors matter.js packages/node/src/behaviors/group-key-management/
-	// GroupKeyManagementServer.ts:291-357 at b25ed960. Five validation classes,
+	// GroupKeyManagementServer.ts:291-357 at db91886c. Five validation classes,
 	// every failure is reported as InvalidCommand (a typed
 	// spec.Errorf(im.StatusInvalidCommand, …)):
 	//
@@ -1498,7 +1498,7 @@ func (g *GroupKeyManagement) handleKeySetRemove(ctx context.Context, fabric uint
 		return nil, fmt.Errorf("%w: KeySetRemoveRequest expected, got %T", errGroupKeyMgmtInvalidArg, fields)
 	}
 	// Mirrors matter.js packages/node/src/behaviors/group-key-management/
-	// GroupKeyManagementServer.ts:414-417 at b25ed960 — GroupKeySet 0 is the IPK
+	// GroupKeyManagementServer.ts:414-417 at db91886c — GroupKeySet 0 is the IPK
 	// (Identity Protection Key) that the bridge needs for CASE; the
 	// spec forbids deleting it via KeySetRemove. matter.js throws a
 	// StatusResponseError with InvalidCommand; we surface the same

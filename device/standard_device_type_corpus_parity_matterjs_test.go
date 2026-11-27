@@ -3,7 +3,7 @@
 
 // A port of matter.js
 // packages/node/test/endpoint/validation/StandardDeviceTypeCorpusTest.ts at
-// b25ed960 (every line below at that pin): every standard device type
+// db91886c (every line below at that pin): every standard device type
 // built with the state its server needs and judged, carrying only the
 // violations the corpus pins.
 //

@@ -4,7 +4,7 @@
 package operational
 
 // A port of matter.js packages/protocol/test/fabric/FabricTest.ts at
-// b25ed960, the rows of Fabric.hasSessionForPeer with a session still
+// db91886c, the rows of Fabric.hasSessionForPeer with a session still
 // establishing (:283-305). Go has no Fabric session set: the question is
 // the session table's (hasSessionForPeer, behind the reannounce trigger;
 // Fabric.ts:422-429 skips a session still establishing).

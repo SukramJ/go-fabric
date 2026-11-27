@@ -69,9 +69,9 @@ func DecodeValue(t Type, n Node) (any, error) {
 // value for an unsigned type, an unsigned one beyond int64 for a signed
 // type and every non-integer element stay as they are and are refused by
 // the strict decoder. Mirrors matter.js
-// packages/protocol/src/action/client/InputChunk.ts:42-48 at b25ed960
+// packages/protocol/src/action/client/InputChunk.ts:42-48 at db91886c
 // (DATA_REPORT_DECODE_OPTIONS) and packages/types/src/tlv/TlvNumber.ts:124-141
-// at b25ed960 (decodeTlvInternalValue: an integer of the other signedness
+// at db91886c (decodeTlvInternalValue: an integer of the other signedness
 // is read and checked against the schema's bounds). The server's decoders
 // (DecodeUintIn, DecodeIntIn) stay strict, as matter.js's default.
 func relaxedInteger(n Node, signed bool) Node {

@@ -16,7 +16,7 @@ var stepStart = time.Date(2026, 11, 4, 12, 0, 0, 0, time.UTC)
 
 // StepWall moves Now alone: the monotonic reading and the armed timers
 // stay (MockTime.stepWallClock, packages/testing/src/mocks/time.ts:472-478
-// at b25ed960).
+// at db91886c).
 func TestStepWallMovesNowAndNotTheMonotonicReading(t *testing.T) {
 	t.Parallel()
 	f := clocktest.New(stepStart)

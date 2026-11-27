@@ -67,7 +67,7 @@ func armOver(ctx context.Context, t *testing.T, gc *core.GeneralCommissioning, e
 
 // TestGeneralCommissioning_FailSafeAttemptTracker: the tracker hears every
 // start of a fail-safe context — where matter.js
-// GeneralCommissioningServer.ts:101-113 at b25ed960 calls
+// GeneralCommissioningServer.ts:101-113 at db91886c calls
 // DeviceCommissioner.beginTimed — and no extend, before the context's end
 // reaches the session closer, and the server's Close.
 func TestGeneralCommissioning_FailSafeAttemptTracker(t *testing.T) {

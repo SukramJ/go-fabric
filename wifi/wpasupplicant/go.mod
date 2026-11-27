@@ -7,7 +7,7 @@ require (
 	thingfabric.dev/go-fabric v0.27.0
 )
 
-require golang.org/x/sys v0.49.0 // indirect
+require golang.org/x/sys v0.50.0 // indirect
 
 // In-repo builds use the main module beside this one. A release of this
 // module bumps the require above to the main module's tag it ships with.

@@ -50,7 +50,7 @@ type Manager struct {
 	// establishment ran, so the hooks of one establishment all run before
 	// those of the next, as matter.js emits them synchronously on one
 	// thread (packages/protocol/src/session/SessionManager.ts:750-769 at
-	// b25ed960, #sessionEstablished; F-b25ed960-40). Released before the
+	// db91886c, #sessionEstablished; F-b25ed960-40). Released before the
 	// per-peer eviction closes anything — matter.js queues that eviction
 	// (:764-768). Lock order: establishMu, then mu; never the reverse.
 	establishMu sync.Mutex
@@ -88,7 +88,7 @@ type Manager struct {
 	// one's registration position ([Entry].registration). Incremented
 	// under mu at the install, read without it by
 	// [Manager.RegistrationCount]. Mirrors matter.js
-	// packages/protocol/src/session/SessionManager.ts:1266-1284 at b25ed960
+	// packages/protocol/src/session/SessionManager.ts:1266-1284 at db91886c
 	// (RegisteredSessions.add: #positions.set(session, this.#count++)).
 	registrations atomic.Uint64
 
@@ -130,7 +130,7 @@ type Manager struct {
 	// fired by [Manager.CloseAllGraceful]: matter.js kicks off the
 	// advertiser shutdown before removing sessions precisely to prevent
 	// re-announces during teardown (packages/node/src/behavior/system/
-	// network/ServerNetworkRuntime.ts:450-453 at b25ed960).
+	// network/ServerNetworkRuntime.ts:450-453 at db91886c).
 	onReannounce func(fabricIndex uint8)
 
 	// onPeerGone, when non-nil, fires once per distinct (fabric, peer)
@@ -263,7 +263,7 @@ func (m *Manager) notifyGracefulClose(entries []*Entry, deadline time.Time) {
 // before resuming operational broadcast on session deletion
 // (DeviceAdvertiser.ts:138 `fabric.hasSessionForPeer(...)`), which skips a
 // session still establishing (packages/protocol/src/fabric/Fabric.ts:422-429
-// at b25ed960).
+// at db91886c).
 func (m *Manager) hasSessionForPeer(fabricIndex uint8, peerNodeID uint64) bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -507,7 +507,7 @@ func (m *Manager) removeLocked(id uint16, e *Entry) {
 
 // equalCATSets reports whether a and b hold the same tags as sets.
 // Mirrors matter.js packages/protocol/src/session/SessionManager.ts:1246-1250
-// at b25ed960 (hasEqualCats).
+// at db91886c (hasEqualCats).
 func equalCATSets(a, b []uint32) bool {
 	for _, x := range a {
 		if !slices.Contains(b, x) {
@@ -690,7 +690,7 @@ type Entry struct {
 	// pickers ([Manager.NewestSessionForPeer], [Manager.SessionIDsForPeer]),
 	// the session listing ([Manager.Sessions]), the peer-presence check
 	// behind the reannounce and the per-peer cap do not. Mirrors matter.js
-	// packages/protocol/src/session/NodeSession.ts:209-231 at b25ed960 (the
+	// packages/protocol/src/session/NodeSession.ts:209-231 at db91886c (the
 	// isEstablishing table). Guarded by the manager's mu, written only
 	// while the entry holds its id.
 	establishing bool
@@ -701,12 +701,12 @@ type Entry struct {
 	// visible, never rewritten, and kept after the session left the table.
 	// 0 and meaningless for a placeholder, which no sweep visits. Mirrors
 	// matter.js packages/protocol/src/session/SessionManager.ts:1258 at
-	// b25ed960 (#positions, a WeakMap nothing deletes from).
+	// db91886c (#positions, a WeakMap nothing deletes from).
 	registration uint64
 	// createdAt is when the session was installed with its keys. The
 	// deprecated time form of the peer-loss sweep ([Manager.ClosePeerLost])
 	// spares sessions created at or after its instant (matter.js
-	// packages/protocol/src/session/SessionManager.ts:832-834 at b25ed960).
+	// packages/protocol/src/session/SessionManager.ts:832-834 at db91886c).
 	createdAt time.Time
 	// lastActivityMono, lastPeerActivityMono and createdAtMono are the
 	// same stamps on the clock's monotonic reading (clock.MonotonicOf): the
@@ -1052,11 +1052,11 @@ func (m *Manager) OpenFromSigma(fabricIndex uint8, localNodeID, peerNodeID uint6
 		m.testBeforeSupersede(entry)
 	}
 	// Supersession before the eviction closes anything: matter.js
-	// SessionManager.ts:750-769 at b25ed960 (#sessionEstablished).
+	// SessionManager.ts:750-769 at db91886c (#sessionEstablished).
 	m.fireOnSessionSuperseded(superseded, entry)
 	m.establishMu.Unlock()
 	// Force close, no CloseSession: matter.js SessionManager.ts:779-808
-	// at b25ed960 (#evictExcessSessionsFor, a forced close) skips the
+	// at db91886c (#evictExcessSessionsFor, a forced close) skips the
 	// graceful path for the cap because the eviction target is typically
 	// the peer it can no longer reach.
 	closeStaleEntries(excess)
@@ -1434,7 +1434,7 @@ func (m *Manager) openFromSigma(id uint16, stake *Stake, fabricIndex uint8, loca
 	// Supersession after the occupant's close — which closes what is
 	// keyed to this id — and before the eviction closes the sessions the
 	// moved subscriptions leave (matter.js SessionManager.ts:750-769 at
-	// b25ed960, #sessionEstablished).
+	// db91886c, #sessionEstablished).
 	if m.testBeforeSupersede != nil && ordered {
 		m.testBeforeSupersede(entry)
 	}
@@ -1646,9 +1646,9 @@ func (m *Manager) installEntryLocked(id uint16, entry *Entry) *Entry {
 // session registers at its install, as it routes from then on), not the
 // placeholder [Manager.AllocateStake] stakes (it has no keys). The
 // caller must hold m.mu in write mode.
-// Mirrors matter.js packages/protocol/src/session/SessionManager.ts:1266-1284 at b25ed960
+// Mirrors matter.js packages/protocol/src/session/SessionManager.ts:1266-1284 at db91886c
 // (RegisteredSessions.add: the position is set before the establishing check),
-// called from packages/protocol/src/session/NodeSession.ts:163-165 at b25ed960
+// called from packages/protocol/src/session/NodeSession.ts:163-165 at db91886c
 // (the NodeSession constructor, once the keys are derived).
 func (m *Manager) registerLocked(entry *Entry) {
 	entry.registration = m.registrations.Add(1) - 1
@@ -1660,9 +1660,9 @@ func (m *Manager) registerLocked(entry *Entry) {
 // [Manager.ClosePeerLostBefore] closes the peer's sessions that existed
 // then, the exchange's own among them, and spares every session that
 // registered since, whatever its creation time. Mirrors matter.js
-// packages/protocol/src/session/SessionManager.ts:408-410 at b25ed960
+// packages/protocol/src/session/SessionManager.ts:408-410 at db91886c
 // (registrationCount), read where an exchange's context is created
-// (packages/protocol/src/protocol/ExchangeManager.ts:623 at b25ed960).
+// (packages/protocol/src/protocol/ExchangeManager.ts:623 at db91886c).
 func (m *Manager) RegistrationCount() uint64 {
 	return m.registrations.Load()
 }
@@ -1819,7 +1819,7 @@ func (m *Manager) completeEstablishment(e *Entry) bool {
 		m.testBeforeSupersede(e)
 	}
 	// Supersession before the eviction closes anything (matter.js
-	// SessionManager.ts:750-769 at b25ed960, #sessionEstablished).
+	// SessionManager.ts:750-769 at db91886c, #sessionEstablished).
 	m.fireOnSessionSuperseded(superseded, e)
 	m.establishMu.Unlock()
 	closeStaleEntries(excess)
@@ -1849,7 +1849,7 @@ func (m *Manager) finishClose(entry *Entry) {
 // daemon shutdown never blocks on the network. The reannounce trigger
 // deliberately does not fire — the caller is shutting the bridge down
 // and matter.js likewise kicks off the advertiser shutdown before removing
-// sessions "to prevent re-announces when removing sessions" (at b25ed960,
+// sessions "to prevent re-announces when removing sessions" (at db91886c,
 // packages/node/src/behavior/system/network/ServerNetworkRuntime.ts:450-453).
 //
 // The CloseSession per session departs from matter.js at db021da0, whose
@@ -2008,13 +2008,13 @@ func (m *Manager) ClosePeer(fabricIndex uint8, peerNodeID uint64) int {
 // peer's data after the loss and is kept, whatever its creation time. No
 // CloseSession goes on the wire: the peer is lost, so each session is
 // marked peer-lost and force-closed. Returns the number of sessions closed.
-// Mirrors matter.js packages/protocol/src/session/SessionManager.ts:742-748 at b25ed960
+// Mirrors matter.js packages/protocol/src/session/SessionManager.ts:742-748 at db91886c
 // (handlePeerLoss with PeerLossContext.registeredBefore),
-// packages/protocol/src/session/SessionManager.ts:812-838 at b25ed960
+// packages/protocol/src/session/SessionManager.ts:812-838 at db91886c
 // (#handlePeerLoss: a session not registered before the cutoff is skipped),
-// packages/protocol/src/session/SessionManager.ts:1295-1298 at b25ed960
+// packages/protocol/src/session/SessionManager.ts:1295-1298 at db91886c
 // (isRegisteredBefore: own position < registeredBefore),
-// packages/protocol/src/session/NodeSession.ts:412-415 at b25ed960
+// packages/protocol/src/session/NodeSession.ts:412-415 at db91886c
 // (handlePeerLoss: #isPeerLost, then initiateForceClose).
 func (m *Manager) ClosePeerLostBefore(fabricIndex uint8, peerNodeID, registeredBefore uint64) int {
 	return m.closePeerLost(fabricIndex, peerNodeID, func(entry *Entry) bool {
@@ -2032,9 +2032,9 @@ func (m *Manager) ClosePeerLostBefore(fabricIndex uint8, peerNodeID, registeredB
 // Deprecated: two sessions may have the same creation time, so the time
 // does not say which session is newer; use [Manager.ClosePeerLostBefore],
 // which cuts by registration order. Removable in v0.26.0.
-// Mirrors matter.js packages/protocol/src/peer/PeerLossContext.ts:42-48 at b25ed960
+// Mirrors matter.js packages/protocol/src/peer/PeerLossContext.ts:42-48 at db91886c
 // (asOf, deprecated for registeredBefore),
-// applied at packages/protocol/src/session/SessionManager.ts:832-834 at b25ed960.
+// applied at packages/protocol/src/session/SessionManager.ts:832-834 at db91886c.
 func (m *Manager) ClosePeerLost(fabricIndex uint8, peerNodeID uint64, asOf time.Time) int {
 	return m.closePeerLost(fabricIndex, peerNodeID, func(entry *Entry) bool {
 		return !asOf.IsZero() && !entry.CreatedAt().Before(asOf)
@@ -2051,9 +2051,9 @@ func (m *Manager) ClosePeerLost(fabricIndex uint8, peerNodeID uint64, asOf time.
 // Deprecated: two sessions may have the same creation time, so the time
 // does not say which session is newer; use [Manager.ClosePeerLostBefore],
 // which cuts by registration order. Removable in v0.26.0.
-// Mirrors matter.js packages/protocol/src/peer/PeerLossContext.ts:42-48 at b25ed960
+// Mirrors matter.js packages/protocol/src/peer/PeerLossContext.ts:42-48 at db91886c
 // (asOf on the clock of Time.nowUs, deprecated for registeredBefore),
-// applied at packages/protocol/src/session/SessionManager.ts:832-834 at b25ed960.
+// applied at packages/protocol/src/session/SessionManager.ts:832-834 at db91886c.
 func (m *Manager) ClosePeerLostSince(fabricIndex uint8, peerNodeID uint64, sinceMono time.Duration) int {
 	return m.closePeerLost(fabricIndex, peerNodeID, func(entry *Entry) bool {
 		return entry.CreatedAtMonotonic() >= sinceMono
@@ -2504,7 +2504,7 @@ func (m *Manager) Occupancy() SessionTableOccupancy {
 // are excluded: they carry no peer; so are sessions still establishing,
 // which a picker does not hand out (matter.js maybeSessionFor reads the
 // established set, packages/protocol/src/session/SessionManager.ts:683-700
-// at b25ed960).
+// at db91886c).
 //
 // Opening a session does not close the peer's earlier ones: only a
 // session the peer establishes beyond [MaxSessionsPerPeer] closes its
@@ -2547,7 +2547,7 @@ func (m *Manager) SessionIDsForPeer(fabricIndex uint8, peerNodeID uint64) []uint
 // [Entry.MarkActiveRx] moves. A closed session is not in the table, so it
 // is never a candidate, nor is a session still establishing: matter.js's
 // pickers read the established set (maybeSessionFor,
-// packages/protocol/src/session/SessionManager.ts:683-700 at b25ed960; the
+// packages/protocol/src/session/SessionManager.ts:683-700 at db91886c; the
 // isEstablishing table, NodeSession.ts:214-217), so a request is not
 // routed onto a session whose handshake has not completed.
 func (m *Manager) NewestSessionForPeer(fabricIndex uint8, peerNodeID uint64, usable func(id uint16) bool) (uint16, bool) {
@@ -2594,7 +2594,7 @@ func (m *Manager) NewestSessionForPeer(fabricIndex uint8, peerNodeID uint64, usa
 //
 // A session still establishing is not listed: matter.js's
 // getActiveSessionInformation reads the established set
-// (packages/protocol/src/session/SessionManager.ts:1145-1149 at b25ed960).
+// (packages/protocol/src/session/SessionManager.ts:1145-1149 at db91886c).
 func (m *Manager) Sessions() []SessionInfo {
 	m.mu.RLock()
 	out := make([]SessionInfo, 0, len(m.sessions))

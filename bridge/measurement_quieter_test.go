@@ -276,7 +276,7 @@ const (
 // BatTimeRemaining and BatTimeToFullCharge are throttled to ten seconds,
 // every other quieter attribute to [cluster.QuietMinimumInterval]
 // (packages/node/src/behaviors/power-source/PowerSourceServer.ts:25-34 at
-// b25ed960). Review II, R2-P4-nv-05b.
+// db91886c). Review II, R2-P4-nv-05b.
 func TestPowerSourceBatteryQuietInterval(t *testing.T) {
 	t.Parallel()
 	for _, c := range []struct {

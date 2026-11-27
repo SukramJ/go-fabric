@@ -106,7 +106,7 @@ type RootClusters struct {
 // which the requestor reports as VersionApplied (mattercore.OTAUpdateApplied)
 // — else the configured one ([Config].BootReason). matter.js leaves the
 // value to the application after an update
-// (OtaSoftwareUpdateRequestorServer.ts:153-155 at b25ed960); the node has
+// (OtaSoftwareUpdateRequestorServer.ts:153-155 at db91886c); the node has
 // the record and states it. A record that cannot be read is logged and
 // leaves the configured value.
 func startBootReason(ctx context.Context, d rootDeps, basicInfo *mattercore.BasicInformation) uint8 {

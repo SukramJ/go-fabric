@@ -22,7 +22,7 @@ import (
 // and NOCSRElements, Matter Core §11.18.4.1 — matter.js
 // OPERATIONAL_CREDENTIALS_RESP_MAX
 // (packages/protocol/src/common/OperationalCredentialsTypes.ts:17-22 at
-// b25ed960).
+// db91886c).
 const respMax = 900
 
 // cdFormatVersion is CD_FORMAT_VERSION, Matter Core §6.3.1
@@ -47,7 +47,7 @@ type Context struct {
 }
 
 // Data is the device's attestation data — matter.js DeviceAttestationData
-// (DeviceAttestationValidator.ts:233-244 at b25ed960).
+// (DeviceAttestationValidator.ts:233-244 at db91886c).
 type Data struct {
 	// DAC and PAI are the X.509 DER certificates of CertificateChainRequest.
 	DAC, PAI []byte
@@ -57,7 +57,7 @@ type Data struct {
 	Nonce []byte
 	// VendorID and ProductID are the node's BasicInformation values, nil
 	// when the device did not report them (DeviceAttestationValidator.ts:
-	// 239-243 at b25ed960). An unreported value never matches the
+	// 239-243 at db91886c). An unreported value never matches the
 	// Certification Declaration: it is the error finding
 	// [CertificationDeclarationFieldMismatch].
 	VendorID, ProductID *uint16
@@ -86,7 +86,7 @@ type Result struct {
 
 // Validate validates the device's attestation. Mirrors matter.js
 // packages/protocol/src/certificate/DeviceAttestationValidator.ts:283-293
-// at b25ed960 (validate): validateCollecting runs the checks, and a hard
+// at db91886c (validate): validateCollecting runs the checks, and a hard
 // failure — an [*Error] — carries the findings collected before it in
 // [Error].PrecedingFindings. Any other error is the trust store's (a
 // stored PAA that does not parse, a revocation lookup that fails), which
@@ -106,7 +106,7 @@ func Validate(ctx Context, data Data) (Result, error) {
 }
 
 // validateCollecting is matter.js validateCollecting
-// (DeviceAttestationValidator.ts:295-694 at b25ed960), check for check and
+// (DeviceAttestationValidator.ts:295-694 at db91886c), check for check and
 // in its order; each step cites the DAV lines it ports. findings collects
 // the non-fatal findings, also those raised before a hard failure.
 func validateCollecting(ctx Context, data Data, findings *[]Finding) (Result, error) {
@@ -135,7 +135,7 @@ func validateCollecting(ctx Context, data Data, findings *[]Finding) (Result, er
 	}
 
 	// AttestationElements no longer than RESP_MAX, before they are decoded
-	// (DeviceAttestationValidator.ts:316-321 at b25ed960).
+	// (DeviceAttestationValidator.ts:316-321 at db91886c).
 	if len(data.Elements) > respMax {
 		return Result{}, fail(AttestationElementsTooLong, fmt.Sprintf("Device returned attestation elements of %d bytes, more than RESP_MAX of %d", len(data.Elements), respMax))
 	}
@@ -169,7 +169,7 @@ func validateCollecting(ctx Context, data Data, findings *[]Finding) (Result, er
 	var paa *attCert
 	testPAA := false
 	if ctx.Store == nil {
-		// DAV:359-366 at b25ed960.
+		// DAV:359-366 at db91886c.
 		*findings = append(*findings, Finding{
 			Level: LevelWarning, Check: DclServiceUnavailable,
 			Message: "DclCertificateService not available; skipping PAA trust store, chain, and revocation checks. " +
@@ -306,7 +306,7 @@ func checkChain(store PAAStore, dac, pai *attCert, findings *[]Finding) (*attCer
 		return nil, false, &Error{Check: CertificateUnparseable, Message: "Device returned a PAI whose public key cannot be read: " + err.Error(), Err: err}
 	}
 	// mayIssue (DAV:423-429; kinds/CertificateSignature.ts:46-54 at
-	// b25ed960): a PAI key no stronger than its PAA's.
+	// db91886c): a PAI key no stronger than its PAA's.
 	if !MayIssue(paaAlgorithm, paiAlgorithm) {
 		return nil, false, fail(CertificateChainInvalid, fmt.Sprintf("PAI key algorithm %s is stronger than the %s of its PAA", paiAlgorithm, paaAlgorithm))
 	}
@@ -391,7 +391,7 @@ func checkDeclaration(cd cdContent, testSigner bool, data Data, dac, pai, paa *a
 	// report the value, so the policy decides and the checks after them
 	// still run. Mirrors matter.js
 	// packages/protocol/src/certificate/DeviceAttestationValidator.ts:
-	// 579-595 at b25ed960 (validateCollecting).
+	// 579-595 at db91886c (validateCollecting).
 	if data.VendorID == nil || cd.vendorID != *data.VendorID {
 		*findings = append(*findings, Finding{
 			Level: LevelError, Check: CertificationDeclarationFieldMismatch,
@@ -502,7 +502,7 @@ func idHex(id *uint16) string {
 }
 
 // basicInformationValue is DeviceAttestationValidator.ts:215-217 at
-// b25ed960: a BasicInformation value the device did not report is named
+// db91886c: a BasicInformation value the device did not report is named
 // as such.
 func basicInformationValue(id *uint16) string {
 	if id == nil {

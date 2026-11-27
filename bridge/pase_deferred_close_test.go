@@ -132,8 +132,8 @@ func (r *deferredRevokeRig) assertOpenAndQuiet(t *testing.T, when string) {
 // RevokeCommissioning's response is acknowledged or its retransmissions
 // are spent; revoked over CASE while the PASE session waits for an
 // acknowledgement, after that acknowledgement. Mirrors matter.js
-// packages/protocol/src/session/Session.ts:304-320 at b25ed960
-// (initiateClose), packages/protocol/src/session/NodeSession.ts:438-462 at b25ed960
+// packages/protocol/src/session/Session.ts:304-320 at db91886c
+// (initiateClose), packages/protocol/src/session/NodeSession.ts:438-462 at db91886c
 // (deferredClose, the close when the last exchange closes) and
 // packages/protocol/src/protocol/MessageExchange.ts:1187-1216 at b25ed960
 // (an exchange whose message is unacknowledged closes on the ack, :549-558,
@@ -165,7 +165,7 @@ func TestRevokeClosesThePASESessionWhenItIsIdle(t *testing.T) {
 	t.Run("over PASE, nothing awaiting an ack: after the response", func(t *testing.T) {
 		t.Parallel()
 		// A connection carries no MRP (matter.js
-		// MessageExchange.ts:1182-1190 at b25ed960): the exchange closes
+		// MessageExchange.ts:1182-1190 at db91886c): the exchange closes
 		// with the response, and the session with it.
 		r := newDeferredRevokeRig(t)
 		r.revokeOverPASE(t, false)
@@ -201,7 +201,7 @@ func TestRevokeClosesThePASESessionWhenItIsIdle(t *testing.T) {
 		// its close was deferred; that rollback closes the PASE session it
 		// finds, and a closing one it does not find (matter.js
 		// packages/protocol/src/session/SessionManager.ts:660-664 at
-		// b25ed960, getPaseSession skips a closing session).
+		// db91886c, getPaseSession skips a closing session).
 		r := newDeferredRevokeRig(t)
 		r.revokeOverPASE(t, true)
 		r.dev.br.FailSafeExpired(context.Background())
@@ -261,7 +261,7 @@ func TestRevokeClosesThePASESessionWhenItIsIdle(t *testing.T) {
 // is dropped: no ack, no reply, the commissioning channel's implicit
 // Administer serves nothing more; a duplicate of a message handled before
 // is still acknowledged. Mirrors matter.js
-// packages/protocol/src/protocol/ExchangeManager.ts:433-438 at b25ed960.
+// packages/protocol/src/protocol/ExchangeManager.ts:433-438 at db91886c.
 func TestClosingPASESessionTakesNoNewExchange(t *testing.T) {
 	t.Parallel()
 	r := newDeferredRevokeRig(t)
@@ -304,7 +304,7 @@ func TestClosingPASESessionTakesNoNewExchange(t *testing.T) {
 // survives it, and the host's PaseSessionCloser runs at the revoke, not
 // at the deferred close. matter.js closes the one session getPaseSession()
 // returned (packages/node/src/behaviors/administrator-commissioning/AdministratorCommissioningServer.ts:143-147
-// at b25ed960; packages/protocol/src/session/SessionManager.ts:660-664).
+// at db91886c; packages/protocol/src/session/SessionManager.ts:660-664).
 func TestRevokeDeferredCloseClosesOnlyTheNamedSession(t *testing.T) {
 	t.Parallel()
 	r := newDeferredRevokeRig(t)
@@ -387,7 +387,7 @@ func TestStopEndsDeferredPASECloses(t *testing.T) {
 // CommissioningComplete named it) is closing; a revoke in between does not
 // mark it for a graceful close of its own, as matter.js's initiateClose
 // returns on a closing session
-// (packages/protocol/src/session/Session.ts:305-307 at b25ed960).
+// (packages/protocol/src/session/Session.ts:305-307 at db91886c).
 func TestRevokeLeavesAForceClosingPASESessionAlone(t *testing.T) {
 	t.Parallel()
 	r := newDeferredRevokeRig(t)

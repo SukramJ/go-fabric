@@ -58,7 +58,7 @@ func TestRefusedRequestNeverReachesTheHostHandler(t *testing.T) {
 }
 
 // TestRefusedRequestOfTheFiveNewRefusalCommandsNeverReachesTheHostHandler:
-// at b25ed960 GetWeekDaySchedule, GetYearDaySchedule, GetHolidaySchedule,
+// at db91886c GetWeekDaySchedule, GetYearDaySchedule, GetHolidaySchedule,
 // ClearCredential and GetCredentialStatus answer a validation error with
 // INVALID_COMMAND too (DoorLockServer.ts:1509-1513), where db021da0 left
 // them unchecked: a CredentialType the enum does not define and a request

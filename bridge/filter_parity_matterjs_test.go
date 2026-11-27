@@ -46,7 +46,7 @@ func TestFilterPayloadsMatchMatterJS(t *testing.T) {
 				// ResetCondition has no fields: it decodes through the
 				// definition (a stray field would be refused) to no payload,
 				// as matter.js's TlvNoArguments decodes to nothing
-				// (packages/types/src/tlv/TlvVoid.ts:20-22 at b25ed960).
+				// (packages/types/src/tlv/TlvVoid.ts:20-22 at db91886c).
 				if got := decodeCommandFields(t, f.Cluster, hepa.CmdResetCondition, f.BytesHex); got != nil {
 					t.Fatalf("decoded %T, want no payload", got)
 				}

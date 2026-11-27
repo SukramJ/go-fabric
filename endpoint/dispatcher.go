@@ -284,7 +284,7 @@ var (
 // them to the host. On the wire [im.AttributeExpansion] hands out a
 // status for a fully concrete path alone, as matter.js
 // packages/protocol/src/action/server/AttributeReadResponse.ts at
-// b25ed960 does (a wildcard path goes to addWildcard, :88-94, which
+// db91886c does (a wildcard path goes to addWildcard, :88-94, which
 // adds no status, :149-197).
 //
 // ctx carries the FabricFiltered flag + FabricIndex via
@@ -812,10 +812,10 @@ func (d *TopologyDispatcher) CommandPathStatus(path im.ConcreteCommandPath) im.S
 // endpoint does not serve, UNSUPPORTED_EVENT for an event its server does
 // not list, Success otherwise — the existence checks of matter.js
 // packages/protocol/src/action/server/EventReadResponse.ts:158-221 at
-// b25ed960 (#addConcrete), in their order. A path that names no event is
+// db91886c (#addConcrete), in their order. A path that names no event is
 // UNSUPPORTED_EVENT when the server lists none: matter.js registers a
 // wildcard event path per event of the cluster (EventReadResponse.ts:277-284
-// at b25ed960), so such a cluster selects nothing (review II,
+// at db91886c), so such a cluster selects nothing (review II,
 // R2-P4-imread-08). A server without a [contract.ClusterEventLister] lists
 // no event, as the contract states, so neither shape of path exists on it
 // (EventReadResponse.ts:216-218 for a named one; review II, R2-P4-nw-05).
@@ -1153,7 +1153,7 @@ func fabricScopeFor(ctx context.Context, srv contract.ClusterServer, attrID uint
 		// adds to a standard cluster: scoped as its own declaration states,
 		// as matter.js takes an element's scope from that element's own
 		// schema (packages/protocol/src/action/server/AccessControl.ts:508-525
-		// at b25ed960; review II, F-db021da0-55).
+		// at db91886c; review II, F-db021da0-55).
 		d, ok := srv.(contract.FabricScopeDeclarer)
 		if !ok {
 			return nil
@@ -1382,7 +1382,7 @@ func invokeHeld(ctx context.Context, srv contract.ClusterServer, cmdID uint32, f
 // judged.
 //
 // Mirrors matter.js packages/node/src/node/integration/ProtocolService.ts:717-733
-// at b25ed960 (completeResponse; the response validated as `data ?? {}`,
+// at db91886c (completeResponse; the response validated as `data ?? {}`,
 // :624-625).
 func responseHeld(ctx context.Context, srv contract.ClusterServer, cmdID uint32, request, response any, write im.CommandFieldsWriter) error {
 	switch response.(type) {
@@ -1499,7 +1499,7 @@ func writeOne(ctx context.Context, srv contract.ClusterServer, path im.ConcreteA
 // its message (ADR 0026 principle 8). A status error naming Success
 // answers FAILURE. Mirrors matter.js's answer to a StatusResponseError a
 // behaviour throws, its code and clusterCode
-// (packages/types/src/common/StatusResponseError.ts:18-25 at b25ed960).
+// (packages/types/src/common/StatusResponseError.ts:18-25 at db91886c).
 // Returns (status, clusterStatus, hasClusterStatus).
 func classifyError(err error) (im.StatusCode, uint8, bool) {
 	if err == nil {
@@ -1552,7 +1552,7 @@ func hostStatusError(err error) (contract.StatusError, bool) {
 // an attribute the cluster does not list — takes no floor from the data
 // model: matter.js authorizes a concrete read at View first, answers the
 // existence statuses next and checks limits.readLevel only for an
-// attribute that exists (AttributeReadResponse.ts:250-274 at b25ed960), as
+// attribute that exists (AttributeReadResponse.ts:250-274 at db91886c), as
 // [MinWritePrivilege] does for a write. The attribute list is asked only
 // for an attribute the data model reads above View.
 func (d *TopologyDispatcher) MinReadPrivilege(endpoint uint16, clusterID, attrID uint32) uint8 {

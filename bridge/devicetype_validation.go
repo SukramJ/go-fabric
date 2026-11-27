@@ -67,7 +67,7 @@ func (b *Bridge) deviceTypeValidator() *endpoint.DeviceTypeValidator {
 // returned unlogged.
 func (b *Bridge) validateDeviceTypes(topology *endpoint.Topology) error {
 	// The node commissions over BLE when the bridge has a radio
-	// (ServerEndpointFacts.ts:140-145 at b25ed960 asks the node's
+	// (ServerEndpointFacts.ts:140-145 at db91886c asks the node's
 	// NetworkServer the same).
 	if topology != nil {
 		topology.CommissionsOverBLE = b.gattPeripheral() != nil
@@ -89,7 +89,7 @@ func (b *Bridge) validateDeviceTypes(topology *endpoint.Topology) error {
 	}
 	// What only a device type of the node asserts at the Root location
 	// requires is logged at debug, never as a warning — matter.js
-	// DeviceTypeConformanceService.ts:437-442 at b25ed960 ("does not meet
+	// DeviceTypeConformanceService.ts:437-442 at db91886c ("does not meet
 	// requirements that device types of its node assert at the Root").
 	for i := range verdict.FreshAssertedAtRoot {
 		v := &verdict.FreshAssertedAtRoot[i]

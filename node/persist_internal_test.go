@@ -250,7 +250,7 @@ func TestRingLogsServeTheAccessingFabricsOwnSessions(t *testing.T) {
 // rotation on serves a salted per-boot value and writes nothing, and the
 // next boot with rotation off serves the value pinned before it, never a
 // salted one; a value flagged by the deprecated marker is migrated once — matter.js creates uniqueId once and persists it
-// (BasicInformationServer.ts:89-91 at b25ed960); rotation is this
+// (BasicInformationServer.ts:89-91 at db91886c); rotation is this
 // module's dev knob (bootid) beside that rule.
 func TestUniqueIDRotationOnOffOn(t *testing.T) {
 	t.Parallel()

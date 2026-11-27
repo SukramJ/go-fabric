@@ -76,13 +76,13 @@ func TestCommandFieldDecoders_RejectOverWideIntegers(t *testing.T) {
 // CertificateChainRequest's CertificateType 0x100 to INVALID_COMMAND, not
 // CONSTRAINT_ERROR: the field's TLV is an enum over a 32-bit integer, so
 // the value decodes (packages/types/src/tlv/TlvOfModel.ts:221-224 at
-// b25ed960); the command is model-validated, so the TLV check is skipped
+// db91886c); the command is model-validated, so the TLV check is skipped
 // (packages/protocol/src/action/server/CommandInvokeResponse.ts:317, :359,
 // :485-487 at b25ed960); the model rejects the undefined member
 // (packages/node/src/behavior/state/validation/ValueValidator.ts:176-181
-// at b25ed960) and the server's onValidationError answers INVALID_COMMAND
+// at db91886c) and the server's onValidationError answers INVALID_COMMAND
 // (packages/node/src/behaviors/operational-credentials/
-// OperationalCredentialsServer.ts:636-638 at b25ed960, through
+// OperationalCredentialsServer.ts:636-638 at db91886c, through
 // packages/node/src/node/integration/ProtocolService.ts:693-694).
 func TestCertificateChainRequest_UndefinedTypeIsInvalidCommand(t *testing.T) {
 	t.Parallel()

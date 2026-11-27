@@ -107,7 +107,7 @@ var (
 // rules: one answered offer per requestor, the admission of a new query,
 // the apply table and the end of an attempt at NotifyUpdateApplied.
 // matter.js has no provider without its SoftwareUpdateManager
-// (OtaSoftwareUpdateProviderServer.ts:81-82 at b25ed960).
+// (OtaSoftwareUpdateProviderServer.ts:81-82 at db91886c).
 //
 // It reads cfg's BDX, BDXMaxBlockSize, DelegateConsentToRequestor, Clock
 // and Logger, and honours a
@@ -181,7 +181,7 @@ func (m *otaStandaloneManager) EndQuery(a *OTAUpdateAttempt) {
 // AdmitQuery implements [OTAUpdateManager]: matter.js's admission table
 // without row 2, which needs a queued update.
 //
-// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:1819-1881 at b25ed960
+// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:1819-1881 at db91886c
 // (admitQuery).
 func (m *otaStandaloneManager) AdmitQuery(_ context.Context, peer OTAPeer, sessionID uint16, _ uint32) bool {
 	m.mu.Lock()
@@ -230,7 +230,7 @@ func transferOf(r *bdx.Responder, peer OTAPeer) interface {
 // delegates on the switch and RequestorCanConsent alone
 // (BD-Matter-OTAProvider-StandaloneManager, F-b25ed960-21).
 //
-// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:638-647 at b25ed960
+// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:638-647 at db91886c
 // (mayDelegateConsentTo).
 func (m *otaStandaloneManager) MayDelegateConsentTo(_ OTAPeer, req provdef.QueryImageRequest) bool {
 	return m.delegate && req.RequestorCanConsent != nil && *req.RequestorCanConsent

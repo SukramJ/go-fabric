@@ -579,21 +579,23 @@ func (g *groupPlan) joinGroup(th *goTH) error {
 
 // caseSC53 mirrors TC-SC-5.3: the group is provisioned on the daemon, and a
 // command sent as a group message reaches the endpoint that joined.
+// #5033 rewrote the flavor dispatch of the file's group-invoke log check
+// (ianaSentCheck, :309-321 at db91886c), which this port does not carry.
 func caseSC53() goCertCase {
 	g := &groupPlan{}
 	return goCertCase{
-		tc: "TC-SC-5.3", line: 370, pics: []string{"MCORE.ROLE.COMMISSIONER", "GRPKEY.C"}, multicast: true,
+		tc: "TC-SC-5.3", line: 371, readAt: "db91886c", pics: []string{"MCORE.ROLE.COMMISSIONER", "GRPKEY.C"}, multicast: true,
 		steps: []goStep{
-			{n: "1a", line: 385, title: "TH should have the ACL entry with the AuthMode as Group by DUT", run: g.aclAdmitsGroup(privManage)},
-			{n: "1b", line: 404, title: "DUT generates a random key and EpochKey0 assigned to GroupKeySetID 1", run: keyMaterial},
-			{n: "2", line: 409, title: "KeySetWrite to GroupKeyManagement on EP0", pics: "GRPKEY.C.C00.Tx", run: g.keySetWrite},
-			{n: "3", line: 418, title: "bind GroupId with GroupKeySetID in GroupKeyMap", pics: "GRPKEY.C.A0000", run: g.legacyOnly(g.groupKeyMap(groupID, 2))},
-			{n: "4", line: 430, title: "AddGroup GroupID 1 \"GroupOne\"", pics: "G.C.C00.Tx", at: "G.S & OO.S", run: g.legacyOnly(g.addGroup)},
-			{n: "5", line: 442, title: "AddGroup GroupID 2 sent as a group command using GroupID 1", pics: "G.C.C00.Tx", at: "G.S & OO.S", run: g.legacyOnly(func(th *goTH) error {
+			{n: "1a", line: 386, title: "TH should have the ACL entry with the AuthMode as Group by DUT", run: g.aclAdmitsGroup(privManage)},
+			{n: "1b", line: 405, title: "DUT generates a random key and EpochKey0 assigned to GroupKeySetID 1", run: keyMaterial},
+			{n: "2", line: 410, title: "KeySetWrite to GroupKeyManagement on EP0", pics: "GRPKEY.C.C00.Tx", run: g.keySetWrite},
+			{n: "3", line: 419, title: "bind GroupId with GroupKeySetID in GroupKeyMap", pics: "GRPKEY.C.A0000", run: g.legacyOnly(g.groupKeyMap(groupID, 2))},
+			{n: "4", line: 431, title: "AddGroup GroupID 1 \"GroupOne\"", pics: "G.C.C00.Tx", at: "G.S & OO.S", run: g.legacyOnly(g.addGroup)},
+			{n: "5", line: 443, title: "AddGroup GroupID 2 sent as a group command using GroupID 1", pics: "G.C.C00.Tx", at: "G.S & OO.S", run: g.legacyOnly(func(th *goTH) error {
 				return errors.New("the legacy groupcast of AddGroup is not ported: the reference daemon serves Groupcast")
 			})},
-			{n: "6", line: 455, title: "Groupcast JoinGroup on EP0 with GroupID 1, Endpoints and KeySetID 1", run: g.groupcastOnly(g.joinGroup)},
-			{n: "7", line: 464, title: "a command sent as a group command using GroupID 1", run: g.groupcastOnly(g.toggleOverGroupcast)},
+			{n: "6", line: 456, title: "Groupcast JoinGroup on EP0 with GroupID 1, Endpoints and KeySetID 1", run: g.groupcastOnly(g.joinGroup)},
+			{n: "7", line: 465, title: "a command sent as a group command using GroupID 1", run: g.groupcastOnly(g.toggleOverGroupcast)},
 		},
 	}
 }
@@ -601,7 +603,7 @@ func caseSC53() goCertCase {
 // toggleOverGroupcast sends OnOff Toggle to group 1 from the TH's own
 // group state — the controller's key set 1 on its fabric, the IANA
 // address the Groupcast join chose — and holds the joined endpoint to
-// have toggled (TC-SC-5.3.test.ts:464-475).
+// have toggled (TC-SC-5.3.test.ts:465-476).
 func (g *groupPlan) toggleOverGroupcast(th *goTH) error {
 	path := attrPath(g.ep, onoff.ClusterID, onoff.AttrOnOff)
 	before, err := th.readValue(g.node, path)

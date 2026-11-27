@@ -34,9 +34,22 @@ var (
 
 // WriteRequest is the in-memory form of a WriteRequestMessage.
 type WriteRequest struct {
-	SuppressResponse bool
-	TimedRequest     bool
-	Writes           []AttributeWrite
+	// SuppressResponse is the request's SuppressResponse flag, false when
+	// absent; HasSuppressResponse says whether the field was present. The
+	// two differ only on a group write: there an absent SuppressResponse
+	// counts as true, an explicit false is refused (matter.js
+	// InteractionServer.ts:410-413, :454-459 at db91886c;
+	// [HandleGroupWrite]). [UnmarshalWriteRequestTLV] sets both; a
+	// hand-built request without HasSuppressResponse reads as absent.
+	// [WriteRequest.MarshalTLV] writes SuppressResponse only when true and
+	// does not read HasSuppressResponse.
+	SuppressResponse    bool
+	HasSuppressResponse bool
+	// TimedRequest is optional on the wire and false when absent
+	// (TlvWriteRequest.ts:29 at db91886c, TlvOptionalField; the server
+	// defaults it to false, InteractionServer.ts:399).
+	TimedRequest bool
+	Writes       []AttributeWrite
 	// MoreChunkedMessages signals that further WriteRequest chunks
 	// follow on the same exchange (Matter §10.6.5 tag 3). Each chunk
 	// is answered with its own WriteResponse — matter.js
@@ -84,7 +97,7 @@ func UnmarshalWriteRequestTLV(dec *tlv.Decoder, valueReader AttributeValueReader
 		return WriteRequest{}, fmt.Errorf("%w: expected struct, got 0x%02X", ErrInvalidWriteRequest, open.Type)
 	}
 	var req WriteRequest
-	var hasTimed, hasWrites bool
+	var hasWrites bool
 	var later laterErrors
 	for {
 		el, err := dec.Next()
@@ -95,13 +108,11 @@ func UnmarshalWriteRequestTLV(dec *tlv.Decoder, valueReader AttributeValueReader
 			if later.first != nil {
 				return WriteRequest{}, later.first
 			}
-			// TimedRequest and WriteRequests are mandatory: matter.js
-			// packages/types/src/protocol/messages/TlvWriteRequest.ts:21, :24
-			// at db021da0 (TlvField; SuppressResponse :18 is optional).
-			switch {
-			case !hasTimed:
-				return WriteRequest{}, fmt.Errorf("%w: %w", ErrInvalidWriteRequest, missingField(tagWriteReqTimedRequest, "TimedRequest"))
-			case !hasWrites:
+			// WriteRequests is mandatory: matter.js
+			// packages/types/src/protocol/messages/TlvWriteRequest.ts:32
+			// at db91886c (TlvField; SuppressResponse :22 and TimedRequest
+			// :29 are TlvOptionalField).
+			if !hasWrites {
 				return WriteRequest{}, fmt.Errorf("%w: %w", ErrInvalidWriteRequest, missingField(tagWriteReqWriteRequests, "WriteRequests"))
 			}
 			return req, nil
@@ -113,20 +124,21 @@ func UnmarshalWriteRequestTLV(dec *tlv.Decoder, valueReader AttributeValueReader
 		case tagWriteReqSuppressResponse:
 			// TlvOptionalField(0, TlvBoolean): a SuppressResponse of another
 			// type fails the decode, and the request is answered
-			// (packages/types/src/protocol/messages/TlvWriteRequest.ts:18;
-			// SuppressResponseTest.ts:399-403).
+			// (packages/types/src/protocol/messages/TlvWriteRequest.ts:22
+			// at db91886c; SuppressResponseTest.ts:399-403 at db021da0).
 			if req.SuppressResponse, err = requestBoolField(el, "SuppressResponse"); err != nil {
 				return WriteRequest{}, fmt.Errorf("%w: %w", ErrInvalidWriteRequest, err)
 			}
+			req.HasSuppressResponse = true
 		case tagWriteReqTimedRequest:
-			// TlvField(1, TlvBoolean), TlvWriteRequest.ts:21: a TimedRequest
-			// of another type fails the decode (FAILURE), never reads as false.
+			// TlvOptionalField(1, TlvBoolean), TlvWriteRequest.ts:29 at
+			// db91886c: a TimedRequest of another type fails the decode
+			// (FAILURE), never reads as false.
 			if req.TimedRequest, err = requestBoolField(el, "TimedRequest"); err != nil {
 				return WriteRequest{}, fmt.Errorf("%w: %w", ErrInvalidWriteRequest, err)
 			}
-			hasTimed = true
 		case tagWriteReqMoreChunked:
-			// TlvOptionalField(3, TlvBoolean), TlvWriteRequest.ts:25.
+			// TlvOptionalField(3, TlvBoolean), TlvWriteRequest.ts:33 at db91886c.
 			if req.MoreChunkedMessages, err = requestBoolField(el, "MoreChunkedMessages"); err != nil {
 				return WriteRequest{}, fmt.Errorf("%w: %w", ErrInvalidWriteRequest, err)
 			}
@@ -203,7 +215,7 @@ func readAttributeData(dec *tlv.Decoder, valueReader AttributeValueReader) (Attr
 			}
 			// Path and Data are mandatory: matter.js
 			// packages/types/src/protocol/types/TlvAttributeData.ts:18-19 at
-			// b25ed960 (TlvField). Without the check an AttributeDataIB
+			// db91886c (TlvField). Without the check an AttributeDataIB
 			// without Data reached the server as a write of nil.
 			switch {
 			case !hasPath:

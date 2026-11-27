@@ -58,7 +58,7 @@ var _ node.OTAApplier = (*otaApplier)(nil)
 // RequestUserConsent implements [node.OTAApplier]. The daemon has no
 // user to ask; it declares CanConsent only in harness mode, where it
 // consents as the matter.js cert requestor does
-// (OtaRequestorTestInstance.ts:166-168 at b25ed960).
+// (OtaRequestorTestInstance.ts:166-168 at db91886c).
 func (a *otaApplier) RequestUserConsent(context.Context, uint32, string) (bool, error) {
 	return a.harness, nil
 }
@@ -75,7 +75,7 @@ func (a *otaApplier) RequestUserConsent(context.Context, uint32, string) (bool, 
 // of its default validation — "The method SHALL be overridden to add
 // additional checks like validating the signature of the file."
 // (packages/node/src/behaviors/ota-software-update-requestor/
-// OtaSoftwareUpdateRequestorServer.ts:1121 at b25ed960). A product
+// OtaSoftwareUpdateRequestorServer.ts:1121 at db91886c). A product
 // verifies its vendor's signature over the payload before it installs the
 // image (R2-P6-sec-2616).
 func (a *otaApplier) ApplyUpdate(ctx context.Context, newSoftwareVersion uint32, file string) error {
@@ -179,7 +179,7 @@ func (a *otaApplier) verify(version uint32, file string) (node.OTAImageHeader, e
 // StartUp with the version now running — the event a node emits on every
 // start (node.Node.Start), which the matter.js cert requestor's restart
 // into its applied image emits too and TC-SU-2.5 waits for
-// (support/chip-testing/test/cert/TC-SU-2.5.test.ts:89-107 at b25ed960) —
+// (support/chip-testing/test/cert/TC-SU-2.5.test.ts:89-107 at db91886c) —
 // then the requestor's own. It gives up, emitting nothing, once ctx — the
 // daemon's lifetime — ends.
 func (a *otaApplier) restartedWhenIdle(ctx context.Context) {

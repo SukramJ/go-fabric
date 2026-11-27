@@ -117,7 +117,7 @@ func (r *failSafeRig) waitClosed(t *testing.T) []uint16 {
 // GeneralCommissioning expires without a CommissioningComplete, for a host
 // that wired nothing for it — no node facade, no fail-safe-expiry hook, no
 // call of Bridge.FailSafeExpired. Mirrors matter.js
-// packages/protocol/src/common/FailsafeContext.ts:281-283 at b25ed960
+// packages/protocol/src/common/FailsafeContext.ts:281-283 at db91886c
 // (rollback: "1. Terminate any open PASE secure session by clearing any
 // associated Secure Session Context at the Server" → closePaseSession,
 // :191-196). Before, the close was the host's call from its own hook, and a
@@ -220,7 +220,7 @@ func TestFailSafeExpiredAfterItsInteractionClosesAtOnce(t *testing.T) {
 // to the bridge closes the PASE sessions when it is revoked, for a host
 // that wired no PaseSessionCloser. Mirrors matter.js
 // packages/node/src/behaviors/administrator-commissioning/AdministratorCommissioningServer.ts:143-147
-// at b25ed960 (revokeCommissioning, "Step 1: Regardless of window state —
+// at db91886c (revokeCommissioning, "Step 1: Regardless of window state —
 // terminate PASE sessions" → getPaseSession().initiateClose()).
 func TestRevokeWindowThroughTheBridgeClosesThePASESessions(t *testing.T) {
 	t.Parallel()

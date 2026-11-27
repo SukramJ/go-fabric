@@ -7,7 +7,7 @@ package attestation
 // 6170af84 (credentials/development/commissioner_dut/<name>/
 // test_case_vector.json, attestation/TestCredentials-FFF1-8001.json,
 // cd-certs/*.der), as testdata/chip-commissioner-dut/vectors.json holds
-// them, with the vector sets matter.js b25ed960 names in
+// them, with the vector sets matter.js db91886c names in
 // packages/protocol/test/certificate/ChipAttestationProfileVectors.ts and
 // ChipCdTestVectors.ts.
 
@@ -91,7 +91,7 @@ func unhex(t *testing.T, s string) []byte {
 
 // encodeDER re-encodes a decoded node tree, so an edited node gets correct
 // container lengths — the reencode of AttestationCertificateProfileTest.ts
-// :79-89 at b25ed960.
+// :79-89 at db91886c.
 func encodeDER(n derNode) []byte {
 	content := n.bytes
 	if n.tag&0x20 != 0 {

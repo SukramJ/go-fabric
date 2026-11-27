@@ -16,8 +16,8 @@ import (
 // matter.js gives a server's cluster type an event only when the selection
 // makes it mandatory or the behaviour implements it
 // (packages/node/src/node/integration/ProtocolService.ts:529-532,
-// packages/node/src/behavior/internal/ClusterDerivation.ts:196-200 at
-// db021da0). PowerSource's three events are optional under every feature
+// packages/node/src/behavior/internal/ClusterDerivation.ts:237-241 at
+// db91886c). PowerSource's three events are optional under every feature
 // ("[WIRED]", "[BAT]", "[RECHG]",
 // packages/model/src/standard/elements/power-source-cluster.element.ts:135,
 // :147, :159) and PowerSourceServer emits none

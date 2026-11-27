@@ -17,7 +17,7 @@ import (
 // TestOTAProvider_InProgressBoundedPerFabric (review II, R2-P6-bound-1206,
 // decision 134): ApplyUpdateRequests with tokens the provider never issued
 // still answer as matter.js does (an unknown token with a version above 0
-// is allowed, SoftwareUpdateManager.ts:1932-1935 at b25ed960), each
+// is allowed, SoftwareUpdateManager.ts:1932-1935 at db91886c), each
 // replacing the requestor's answered attempt before it; and the requestors
 // of one fabric hold at most otaAttemptsPerFabric running attempts, the
 // one active longest ago ending first.

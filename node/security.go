@@ -69,7 +69,7 @@ type caseFabric struct {
 // peerVerifier is the verifier rooted at a fabric's trust anchor: built
 // from the root certificate when the fabric row holds it, so a root-signed
 // NOC's authorityKeyIdentifier is checked against the root's
-// subjectKeyIdentifier (matter.js Noc.ts:174-188 at b25ed960); from the
+// subjectKeyIdentifier (matter.js Noc.ts:174-188 at db91886c); from the
 // root's public key alone for a legacy row without it.
 func peerVerifier(rcac, rootPublicKey []byte, ts mattercert.TimeSource) (*mattercert.Verifier, error) {
 	if len(rcac) > 0 {
@@ -563,7 +563,7 @@ type security struct {
 // — so a peer learns them during the handshake and may open TCP to us,
 // and a bitmap of 0 when TCP is off. Mirrors matter.js
 // packages/node/src/behavior/system/network/ServerNetworkRuntime.ts:204-210
-// at b25ed960 (`sessions.sessionParameters = {supportedTransports:
+// at db91886c (`sessions.sessionParameters = {supportedTransports:
 // {tcpClient: tcpConfig.outgoing, tcpServer: tcpConfig.incoming}, …}`
 // whatever the roles; review II, R2-P6-par-2905); the size bound is
 // sessionparams.DefaultMaxTCPMessageSize (bridge.SessionParametersFor).
@@ -841,7 +841,7 @@ func caseInitiatorProvider(st store.Resumption, sessions *operational.Manager, i
 // ([operational.Entry.RetransmitBaseInterval]). Without it the bridge's
 // tracker sent every secure-session retransmission on the 500 ms idle
 // default whatever the peer advertised. Mirrors matter.js
-// packages/protocol/src/protocol/MessageChannel.ts:268-275 at b25ed960
+// packages/protocol/src/protocol/MessageChannel.ts:268-275 at db91886c
 // (every transmission takes the peer's session parameters and
 // isPeerActive) into packages/protocol/src/protocol/MRP.ts:162-190 (the
 // base `isPeerActive ? activeInterval : idleInterval`, :181).
@@ -1276,7 +1276,7 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 		}
 		// The initiator's Sigma1 SessionParameters size the session's
 		// retransmissions and name its transports (matter.js
-		// CaseServer.ts:352 at b25ed960 `sessionParameters:
+		// CaseServer.ts:352 at db91886c `sessionParameters:
 		// secureSession.parameters`).
 		if est.PeerSessionParamsOK {
 			p := est.PeerSessionParams
@@ -1326,7 +1326,7 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 // establishing (internal/sessionseam OpenEstablishing): it routes, and the
 // pickers, the session listing and the per-peer cap leave it out until
 // [caseEstablishment.complete] (matter.js CaseServer.ts:314-327 at
-// b25ed960, `establishing: true`).
+// db91886c, `establishing: true`).
 func openEstablishing(sessions *operational.Manager, stake operational.Stake, fabricIndex uint8, localNodeID, peerNodeID uint64, peerSessionID uint16, peerCATs []uint32, keys sigma.SessionKeys) (*operational.Entry, error) {
 	opened, err := sessionseam.OpenEstablishing(sessions, stake, fabricIndex, localNodeID, peerNodeID, peerSessionID, peerCATs, keys)
 	if err != nil {
@@ -1469,7 +1469,7 @@ func (s *caseEstablishment) complete(sessionID uint16, completed bool) bool {
 // its resume presented — the record holding it is replaced. A record the
 // store refuses leaves the presented record in place, its id claimed, so
 // it resumes nothing more; the session stays established (matter.js
-// CaseServer.ts:66-97 at b25ed960 logs a failing save).
+// CaseServer.ts:66-97 at db91886c logs a failing save).
 func (s *caseEstablishment) save(p *pendingCASE) {
 	if s.ids.testBeforeRecord != nil {
 		s.ids.testBeforeRecord()
@@ -1620,7 +1620,7 @@ const (
 // subscriptions of the sessions it supersedes, before the eviction its
 // establishment causes closes any of them (matter.js
 // packages/protocol/src/session/SessionManager.ts:750-769,
-// packages/node/src/node/server/ServerSubscription.ts:819-834 at b25ed960).
+// packages/node/src/node/server/ServerSubscription.ts:819-834 at db91886c).
 // The bridge's method closes what it moved onto a newer session already
 // closed (bridge.Bridge.SessionSuperseded).
 func wireSupersession(sessions *operational.Manager, br *bridge.Bridge) {

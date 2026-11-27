@@ -113,8 +113,8 @@ type Policies struct {
 // encoding cannot collide with an earlier one. v2 added the extensions.
 const policiesDigestDomain = "go-fabric surface.Policies v2\n"
 
-// Digest identifies the policies: the SHA-256 over the enabled extensions,
-// sorted, the effective level when it is not the pin's, the selected
+// Digest identifies the policies: the SHA-256 over the enabled extensions
+// except the retired ones ([RetiredExtensions]), sorted, the effective level when it is not the pin's, the selected
 // profile names, sorted, then every custom policy's kind, name and
 // description, in order. The zero value has a fixed digest, and a Level
 // naming the pin's level has the same one: the two compose alike. A
@@ -124,7 +124,7 @@ const policiesDigestDomain = "go-fabric surface.Policies v2\n"
 func (p Policies) Digest() [32]byte {
 	var b strings.Builder
 	b.WriteString(policiesDigestDomain)
-	for _, id := range p.Extensions.IDs() {
+	for _, id := range p.Extensions.effectiveIDs() {
 		fmt.Fprintf(&b, "extensions\x00%s\n", id)
 	}
 	if l := p.EffectiveLevel(); l != PinLevel() {
@@ -303,7 +303,8 @@ type Report struct {
 	// sorted, each once.
 	Profiles []string
 	// Extensions are the enabled "Ahead of matter.js" register IDs
-	// ([Policies].Extensions), sorted; nil when none is enabled. A host's
+	// ([Policies].Extensions) except the retired ones
+	// ([RetiredExtensions]), sorted; nil when none is left. A host's
 	// pages show them next to the level and the profiles.
 	Extensions []string
 	Effective  Surface

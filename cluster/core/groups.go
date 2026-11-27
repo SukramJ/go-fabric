@@ -270,7 +270,7 @@ func (s *Groups) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (an
 
 // nameLength is the length matter.js checks GroupName against: its UTF-8
 // bytes. Mirrors matter.js packages/node/src/behaviors/groups/GroupsServer.ts:101
-// at b25ed960 (`Bytes.utf8Length(groupName) > 16`, #4995; a JS string
+// at db91886c (`Bytes.utf8Length(groupName) > 16`, #4995; a JS string
 // length, UTF-16 code units, before).
 func nameLength(name string) int { return spec.StringLength(name) }
 

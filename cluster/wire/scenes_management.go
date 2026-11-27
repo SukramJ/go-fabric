@@ -89,7 +89,7 @@ func (s ScenesManagement) MatterWriteChanged(ctx context.Context, attrID uint32,
 // 6170af84, the default of InvokeCommand), and matter.js so answers a
 // command the cluster does not carry, in its protocol layer
 // (`packages/protocol/src/action/server/CommandInvokeResponse.ts:269-271`
-// at b25ed960); matter.js's ScenesManagementServer is an implemented
+// at db91886c); matter.js's ScenesManagementServer is an implemented
 // server, not a stub that refuses commands.
 func (ScenesManagement) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any, error) {
 	return nil, spec.Errorf(im.StatusUnsupportedCommand, "%w: no commands supported, cmdID 0x%02X", errScenesStub, cmdID)

@@ -16,7 +16,7 @@ import (
 // connectedhomeip refuses it the same way (src/ble/BtpEngine.cpp:142-162
 // IsValidAck, :169 BLE_ERROR_INVALID_ACK; the error closes the end point,
 // BLEEndPoint.cpp:1293-1297 at 6170af84); matter.js accepts it
-// (packages/protocol/src/ble/BtpSessionHandler.ts:287-304 at b25ed960)
+// (packages/protocol/src/ble/BtpSessionHandler.ts:287-304 at db91886c)
 // (review II, R2-P3-ble-03).
 func TestSession_RepeatedAckIsRefused(t *testing.T) {
 	t.Parallel()

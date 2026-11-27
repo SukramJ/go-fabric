@@ -1185,7 +1185,7 @@ func (a *AccessControl) MatterWriteChanged(ctx context.Context, attrID uint32, v
 				}
 				// Cluster / Endpoint / DeviceType ID validity, in the same
 				// order matter.js checks them. Mirrors matter.js
-				// packages/node/src/behaviors/access-control/AccessControlServer.ts:254-265 at b25ed960
+				// packages/node/src/behaviors/access-control/AccessControlServer.ts:254-265 at db91886c
 				// (ClusterId.isValid / EndpointNumber.isValid / DeviceTypeId.isValid,
 				// each throwing ConstraintError). Cross-check chip
 				// AccessControl.cpp:746-748 IsValidClusterId / IsValidEndpointId /
@@ -1332,7 +1332,7 @@ func (a *AccessControl) MatterWriteChanged(ctx context.Context, attrID uint32, v
 		// fabric below (a write reaches no other fabric's list), so more
 		// than one entry in a single write always means
 		// more than one entry for that fabric. Mirrors matter.js
-		// AccessControlServer.ts:344-362 at b25ed960
+		// AccessControlServer.ts:344-362 at db91886c
 		// (#validateAccessControlExtensionChanges): a fabric may hold at
 		// most one AccessControlExtensionStruct.
 		if len(entries) > 1 {
@@ -1343,7 +1343,7 @@ func (a *AccessControl) MatterWriteChanged(ctx context.Context, attrID uint32, v
 				return false, spec.Errorf(im.StatusConstraintError, "core: AccessControl.Extension[%d] write: constraint error: Data length %d exceeds max 128", i, len(e.Data))
 			}
 			// Data must itself decode as a well-formed TLV List — mirrors
-			// matter.js AccessControlServer.ts:416-434 at b25ed960
+			// matter.js AccessControlServer.ts:416-434 at db91886c
 			// (extensionEntryValidator's default implementation). A blob
 			// that fails this is rejected rather than stored, so a
 			// garbage write cannot wedge a later fabric-scoped read.
@@ -1543,7 +1543,7 @@ func aclIsValidCASESubject(id uint64) bool {
 	// CASE Auth Tag: upper 32 bits == 0xFFFF_FFFD. The low 16 bits carry
 	// the CAT version, which MUST NOT be 0 — a version-0 CAT is rejected
 	// with ConstraintError. Mirrors matter.js
-	// packages/node/src/behaviors/access-control/AccessControlServer.ts:205-212 at b25ed960
+	// packages/node/src/behaviors/access-control/AccessControlServer.ts:205-212 at db91886c
 	// (CaseAuthenticatedTag.getVersion(cat) === 0 → ConstraintError) and
 	// packages/types/src/datatype/CaseAuthenticatedTag.ts:76
 	// (getVersion = tag & 0xffff). Matter §6.6.2.1.2.
@@ -1600,7 +1600,7 @@ func aclIsValidGroupSubject(id uint64) bool {
 // type byte is TlvType.List (0x17) and whose final byte is the
 // EndOfContainer marker (0x18), with everything in between parsing as
 // balanced TLV. Mirrors matter.js
-// packages/node/src/behaviors/access-control/AccessControlServer.ts:416-434 at b25ed960
+// packages/node/src/behaviors/access-control/AccessControlServer.ts:416-434 at db91886c
 // (extensionEntryValidator, the default implementation): a controller
 // may attach arbitrary vendor metadata to a fabric's Extension entry,
 // but the octet-string must itself be decodable TLV, or a later

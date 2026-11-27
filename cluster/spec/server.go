@@ -277,7 +277,7 @@ func NewServer(def *Cluster, opts Options, cfg ServerConfig) (*Server, error) {
 	// A command the conformance requires is fatal at construction when it
 	// has no implementation. Mirrors matter.js
 	// packages/node/src/behavior/cluster/ValidatedElements.ts:331-333,357-370
-	// at b25ed960 (requireCommand, #validateRequiredCommands: "Implementation
+	// at db91886c (requireCommand, #validateRequiredCommands: "Implementation
 	// missing", fatal) — rather than advertising it in AcceptedCommandList
 	// and answering UNSUPPORTED_COMMAND at invoke.
 	for id, fn := range cfg.Handlers {
@@ -1007,7 +1007,7 @@ func (s *Server) unimplementedLocked(cmdID uint32) bool { return s.handlers[cmdI
 // command left out of AcceptedCommandList, or under strict validation a
 // fatal ClusterImplementationError
 // (packages/node/src/behavior/cluster/ValidatedElements.ts:357-372 at
-// b25ed960, #validateRequiredCommands). The device-type validator reports
+// db91886c, #validateRequiredCommands). The device-type validator reports
 // each as a violation of the endpoint (endpoint.ViolationUnimplemented).
 func (s *Server) UnimplementedMandatoryCommands() []uint32 {
 	s.mu.Lock()

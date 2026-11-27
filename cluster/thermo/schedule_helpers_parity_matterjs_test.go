@@ -2,11 +2,10 @@
 // Copyright (C) 2026 SukramJ.
 
 // The port of matter.js packages/node/test/behaviors/thermostat/schedule-helpers.ts
-// at b25ed960 and the fabrictest scaffolding the three Schedules ports
-// share. MatterScheduleConfiguration is served behind the thermostat-msch
-// forward feature in matter.js (ThermostatServer.ts:267-271) and behind
-// the extension BD-chip-Thermostat-Schedules here (ahead.go); thermo.New
-// takes the feature without the gate, which the device layer applies.
+// at db91886c and the fabrictest scaffolding the three Schedules ports
+// share. matter.js serves MatterScheduleConfiguration without a forward
+// gate since #5044, and the device layer without an extension since the
+// lift to db91886c; thermo.New never had a gate.
 package thermo_test
 
 import (

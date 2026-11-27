@@ -6,6 +6,8 @@ package interaction
 import (
 	"context"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"thingfabric.dev/go-fabric/client/exchange"
 	"thingfabric.dev/go-fabric/im"
@@ -134,17 +136,13 @@ func InvokeChunkCharge(payload []byte) int {
 	return invokeCharge(payload, &resp)
 }
 
-// ReportStatusUnacknowledged starts a report on s and tells s the peer
-// never acknowledged our status to it — to a chunk with more to follow
-// when chunk, to the final report otherwise: the test seam of
-// ClientInteractionSubscribeTest.ts:199-218 at b25ed960, which calls
-// reportStatusUnacknowledged(nextReportNumber(), "final").
-func ReportStatusUnacknowledged(s *Subscription, chunk bool) {
-	status := reportStatusFinal
-	if chunk {
-		status = reportStatusChunk
-	}
-	s.reportStatusUnacknowledged(s.nextReportNumber(), status)
+// ReportInterrupted starts a report on s and tells s it was interrupted
+// as interruption says ("chunk-unacknowledged", "final-unacknowledged" or
+// "chunk-missing"): the test seam of ClientInteractionSubscribeTest.ts:199-218
+// at db91886c, which calls
+// reportInterrupted(nextReportNumber(), "final-unacknowledged").
+func ReportInterrupted(s *Subscription, interruption string) {
+	s.reportInterrupted(s.nextReportNumber(), reportInterruption(interruption))
 }
 
 // EstablishedCount is the number of subscriptions c established that
@@ -163,4 +161,47 @@ func RegisterPeerSubscription(c *Interaction, id uint32) (*Subscription, error) 
 	s := c.subs.newSubscription(peer, SubscribeRequest{}, c.log)
 	s.id = id
 	return s, c.register(s, c.subs.AddPeer)
+}
+
+// BlockAtReportEnd wraps c in a clock for [SubscriptionsConfig].Clock that
+// blocks the registry as BlockNewActivity does once arm names it: on the
+// first Now at which none of its subscriptions is reading. The registry
+// reads Now only in ResetTimer, under its lock, which a report's handler
+// runs after its read ended and before it asks IsBlocked — so a report
+// whose wait for the next chunk already failed meets a blocked registry
+// with that failure recorded. The seam of ClientSubscriptionHandlerTest.ts:186-197
+// at db91886c, where the wait fails after the handler was blocked; a Go
+// shutdown would end the wait itself (BlockNewActivity cancels the reads).
+func BlockAtReportEnd(c exchange.Clock) (clock exchange.Clock, arm func(*Subscriptions)) {
+	b := &reportEndBlocker{Clock: c}
+	return b, func(r *Subscriptions) { b.reg.Store(r) }
+}
+
+type reportEndBlocker struct {
+	exchange.Clock
+	reg atomic.Pointer[Subscriptions]
+}
+
+func (b *reportEndBlocker) Now() time.Time {
+	if r := b.reg.Load(); r != nil && !r.anyReadingLocked() {
+		b.reg.Store(nil)
+		r.blockLocked()
+	}
+	return b.Clock.Now()
+}
+
+// anyReadingLocked reports whether a subscription of r is reading; r.mu
+// is held.
+func (r *Subscriptions) anyReadingLocked() bool {
+	for _, forPeer := range r.peers {
+		for _, s := range forPeer {
+			s.mu.Lock()
+			reading := s.isReading
+			s.mu.Unlock()
+			if reading {
+				return true
+			}
+		}
+	}
+	return false
 }

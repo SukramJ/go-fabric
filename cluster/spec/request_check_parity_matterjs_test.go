@@ -42,7 +42,7 @@ func decodeRequest(t *testing.T, clusterID, cmdID uint32, req spec.Encodable) (a
 // makes before the server runs to matter.js's: the request schema refuses
 // a field outside its constraint with CONSTRAINT_ERROR
 // (packages/protocol/src/action/server/CommandInvokeResponse.ts:474-488
-// at b25ed960), and a server that departs from it says so in the
+// at db91886c), and a server that departs from it says so in the
 // relaxation table (script/clustergen/relaxed.go) — DoorLock answers
 // INVALID_COMMAND for fifteen commands (onValidationError,
 // DoorLockServer.ts:1494-1516 at b25ed960) and leaves the get*Schedule
@@ -76,7 +76,7 @@ func TestRequestCheckParityMatterJS(t *testing.T) {
 		t.Errorf("SetAliroReaderConfig with a 31-byte SigningKey: %v, want CONSTRAINT_ERROR", err)
 	}
 	// DoorLock, a get*Schedule index: 0 reaches the server, which answers
-	// it in its response (DoorLockServer.ts:1518-1526 at b25ed960); the
+	// it in its response (DoorLockServer.ts:1518-1526 at db91886c); the
 	// type's width still holds.
 	if _, err := decodeRequest(t, lockdef.ClusterID, lockdef.CmdGetHolidaySchedule, lockdef.GetHolidayScheduleRequest{HolidayIndex: 0}); err != nil {
 		t.Errorf("GetHolidaySchedule index 0: %v, want it decoded", err)

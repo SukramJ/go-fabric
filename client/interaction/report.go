@@ -53,7 +53,7 @@ type EventData struct {
 	// carried no timestamp, or carried a delta and the event before it has
 	// no absolute time on the same clock. Mirrors matter.js
 	// ReadResult.EventValue.resolvedTimestamp (ReadResult.ts:78-88 at
-	// b25ed960).
+	// db91886c).
 	ResolvedTimestamp *uint64
 	// The four timestamps as the event carried them, nil when absent.
 	EpochTimestamp       *uint64
@@ -401,7 +401,7 @@ func (a *assembler) emitEvents(rd *im.ReportData) {
 		ev := &rd.EventReports[i]
 		// An entry with neither data nor a status (Received nil) is
 		// skipped without touching the chain, as matter.js yields nothing
-		// for it (InputChunk.ts:341-351 at b25ed960); its missing path
+		// for it (InputChunk.ts:341-351 at db91886c); its missing path
 		// drops it below.
 		var resolved *uint64
 		if !ev.IsStatus && ev.Received != nil {
@@ -468,7 +468,7 @@ const (
 // before it in the same message and starts each message with an absolute
 // timestamp, so a chain never spans messages." Mirrors matter.js
 // EventTimestampChain (packages/protocol/src/action/client/InputChunk.ts:360-405
-// at b25ed960, matter.js #4832); the sum wraps where matter.js's Number
+// at db91886c, matter.js #4832); the sum wraps where matter.js's Number
 // arithmetic loses precision, both far beyond any real clock.
 type eventTimestampChain struct {
 	clock eventClock // 0: no prior absolute time
@@ -710,18 +710,22 @@ func (m *messenger) holdChunk(ctx context.Context, held *int, charge int) error 
 
 // readDataReports reads the DataReport chunks of an exchange as matter.js
 // IncomingInteractionClientMessenger.readDataReports does
-// (interaction/InteractionMessenger.ts:1019-1054 at b25ed960): the next
+// (interaction/InteractionMessenger.ts:1025-1062 at db91886c): the next
 // message must be a ReportData (a StatusResponse error in its place is a
-// *StatusError, :992-1012); the consumer takes the chunk first; then a
+// *StatusError, waitFor :998-1018); the consumer takes the chunk first; then a
 // chunk with more to come is answered with a StatusResponse Success and
 // the next one awaited, the last one with a Success unless it suppresses
 // the response — sent before the exchange closes, a failure only logged
-// (the tracked end message, :1035-1048). A status the peer never
-// acknowledged is recorded on m (#sendReportStatus, :1056-1068 at
-// b25ed960). first, when set, is the chunk
+// (the tracked end message, :1043-1056). A status the peer never
+// acknowledged is recorded on m (#sendReportStatus, :1075-1087 at
+// db91886c), and so is a continuation chunk that never came: when the wait
+// for a chunk after one was taken ends in a
+// [*exchange.PeerMessageMissingError], the interruption is chunk-missing
+// and the error is returned unchanged (#nextDataReport, :1064-1073; the
+// continuation flag, :1026-1029). first, when set, is the chunk
 // already received, firstPayload its bytes, held to the report bound as
-// every later chunk is. A consumer returning errStopReports ends the
-// reading with nil and no answer.
+// every later chunk is — the wait after it is a continuation. A consumer
+// returning errStopReports ends the reading with nil and no answer.
 func readDataReports(ctx context.Context, log *slog.Logger, m *messenger, first *im.ReportData, firstPayload []byte, consume func(rd *im.ReportData) error) error {
 	held := 0
 	defer func() { releaseAssembly(m.x.Session(), held) }()
@@ -731,12 +735,17 @@ func readDataReports(ctx context.Context, log *slog.Logger, m *messenger, first 
 		}
 	}
 	rd := first
+	continuation := first != nil
 	for {
 		if rd == nil {
 			msg, err := m.nextReport(ctx)
 			if err != nil {
+				if interruption := waitInterruption(continuation, err); interruption != "" {
+					m.reportInterruption = interruption
+				}
 				return err
 			}
+			continuation = true
 			if rd, err = decodeReport(msg.Payload); err != nil {
 				return err
 			}
@@ -745,7 +754,7 @@ func readDataReports(ctx context.Context, log *slog.Logger, m *messenger, first 
 			}
 		}
 		// A report read owes its status until it is consumed, unless it
-		// suppresses the response (InteractionMessenger.ts:1013-1025).
+		// suppresses the response (InteractionMessenger.ts:1030-1036 at db91886c).
 		m.reportAwaitsStatus = !rd.SuppressResponse || rd.MoreChunkedMessages
 		m.reportSubscriptionID = rd.SubscriptionID
 		if err := consume(rd); err != nil {
@@ -777,10 +786,25 @@ func readDataReports(ctx context.Context, log *slog.Logger, m *messenger, first 
 	}
 }
 
+// waitInterruption is the interruption a failed wait for a report chunk
+// records: chunk-missing when a chunk was taken before (continuation) and
+// the wait ended in a [*exchange.PeerMessageMissingError], none otherwise —
+// no report at all, or another failure (a [*exchange.PeerUnresponsiveError]
+// included). Mirrors matter.js #nextDataReport
+// (packages/protocol/src/interaction/InteractionMessenger.ts:1064-1073 at
+// db91886c).
+func waitInterruption(continuation bool, err error) reportInterruption {
+	if continuation && isMessageMissing(err) {
+		return reportChunkMissing
+	}
+	return ""
+}
+
 // nextReport is IncomingInteractionClientMessenger.waitFor("DataReport"):
 // a StatusResponse in place of the report is a *StatusError, Success
 // included, any other message an ErrUnexpectedMessage. Mirrors matter.js
-// packages/protocol/src/interaction/InteractionMessenger.ts:985-1000.
+// packages/protocol/src/interaction/InteractionMessenger.ts:998-1018 at
+// db91886c.
 func (m *messenger) nextReport(ctx context.Context) (*exchange.Message, error) {
 	msg, err := m.x.Next(ctx, exchange.ReceiveOptions{})
 	if err != nil {

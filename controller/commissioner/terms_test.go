@@ -186,7 +186,7 @@ func TestTermsRequirementReadPaths(t *testing.T) {
 // TestTermsRequiredBeforeArmFailSafe: the flow ends with the requirement
 // right after step 0.1 — nothing armed, no command reaches the device but
 // the one ArmFailSafe with expiry 0 that expires the fail-safe the device
-// armed with the PASE session (disarmAfterFailure) — and reports step 0.1
+// armed with the PASE session (expireFailsafe) — and reports step 0.1
 // failed with it.
 func TestTermsRequiredBeforeArmFailSafe(t *testing.T) {
 	t.Parallel()

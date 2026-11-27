@@ -43,7 +43,7 @@ type UnitLocalizationConfig struct {
 // TemperatureUnit feature.
 //
 // Mirrors matter.js packages/node/src/behaviors/unit-localization/
-// UnitLocalizationServer.ts at b25ed960: the behavior
+// UnitLocalizationServer.ts at db91886c: the behavior
 // .with("TemperatureUnit") (:16); initialize (:17-38) seeds
 // SupportedTemperatureUnits with [Celsius, Fahrenheit] when it is empty or
 // unset (:18-23), keeps a TemperatureUnit that is set and supported
@@ -60,9 +60,9 @@ type UnitLocalizationConfig struct {
 // A written TemperatureUnit that SupportedTemperatureUnits does not hold
 // is CONSTRAINT_ERROR: the model constraint is "in
 // supportedTemperatureUnits" (matter.js packages/model/src/standard/
-// elements/unit-localization.element.ts:24-27 at b25ed960), enforced by
+// elements/unit-localization.element.ts:24-27 at db91886c), enforced by
 // matter.js's validator (packages/node/src/behavior/state/validation/
-// constraint.ts:157-168 at b25ed960) and by the generated runtime before
+// constraint.ts:157-168 at db91886c) and by the generated runtime before
 // the sink sees the value (spec.Instance.ValidateWrite).
 func NewUnitLocalization(cfg UnitLocalizationConfig) (*spec.Server, error) {
 	supported := slices.Clone(cfg.SupportedTemperatureUnits)
@@ -71,8 +71,8 @@ func NewUnitLocalization(cfg UnitLocalizationConfig) (*spec.Server, error) {
 	}
 	// Each unit once: the model's text for the attribute, "Each entry in
 	// the list shall be unique" (matter.js unit-localization.resource.ts:43-45
-	// at b25ed960); neither matter.js's constraint ("2 to 3",
-	// unit-localization.element.ts:29-35 at b25ed960) nor connectedhomeip
+	// at db91886c); neither matter.js's constraint ("2 to 3",
+	// unit-localization.element.ts:29-35 at db91886c) nor connectedhomeip
 	// (UnitLocalizationCluster.cpp:52-66 at 6170af84, the size alone)
 	// checks it (review II, R2-P6-err-1268).
 	if sorted := slices.Sorted(slices.Values(supported)); len(slices.Compact(sorted)) != len(supported) {

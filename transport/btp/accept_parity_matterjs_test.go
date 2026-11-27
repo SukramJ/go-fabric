@@ -15,7 +15,7 @@ import (
 )
 
 // The peripheral's GATT server, Accept, follows matter.js
-// packages/nodejs-ble/src/BlenoBleServer.ts at b25ed960. matter.js has no
+// packages/nodejs-ble/src/BlenoBleServer.ts at db91886c. matter.js has no
 // test of that file at the pin (packages/nodejs-ble/test holds only the
 // central's NobleBleChannelTest.ts and ScanControlTest.ts), so these cases
 // are written from the server's lines, each named where it asserts.

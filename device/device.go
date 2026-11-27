@@ -605,7 +605,7 @@ func powerSource(cfg *spec.ServerConfig, features uint32, self func() (uint16, b
 
 // powerSourceDefaults fills what matter.js's PowerSourceServer.initialize
 // sets when the state leaves it unset (packages/node/src/behaviors/power-source/PowerSourceServer.ts:37-62
-// at b25ed960): Status Unspecified; Description "Mains power" with WIRED,
+// at db91886c): Status Unspecified; Description "Mains power" with WIRED,
 // else "Battery power" with BAT; with BAT, BatChargeLevel Ok and
 // BatReplaceability Unspecified; with WIRED, WiredCurrentType AC.
 func powerSourceDefaults(features uint32, initial map[uint32]any) {
@@ -637,8 +637,8 @@ func powerSourceDefaults(features uint32, initial map[uint32]any) {
 // endpoints a bridged device's power source feeds are its own, unless the
 // declaration's Initial names them. matter.js's PowerSourceServer sets no
 // EndpointList (packages/node/src/behaviors/power-source/PowerSourceServer.ts:21-63
-// at b25ed960), and the model makes EndpointList mandatory
-// (power-source-cluster.element.ts:130 at b25ed960), so the application
+// at db91886c), and the model makes EndpointList mandatory
+// (power-source-cluster.element.ts:130 at db91886c), so the application
 // fills it; the kit fills it as the measurement-projected server does
 // (cluster/measurement SetEndpoint).
 type ownEndpointList struct{ self func() (uint16, bool) }
@@ -759,7 +759,7 @@ func (d *Device) MatterClusterServers() []contract.ClusterServer { return d.Serv
 // (its deviceType requirements, schema.DeviceTypeDefinitionOf, through its
 // base types), except under a BridgedNode, whose "Separate Endpoints"
 // pattern hosts any application device type on descendants
-// (packages/node/src/endpoints/bridged-node.ts:39-73 at b25ed960).
+// (packages/node/src/endpoints/bridged-node.ts:39-73 at db91886c).
 //
 // A part of another device moves while it is bound to no running node:
 // it leaves its former owner's parts — and that owner's node, which has
@@ -907,7 +907,7 @@ func (d *Device) composeLocked(parts []*Device, via deviceseam.Host, check func(
 		if former == d {
 			continue
 		}
-		// The move (packages/node/src/endpoint/Endpoint.ts:709-721 at b25ed960): out of the former owner, then in.
+		// The move (packages/node/src/endpoint/Endpoint.ts:709-721 at db91886c): out of the former owner, then in.
 		if former != nil {
 			former.mu.Lock()
 			former.parts = slices.DeleteFunc(former.parts, func(x *Device) bool { return x == p })

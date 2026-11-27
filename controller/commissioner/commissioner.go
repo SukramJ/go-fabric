@@ -407,15 +407,16 @@ func (c *Commissioner) Commission(ctx context.Context, opts Options) (Result, er
 // ContinueAfterPASE refuses: the device's rollback ends the PASE session
 // (matter.js packages/protocol/src/common/FailsafeContext.ts:277-279 at
 // db021da0), and until it ends the device accepts no new PASE exchange
-// (PaseServer.ts:80-82 at db021da0). The flow's own failures disarm
-// themselves (flow.disarmAfterFailure, which says why, and
-// flow.disarmAfterAbort). It sends the request of the flow's expiry
-// (flow.sendFailsafeExpiry, without its response check) with the breadcrumb the flow starts with (initialBreadcrumb), bounded by
-// ctx and the exchange's response timeout or, ctx having ended, by
-// abortDisarmTimeout as after an abort; nothing on a closed session, a
-// failure logged. Ahead of matter.js, whose commission only force-closes
-// the session on a failure (ControllerCommissioner.ts:304-306, :313-319
-// at db021da0).
+// (PaseServer.ts:80-82 at db021da0). The flow's own failures and cancels
+// expire it themselves (flow.expireFailsafe). It sends the request of the
+// flow's expiry (flow.sendFailsafeExpiry, without its response check) with
+// the breadcrumb the flow starts with (initialBreadcrumb), bounded by ctx
+// and the exchange's response timeout or, ctx having ended, by
+// canceledExpiryWait as the flow's expiry after a cancel; nothing on a
+// closed session, a failure logged. Ahead of matter.js, whose commission
+// only force-closes such a session (packages/protocol/src/peer/ControllerCommissioner.ts:305-309,
+// :322-324, #closePaseSession :331-337 at db91886c; a race loser,
+// CommissioningConnection.ts:144-157): BD-Matter-Commissioner-GivenUpPASEDisarmed.
 func (c *Commissioner) disarmPASE(ctx context.Context, s *exchange.Session, ch Channel) {
 	if s.IsClosed() {
 		return
@@ -426,7 +427,7 @@ func (c *Commissioner) disarmPASE(ctx context.Context, s *exchange.Session, ch C
 	}
 	if ctx.Err() != nil {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(context.WithoutCancel(ctx), abortDisarmTimeout)
+		ctx, cancel = context.WithTimeout(context.WithoutCancel(ctx), canceledExpiryWait)
 		defer cancel()
 	}
 	path := im.ConcreteCommandPath{Endpoint: rootEndpoint, Cluster: gencomm.ClusterID, Command: gencomm.CmdArmFailSafe}
@@ -829,11 +830,22 @@ func (c *Commissioner) forgetIn(s CommissionedScanner, addresses []string, ident
 // parameters the PASE session reported — connects over CASE with the
 // connection timeout and timing, a NoSharedTrustRoots refusal retried
 // after 15 s, and the CASE session is the interaction's from then on.
+// A cancel that came before the hand-off starts no FinalizeCommissioning:
+// the cancel's reason is returned (matter.js `options.abort?.throwIfAborted()`
+// before performCaseCommissioning, ControllerCommissioner.ts:742-745 at
+// db91886c), after the PASE close (:728-739). FinalizeCommissioning gets
+// ctx, where matter.js's performCaseCommissioning gets no signal (:744) —
+// a Go context is how a callback is told; one that ignores it completes
+// the commissioning despite a later cancel, as matter.js's does. The
+// operational connection waits on ctx (`peer.connect({ abort: options.abort })`, :753-754).
 func (c *Commissioner) transitionToCase(ctx context.Context, pase *exchange.Session, addr handshake.PeerAddress, concurrent bool, opts Options) (*interaction.Interaction, error) {
 	if !concurrent {
 		c.closePASE(pase, opts.Channel, &CommissioningTransitionError{Message: "Commissioning session closed because node has now joined fabric"})
 	}
 	if opts.FinalizeCommissioning != nil {
+		if ctx.Err() != nil {
+			return nil, cancelError(ctx)
+		}
 		return nil, opts.FinalizeCommissioning(ctx, addr, opts.DiscoveryData, pase.ReportedParameters())
 	}
 	// The peer with the discovery data and the parameters the PASE session

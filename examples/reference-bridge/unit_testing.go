@@ -21,7 +21,7 @@ import (
 // what a write carries, as matter.js's does.
 //
 // Mirrors matter.js support/chip-testing/src/cert/unit-testing-cluster.ts:63-107
-// at b25ed960 (UNIT_TESTING_ENDPOINT 1, LONG_OCTET_STRING_ENTRY,
+// at db91886c (UNIT_TESTING_ENDPOINT 1, LONG_OCTET_STRING_ENTRY,
 // UnitTestingServer and its State), served unconditionally on the
 // all-clusters endpoint 1 there (src/AllClustersTestInstance.ts:1198);
 // here behind the flag, the daemon serving no test cluster by default
@@ -37,11 +37,11 @@ const (
 
 // unitTestingLongOctetStringEntry is the one value each entry of
 // listLongOctetString holds on a chip TH: "0123456789abcdef" 32 times, 512
-// bytes (unit-testing-cluster.ts:66-70 at b25ed960).
+// bytes (unit-testing-cluster.ts:66-70 at db91886c).
 var unitTestingLongOctetStringEntry = bytes.Repeat([]byte("0123456789abcdef"), 32)
 
 // unitTestingSimpleStruct is CHIP's SimpleStruct without the optional
-// field 8 (unit-testing-cluster.ts:35-61 at b25ed960): every field is
+// field 8 (unit-testing-cluster.ts:35-61 at db91886c): every field is
 // optional — matter.js's @field states no conformance — so an absent one
 // stays absent through a write and its read-back.
 type unitTestingSimpleStruct struct {
@@ -88,7 +88,7 @@ func (v *unitTestingSimpleStruct) DecodeTLV(n spec.Node) error {
 var unitTestingDefinition = unitTestingCluster()
 
 // unitTestingCluster states the cluster (unit-testing-cluster.ts:83-106 at
-// b25ed960): revision 1 (no ClusterRevision stated), no features, commands
+// db91886c): revision 1 (no ClusterRevision stated), no features, commands
 // or events, four mandatory attributes, each "writable" — access RW with
 // no privilege stated, so View to read and Operate to write — and not
 // nonvolatile.
@@ -137,7 +137,7 @@ func unitTestingCluster() *spec.Cluster {
 }
 
 // newUnitTesting registers the definition and returns its server holding
-// matter.js's initial state (unit-testing-cluster.ts:91-106 at b25ed960):
+// matter.js's initial state (unit-testing-cluster.ts:91-106 at db91886c):
 // floatSingle 0, octetString empty, structAttr with every field at its
 // zero value, listLongOctetString four long entries. Every value is
 // Initial: a definition's Default renders a number only as a float64 and

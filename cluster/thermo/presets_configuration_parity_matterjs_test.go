@@ -2,7 +2,7 @@
 // Copyright (C) 2026 SukramJ.
 
 // A port of matter.js packages/node/test/behaviors/thermostat/PresetsConfigurationTest.ts
-// at b25ed960: the write rules without configured presets, presets the
+// at db91886c: the write rules without configured presets, presets the
 // configuration supplies, and a start whose stored presets exceed
 // NumberOfPresets (#4467).
 //

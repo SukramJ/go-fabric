@@ -200,7 +200,7 @@ func TestCertificateStoreRejectsBadRoots(t *testing.T) {
 // TestCertificateStoreCDSigner: a CSA-issued CD signer absent locally is
 // fetched by key identifier from the production ledger and stored as a
 // production CD signer (lookupCdSigner, DclCertificateService.ts:901-970 at
-// b25ed960); the next lookup is local. A PAA is not a CD signer; a key
+// db91886c); the next lookup is local. A PAA is not a CD signer; a key
 // identifier the ledger lacks is none.
 func TestCertificateStoreCDSigner(t *testing.T) {
 	t.Parallel()
@@ -332,7 +332,7 @@ func TestCertificateStoreGitHub(t *testing.T) {
 	}
 	// Stored as a test CD signer, but a certificate the CSA CD root did
 	// not issue is no CD signer (lookupCdSigner, DclCertificateService.ts:
-	// 935-940 at b25ed960).
+	// 935-940 at db91886c).
 	if _, ok := on.CDSigner(signer.skid()); ok {
 		t.Fatal("a GitHub certificate the CSA did not issue was trusted as CD signer")
 	}

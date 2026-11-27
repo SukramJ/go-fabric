@@ -108,7 +108,7 @@ func TestOTAConsentChangesQueuedOptionsParity(t *testing.T) {
 	}
 	// The one entry: queued, or announcing already — an announcing entry
 	// lists in-progress (queuedUpdates, SoftwareUpdateManager.ts:401-407 at
-	// b25ed960).
+	// db91886c).
 	if q := r.c.SoftwareUpdates().QueuedUpdates(); len(q) != 1 || q[0].Status == softwareupdate.PendingStalled {
 		t.Errorf("queue %+v, want the one entry", q)
 	}
@@ -286,7 +286,7 @@ func TestOTACancelByRemovingConsentParity(t *testing.T) {
 // OTAConfig.DelegateConsentToRequestor to its update manager. Off (the
 // default), a node that says it can consent is offered nothing without a
 // consent given to the manager; on, it is offered the newest stored image,
-// consent-required — OtaTest.ts:4666 at b25ed960, through the controller's
+// consent-required — OtaTest.ts:4666 at db91886c, through the controller's
 // configuration.
 func TestOTADelegatesConsentOnlyWhenOnParity(t *testing.T) {
 	t.Parallel()

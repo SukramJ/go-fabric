@@ -17,7 +17,7 @@ import (
 // generation.
 //
 // quietDefault is matter.js's QuietObservable default minimumEmitInterval
-// (packages/general/src/util/Observable.ts:1383-1387 at b25ed960,
+// (packages/general/src/util/Observable.ts:1383-1387 at db91886c,
 // Seconds.one).
 const quietDefault = time.Second
 
@@ -34,7 +34,7 @@ var quietIntervals = map[string]struct {
 	"PowerSource.BatTimeToFullCharge": {10 * time.Second, powerSourceQuiet},
 }
 
-const powerSourceQuiet = "matter.js packages/node/src/behaviors/power-source/PowerSourceServer.ts:25-34 at b25ed960"
+const powerSourceQuiet = "matter.js packages/node/src/behaviors/power-source/PowerSourceServer.ts:25-34 at db91886c"
 
 // quietInterval returns the interval of attribute a of the generator's
 // cluster: the table's entry, else [quietDefault]; zero for an attribute

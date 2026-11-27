@@ -2,7 +2,7 @@
 // Copyright (C) 2026 SukramJ.
 
 // A port of matter.js packages/node/test/behaviors/localization-configuration/
-// LocalizationConfigurationServerTest.ts at b25ed960, by meaning.
+// LocalizationConfigurationServerTest.ts at db91886c, by meaning.
 // matter.js runs EnglishServer, whose detected locale is "en-US" (:16-21),
 // sets its state on the root (rootWith :23-25) and writes as a controller
 // (writeActiveLocale :27-39). The Go server has no detected locale of its
@@ -132,7 +132,7 @@ func TestLocalizationConfigurationServerParityMatterJS(t *testing.T) {
 
 	// Go's own: an empty, non-nil list is no configuration, as matter.js's
 	// `!supportedLocales?.length` (LocalizationConfigurationServer.ts:17
-	// at b25ed960). Refused with ErrLocalizationConfig before (decision 296).
+	// at db91886c). Refused with ErrLocalizationConfig before (decision 296).
 	t.Run("seeds an empty SupportedLocales with the ActiveLocale", func(t *testing.T) {
 		t.Parallel()
 		check(t, build(t, core.LocalizationConfigurationConfig{ActiveLocale: "de-DE", SupportedLocales: []string{}}), "de-DE", []string{"de-DE"})

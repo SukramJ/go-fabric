@@ -134,7 +134,7 @@ func (n *Node) buildOTAProvider() error {
 		RebootQuery:       cfg.RebootQuery,       //nolint:staticcheck // honoured for the deprecation window
 		TransferBlockSize: cfg.TransferBlockSize, //nolint:staticcheck // honoured for the deprecation window
 		// The URI names this node on the requestor's fabric
-		// (OtaSoftwareUpdateProviderServer.ts:300 at b25ed960).
+		// (OtaSoftwareUpdateProviderServer.ts:300 at db91886c).
 		NodeID: func(fabricIndex uint8) (uint64, bool) {
 			_, nodeID, ok := n.caseIDs.announceIdentity(fabricIndex)
 			return nodeID, ok
@@ -297,7 +297,7 @@ func (n *Node) ensureOTAProviderACLOn(ctx context.Context, fabricIndex uint8, ep
 	// AccessControlEntryChanged is emitted, because matter.js's
 	// setStateOf(AccessControlServer) runs without a remote actor and
 	// #handleAccessControlListChange returns before its events
-	// (AccessControlServer.ts:286-302 at b25ed960). Called after
+	// (AccessControlServer.ts:286-302 at db91886c). Called after
 	// addLocalOperateEntry released the write lock, as
 	// NotifyLocalEntryInstalledOn requires (review II, R5-par-5003).
 	n.root.AccessControl.NotifyLocalEntryInstalledOn(ctx, fabricIndex)

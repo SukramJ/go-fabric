@@ -96,7 +96,7 @@ func (m *fakeMeter) notify() {
 // ElectricalEnergyMeasurement server, bound to CumulativeEnergy and
 // ImportedEnergy, lists CumulativeEnergyMeasured — mandatory with CUME
 // (packages/model/src/standard/elements/electrical-energy-measurement.element.ts:56-59
-// at b25ed960) — and the event is emitted, carrying the imported energy,
+// at db91886c) — and the event is emitted, carrying the imported energy,
 // when the source's cumulative value changes: matter.js emits it with each
 // measurement set through setMeasurement
 // (packages/node/src/behaviors/electrical-energy-measurement/ElectricalEnergyMeasurementServer.ts:44-62),

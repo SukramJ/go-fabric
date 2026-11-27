@@ -110,7 +110,7 @@ func TestDispatchEndpoints(t *testing.T) {
 
 // TestDeniedEventPathStatusesExistence: a concrete event path that does not
 // exist answers its existence status (EventReadResponse.ts:158-224 at
-// b25ed960); a wildcard is skipped; Messages is fabric-sensitive.
+// db91886c); a wildcard is skipped; Messages is fabric-sensitive.
 func TestDeniedEventPathStatusesExistence(t *testing.T) {
 	t.Parallel()
 	d := &gateDispatcher{}

@@ -138,7 +138,7 @@ func refusedAtInit(t spec.Type, q spec.Quality, c spec.Constraint, def any) bool
 
 // structRefused reports whether matter.js leaves a mandatory field of a
 // struct built from its children's defaults undefined (DefaultValue.ts
-// buildObject, :153-179 at b25ed960): a mandatory, non-nullable child
+// buildObject, :153-179 at db91886c): a mandatory, non-nullable child
 // without a default of its own is undefined unless it is a list whose
 // constraint admits the empty list — matter.js gives such a child []
 // (DefaultValue.ts:130-143) — or a struct that is itself built from its

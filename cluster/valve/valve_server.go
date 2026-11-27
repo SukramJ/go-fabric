@@ -17,7 +17,7 @@
 // [DefaultOpenLevelSource] for the optional DefaultOpenLevel): the server
 // resolves an Open's level and checks it against LevelStep, as
 // connectedhomeip's cluster does. matter.js's server is the empty
-// subclass (ValveConfigurationAndControlServer.ts:14 at b25ed960), so
+// subclass (ValveConfigurationAndControlServer.ts:14 at db91886c), so
 // both features are an "Ahead of matter.js" row
 // (notes/parity/by_design.md BD-chip-Valve-RulesInServer; [Ahead]).
 //

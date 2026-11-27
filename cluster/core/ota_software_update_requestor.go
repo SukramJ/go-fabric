@@ -428,7 +428,7 @@ func NewOTASoftwareUpdateRequestor(cfg OTARequestorConfig) (*OTASoftwareUpdateRe
 		cfg.TransferProtocols = []DownloadProtocol{DownloadProtocolBDXSynchronous}
 	} else if !slices.Contains(cfg.TransferProtocols, DownloadProtocolBDXSynchronous) {
 		// matter.js's query carries BDX synchronous by default
-		// (OtaSoftwareUpdateRequestorServer.ts:1367-1372 at b25ed960).
+		// (OtaSoftwareUpdateRequestorServer.ts:1367-1372 at db91886c).
 		return nil, errors.New("core: OTA requestor TransferProtocols must include DownloadProtocolBDXSynchronous")
 	} else {
 		cfg.TransferProtocols = slices.Clone(cfg.TransferProtocols)
@@ -906,7 +906,7 @@ func (r *OTASoftwareUpdateRequestor) markActiveOtaProviderNoUpdate(ctx context.C
 // later fabric that receives the index inherits none (review II,
 // R2-P6-store-1204 — matter.js keeps activeOtaProviders node-wide and has
 // no fabric-removal handling, OtaSoftwareUpdateRequestorServer.ts:109-116
-// at b25ed960). An update in progress keeps its provider location: the
+// at db91886c). An update in progress keeps its provider location: the
 // apply it names is already under way.
 func (r *OTASoftwareUpdateRequestor) FabricRemoved(fabricIndex uint8) {
 	_ = r.fabricRemoved(context.Background(), fabricIndex)
@@ -1127,7 +1127,7 @@ func (r *OTASoftwareUpdateRequestor) goRun(fn func(ctx context.Context)) {
 // requestor's [OTASoftwareUpdateRequestor.Start] reports as applied
 // (VersionApplied). Mirrors the condition of matter.js
 // OtaSoftwareUpdateRequestorServer.ts #handlePreviousUpdateOnStart
-// (:255-283 at b25ed960, newSoftwareVersion equal to the running
+// (:255-283 at db91886c, newSoftwareVersion equal to the running
 // softwareVersion). A node reads it before the requestor starts, to state
 // GeneralDiagnostics BootReason SoftwareUpdateCompleted for the start the
 // update brought about. No record is false.

@@ -108,7 +108,7 @@ func TestPingAddressRefusals(t *testing.T) {
 
 // TestDecommissionProbeParity ports DecommissionTest "probe resolves false
 // on a destroyed node instead of throwing"
-// (packages/node/test/node/DecommissionTest.ts:309-328 at b25ed960): the
+// (packages/node/test/node/DecommissionTest.ts:309-328 at db91886c): the
 // decommission completes with RemoveFabric's answer missing, and a late
 // ping of the removed node fails instead of panicking — matter.js's false
 // is the Go error.

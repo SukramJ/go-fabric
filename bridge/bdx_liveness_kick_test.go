@@ -17,7 +17,7 @@ import (
 )
 
 // kickLookup is a session lookup stating SLOW_PEER's schedule for its
-// session (matter.js MessageExchangeTest.ts:219 at b25ed960): both
+// session (matter.js MessageExchangeTest.ts:219 at db91886c): both
 // intervals 7 s, the active threshold its own.
 type kickLookup struct {
 	sid       uint16
@@ -106,7 +106,7 @@ func (r *kickRig) duplicate(t *testing.T, gap time.Duration, dup uint32) bool {
 
 // TestBDXLivenessKickOnDuplicate ports matter.js
 // packages/protocol/test/protocol/MessageExchangeTest.ts:207-355 at
-// b25ed960 (describe "liveness kick on duplicate") onto the bridge's
+// db91886c (describe "liveness kick on duplicate") onto the bridge's
 // reliable tracker: the duplicate's verdict, the retransmission of the
 // outstanding message through the listener, its schedule restarted. As in
 // matter.js, the 7 s base puts the backoff above the BDX cap, so the armed

@@ -164,7 +164,7 @@ func decodeRangeControl(b byte) rangeControl {
 // (src/protocols/bdx/BdxMessages.cpp:47-48, :53 at 6170af84), so nothing is
 // truncated (review II, R2-P6-wire-1909; an Ahead-of-matter.js row: matter.js
 // takes the wide form by type — BdxInitMessagesSchema.ts:115 for the Init,
-// BdxAcceptMessagesSchema.ts:110 for the ReceiveAccept, at b25ed960 — and
+// BdxAcceptMessagesSchema.ts:110 for the ReceiveAccept, at db91886c — and
 // writes a number above 2³²−1 through DataView.setUint32,
 // DataWriter.ts:33-35, which wraps it modulo 2³²). A
 // MaxLength of 0 means an indefinite length, as in matter.js, and is not

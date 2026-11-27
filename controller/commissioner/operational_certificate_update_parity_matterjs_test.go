@@ -2,7 +2,7 @@
 // Copyright (C) 2026 SukramJ.
 
 // A port of matter.js packages/node/test/node/OperationalCertificateUpdateTest.ts
-// at b25ed960: the controller replacing the NOC of a commissioned peer —
+// at db91886c: the controller replacing the NOC of a commissioned peer —
 // the success path against the module's own node device (UpdateNOC, a
 // fresh CASE session, CommissioningComplete), the refusals before arming,
 // the rollbacks, the recovery pass and the unknown outcomes.

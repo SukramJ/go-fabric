@@ -22,7 +22,7 @@ import (
 // defaultRequest is the default subscription — every attribute, every
 // event urgent, fabric-filtered, replacing our other subscriptions —
 // narrowed by the stored options (the options branch of
-// NetworkClient.#defaultSubscribe, NetworkClient.ts:265-271 at b25ed960).
+// NetworkClient.#defaultSubscribe, NetworkClient.ts:265-271 at db91886c).
 // The caller holds the lock.
 func (n *Node) defaultRequest() SubscribePaths {
 	r := SubscribePaths{
@@ -48,7 +48,7 @@ func (n *Node) defaultRequest() SubscribePaths {
 // subscribed if it was reported subscribed. Mirrors matter.js
 // NetworkClient.#endDefaultSubscription
 // (packages/node/src/behavior/system/network/NetworkClient.ts:243-252 at
-// b25ed960).
+// db91886c).
 func (n *Node) endDefaultSubscription() {
 	n.mu.Lock()
 	s, wasActive := n.sub, n.subReported
@@ -64,7 +64,7 @@ func (n *Node) endDefaultSubscription() {
 
 // syncAutoSubscribe is NetworkClient.#syncAutoSubscribe with the node's
 // autoSubscribe, serialised with the other reactions (subSync, the
-// subscriptionChanges queue, NetworkClient.ts:114-116 at b25ed960).
+// subscriptionChanges queue, NetworkClient.ts:114-116 at db91886c).
 func (n *Node) syncAutoSubscribe(ctx context.Context) error {
 	n.subSync.Lock()
 	defer n.subSync.Unlock()
@@ -105,7 +105,7 @@ func (n *Node) syncAutoSubscribeLocked(ctx context.Context, desire *bool) error 
 		// the peer does not answer; Stop, then the change, is the way out. A module rule (review II, R2-P6-err-2363; Fable
 		// fact note fable-6b-w2 G1): matter.js clears the flag before its
 		// read (packages/node/src/behavior/system/network/
-		// NetworkClient.ts:147-150 at b25ed960). The caller holds subSync,
+		// NetworkClient.ts:147-150 at db91886c). The caller holds subSync,
 		// so no other sync runs meanwhile.
 		if _, err := n.read(ctx, ReadRequest{ReadRequest: ReadPaths{Attributes: req.Attributes, Events: req.Events, NoFabricFilter: req.NoFabricFilter}}, true); err != nil {
 			return err
@@ -222,7 +222,7 @@ func sameSubscribeOptions(a, b *SubscribeOptions) bool {
 // succeeds at the next start or the next change of the default
 // subscription. Mirrors matter.js NetworkClient.#adoptFabricFilter
 // (packages/node/src/behavior/system/network/NetworkClient.ts:274-298 at
-// b25ed960): a record that failed while the filter is already the cache's
+// db91886c): a record that failed while the filter is already the cache's
 // is a warning, a failed switch an error. The caller holds subSync.
 //
 // Its error is ctx's and nothing else: ctx ended while the node's report
@@ -318,7 +318,7 @@ func (n *Node) adoptFabricFilterDrained(filtered bool) error {
 
 // recordCacheFabricFilteredLocked records the cache's fabric filter in the
 // store — ClientNodeStore.recordCacheFabricFiltered
-// (packages/node/src/storage/client/ClientNodeStore.ts:88-97 at b25ed960),
+// (packages/node/src/storage/client/ClientNodeStore.ts:88-97 at db91886c),
 // under the settings' place. The caller holds n.mu.
 func (n *Node) recordCacheFabricFilteredLocked(filtered bool) error {
 	if n.erased {
@@ -433,7 +433,7 @@ func (n *Node) announceSubscriptionStatus(active bool, owner *subscriptionOwner)
 		// matter.js goes live only once the priming report's updated has
 		// drained (ClientInteraction.ts:1173-1174, SustainedSubscription.ts:224,
 		// :282 at db021da0), and emits alive after that, unconditionally
-		// (NetworkClient.ts:226-236 at b25ed960); here the priming report's
+		// (NetworkClient.ts:226-236 at db91886c); here the priming report's
 		// hooks may still be queued, so the alive queues behind them. It
 		// needs no subscription id, and it is the only alive of a
 		// subscription going live: the priming report's was dropped when it
@@ -458,7 +458,7 @@ func (n *Node) announceSubscriptionStatus(active bool, owner *subscriptionOwner)
 // (brief FP2 §2). A keepalive's alive queues behind the reports before it.
 //
 // matter.js gates a report's alive on the subscription id
-// (NetworkClient.ts:179-191 at b25ed960), and the id is assigned only after
+// (NetworkClient.ts:179-191 at db91886c), and the id is assigned only after
 // the priming report's updated returned (ClientInteraction.ts:1083 before
 // :1086, SustainedSubscription.ts:224 before :226 at db021da0): the
 // priming report emits no alive, and a subscription going live emits
@@ -599,7 +599,7 @@ func (n *Node) observePeer() func() {
 // an operational address or an address of its operational service.
 // Without one no establishment runs, so the establishment-unresponsive
 // signal that marks the peer likely offline never fires. Mirrors matter.js
-// NetworkClient.ts:541-546 (hasAnyAddress) at b25ed960.
+// NetworkClient.ts:541-546 (hasAnyAddress) at db91886c.
 func hasAnyAddress(p *peer.Peer) bool {
 	if len(p.Sessions()) > 0 || p.Descriptor().OperationalAddress != nil {
 		return true
@@ -662,7 +662,7 @@ func (n *Node) recompute() {
 }
 
 // connectionStateFor is the decision of NetworkClient.ts:383-396 at
-// b25ed960; waiting is the latch or a peer without any address.
+// db91886c; waiting is the latch or a peer without any address.
 func connectionStateFor(active, hasSession, offline, waiting bool) ConnectionState {
 	switch {
 	case active && hasSession:

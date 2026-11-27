@@ -89,7 +89,7 @@ func TestZoneCommandRules(t *testing.T) { //nolint:funlen // one rule per block
 		wantCode(t, "update Mfg", update(9, camera.TwoDZone{Vertices: triangle(0)}), im.StatusConstraintError)
 		wantCode(t, "update invalid", update(9, camera.TwoDZone{Vertices: triangle(0)[:1]}), im.StatusConstraintError)
 		// The server continues after the manufacturer's zone 9
-		// (ZoneManagementServer.ts:243-250 at b25ed960).
+		// (ZoneManagementServer.ts:243-250 at db91886c).
 		resp, st := invokeZones(z, zmdef.CmdCreateTwoDCartesianZone, createZoneRequest("a", triangle(0)))
 		wantCode(t, "create", st, im.StatusSuccess)
 		if r, _ := resp.(zmdef.CreateTwoDCartesianZoneResponse); r.ZoneId != 10 {

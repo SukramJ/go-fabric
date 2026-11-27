@@ -185,7 +185,7 @@ func TestMandatedUnderRefusesWhatItDoesNotEvaluate(t *testing.T) {
 // TestRequirementConstraintForms holds ingestElement's reading of a
 // requirement constraint to matter.js's ClusterRequirements.ingestElement
 // (support/codegen/src/endpoints/ClusterRequirements.ts:169-187 at
-// b25ed960, read by Fable for R2-P6-par-2708): a number is taken, a
+// db91886c, read by Fable for R2-P6-par-2708): a number is taken, a
 // non-numeric value states nothing and min / max are still tried; a form
 // the generator does not render is refused (wizard-6b §2 gen Q1).
 func TestRequirementConstraintForms(t *testing.T) {

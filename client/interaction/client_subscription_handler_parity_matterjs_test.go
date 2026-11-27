@@ -5,8 +5,9 @@ package interaction_test
 
 // A port of matter.js
 // packages/protocol/test/action/client/subscription/ClientSubscriptionHandlerTest.ts
-// at b25ed960 (#4943): a subscription closed when the peer never
-// acknowledged our status to its report or to a report chunk.
+// at db91886c (#4943, #5046): a subscription closed when the peer never
+// acknowledged our status to its report or to a report chunk, or never
+// sent the next chunk after acknowledging our status to one.
 //
 // matter.js drives the handler with a fake exchange whose StatusResponse
 // send rejects with PeerAckMissingError; here the peer of the scripted rig
@@ -17,12 +18,17 @@ package interaction_test
 // compactly, a wildcard one without DataVersionFilters does not.
 
 import (
+	"bytes"
 	"context"
+	"log/slog"
 	"slices"
+	"strings"
+	"sync"
 	"testing"
 	"testing/synctest"
 	"time"
 
+	"thingfabric.dev/go-fabric/client/exchange"
 	"thingfabric.dev/go-fabric/client/interaction"
 	"thingfabric.dev/go-fabric/im"
 )
@@ -39,6 +45,56 @@ func keepaliveRig(t *testing.T, compact bool) (*scripted, *interaction.Subscript
 	}
 	sub := subscribed(t, s, c, interaction.SubscribeRequest{Attributes: paths}, 5)
 	return s, reg, sub, 30*time.Second + 2*c.MaximumPeerResponseTime(interaction.SubscriptionProcessingTime, false)
+}
+
+// handlerLog is a slog destination the chunk-missing cases read back.
+type handlerLog struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *handlerLog) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *handlerLog) has(key string) bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return strings.Contains(b.buf.String(), key)
+}
+
+// chunkRig subscribes, without compact priming, on a handler rig whose
+// registry logs to log, has the peer push the first chunk of a report with
+// more to follow, and acknowledges our Success status to it: the next chunk
+// is what the peer owes.
+func chunkRig(t *testing.T, log *handlerLog, xid uint16) (*scripted, *interaction.Subscriptions, *interaction.Subscription, time.Duration, msg) {
+	t.Helper()
+	return chunkRigClock(t, log, xid, nil)
+}
+
+// chunkRigClock is chunkRig with the registry on clock, when set, in place
+// of the rig's fake clock.
+func chunkRigClock(t *testing.T, log *handlerLog, xid uint16, clock func(*scripted) exchange.Clock) (*scripted, *interaction.Subscriptions, *interaction.Subscription, time.Duration, msg) {
+	t.Helper()
+	s := newScripted(t)
+	var regClock exchange.Clock = s.clock
+	if clock != nil {
+		regClock = clock(s)
+	}
+	reg := interaction.NewSubscriptions(interaction.SubscriptionsConfig{
+		Clock:  regClock,
+		Logger: slog.New(slog.NewTextHandler(log, &slog.HandlerOptions{Level: slog.LevelDebug})),
+	})
+	reg.Register(s.mgr)
+	t.Cleanup(func() { s.mgr.SetProtocolHandler(im.InteractionModelProtocolID, nil) })
+	c := interaction.Bind(interaction.SessionProvider(s.mgr, s.session), interaction.Config{Subscriptions: reg})
+	sub := subscribed(t, s, c, interaction.SubscribeRequest{Attributes: []im.ConcreteAttributePath{{}}}, 5)
+	s.push(t, xid, im.OpcodeReportData, pushedReport(t, 5, true, true, false, true))
+	status := expectStatus(t, s, im.StatusSuccess)
+	s.ackPushed(t, status)
+	return s, reg, sub, 30*time.Second + 2*c.MaximumPeerResponseTime(interaction.SubscriptionProcessingTime, false), status
 }
 
 // unanswered lets the scripted peer stay silent until the exchange's MRP
@@ -140,6 +196,78 @@ func TestClientSubscriptionHandlerParity(t *testing.T) {
 			s.push(t, 0x7305, im.OpcodeReportData, pushedReport(t, 5, false, false, false, false))
 			if isClosed(sub) {
 				t.Fatal("the subscription closed")
+			}
+			sub.Close()
+		})
+	})
+	// ClientSubscriptionHandlerTest.ts:167-175 at db91886c: the wait for the
+	// next chunk ends without one, the report is interrupted chunk-missing,
+	// which closes the subscription whatever its priming, and the report's
+	// error is swallowed.
+	t.Run("closes a subscription whose peer acknowledged our status to a chunk but sent no next chunk", func(t *testing.T) {
+		t.Parallel()
+		synctest.Test(t, func(t *testing.T) {
+			var log handlerLog
+			s, _, sub, timeout, _ := chunkRig(t, &log, 0x7311)
+			unanswered(t, s, timeout)
+			if !isClosed(sub) {
+				t.Fatal("the subscription stayed open")
+			}
+			if log.has("report_failed") {
+				t.Fatal("the missing chunk surfaced as a failed report")
+			}
+		})
+	})
+	// :177-184: the wait for the next chunk fails for another reason — here
+	// the peer answers with a StatusResponse Failure in place of the chunk —
+	// so no interruption is recorded, the subscription is kept and the error
+	// surfaces.
+	t.Run("keeps a subscription when waiting for the next chunk fails for another reason", func(t *testing.T) {
+		t.Parallel()
+		synctest.Test(t, func(t *testing.T) {
+			var log handlerLog
+			s, _, sub, _, status := chunkRig(t, &log, 0x7312)
+			s.continueOn(t, status, im.OpcodeStatusResponse, statusResponse(t, im.StatusFailure))
+			synctest.Wait()
+			if isClosed(sub) {
+				t.Fatal("the subscription closed")
+			}
+			if !log.has("report_failed") {
+				t.Fatal("the failure did not surface")
+			}
+			sub.Close()
+		})
+	})
+	// :186-197: the next chunk goes missing while the registry shuts down —
+	// the interruption is recorded but not handed over, the subscription is
+	// kept. matter.js blocks the handler while it waits and then lets the
+	// wait fail with PeerMessageMissingError; a Go shutdown would end the
+	// wait itself, so the wait expires first and the registry is blocked
+	// at the end of the report, before the handler asks IsBlocked
+	// (interaction.BlockAtReportEnd).
+	t.Run("keeps a subscription whose next chunk goes missing during shutdown", func(t *testing.T) {
+		t.Parallel()
+		synctest.Test(t, func(t *testing.T) {
+			var log handlerLog
+			var arm func(*interaction.Subscriptions)
+			s, reg, sub, timeout, _ := chunkRigClock(t, &log, 0x7313, func(s *scripted) exchange.Clock {
+				var c exchange.Clock
+				c, arm = interaction.BlockAtReportEnd(s.clock)
+				return c
+			})
+			arm(reg)
+			unanswered(t, s, timeout)
+			if !reg.IsBlocked() {
+				t.Fatal("the registry was not blocked at the end of the report")
+			}
+			if err := reg.BlockNewActivity(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			if isClosed(sub) {
+				t.Fatal("the subscription closed")
+			}
+			if !log.has("report_interrupted_during_shutdown") || !log.has("interruption=chunk-missing") {
+				t.Fatalf("no chunk-missing interruption during shutdown logged:\n%s", log.buf.String())
 			}
 			sub.Close()
 		})

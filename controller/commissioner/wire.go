@@ -62,7 +62,7 @@ func decodeCertificateChainResponse(n spec.Node) ([]byte, error) {
 // AttestationElements over RESP_MAX is the hard failure
 // AttestationElementsTooLong
 // (packages/protocol/src/certificate/DeviceAttestationValidator.ts:316-321
-// at b25ed960), which the flow hands to the attestation policy as an error
+// at db91886c), which the flow hands to the attestation policy as an error
 // finding.
 type signedElements struct {
 	elements, signature []byte

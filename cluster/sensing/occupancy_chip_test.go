@@ -381,7 +381,7 @@ func TestOccupancyShutdownCancelsTimer(t *testing.T) {
 
 // TestOccupancySensorTypeFromFeatures: matter.js's initialize sync of the
 // sensor type and its bitmap (OccupancySensingServer.ts:34-55 at
-// b25ed960); Ultrasonic alone leaves the type at its SelectDefaultValue.
+// db91886c); Ultrasonic alone leaves the type at its SelectDefaultValue.
 func TestOccupancySensorTypeFromFeatures(t *testing.T) {
 	for _, c := range []struct {
 		f      sensing.OccupancyFeature

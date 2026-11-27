@@ -19,7 +19,7 @@ import (
 // matter.js reserves an endpoint number per endpoint store: "Each number
 // is reserved for one store. An installed endpoint keeps its number"
 // (packages/node/src/storage/server/ServerEndpointStores.ts:20-22 at
-// b25ed960), a closed endpoint keeps its reservation
+// db91886c), a closed endpoint keeps its reservation
 // (packages/node/src/node/server/ServerEndpointInitializer.ts:67-69), an
 // endpoint that returns gets its stored number back
 // (ServerEndpointStores.ts:117-123), and only an erased store frees it

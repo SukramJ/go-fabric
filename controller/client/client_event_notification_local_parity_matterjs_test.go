@@ -19,9 +19,9 @@ import (
 // at 862ad75f, the subscriptions a host opens itself (:737-790): their
 // events reach the host's own Updated only — never the node's Event hook
 // nor its stored event number (ClientNodeInteraction.ts:115-118 at
-// b25ed960, a host's subscription leaves emitEvents unset) — and a
+// db91886c, a host's subscription leaves emitEvents unset) — and a
 // sustained one resubscribes above the last event it delivered
-// (SustainedSubscription.ts:379-384 at b25ed960).
+// (SustainedSubscription.ts:379-384 at db91886c).
 
 // eventNumbers records the event numbers of a subscription's reports.
 type eventNumbers struct {

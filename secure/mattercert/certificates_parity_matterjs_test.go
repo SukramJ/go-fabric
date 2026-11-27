@@ -369,7 +369,7 @@ const certificatesNOCCATASN1 = "308201cea003020102020101300a06082a8648ce3d040302
 
 // TestCertificatesRecodeParityMatterJS ports "recode root certificate",
 // "recode intermediate certificate" and "recode operational certificate"
-// (CertificatesTest.ts:58-73 at b25ed960): Rcac/Icac/Noc.fromTlv(…).asSignedTlv()
+// (CertificatesTest.ts:58-73 at db91886c): Rcac/Icac/Noc.fromTlv(…).asSignedTlv()
 // reproduces the fixture TLV of every certificate set — here Decode then
 // [Encode], the DN attributes and the extensions in their arrival order.
 func TestCertificatesRecodeParityMatterJS(t *testing.T) {

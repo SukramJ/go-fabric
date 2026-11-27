@@ -151,7 +151,7 @@ import (
 // setActivePresetRequest (:551-553) and subscription.go's activate()
 // (:415/:433) leave the drift list (measured by make cite-report).
 // 426 after wave P4-S: the DAV: lines of controller/attestation
-// renumbered to DeviceAttestationValidator.ts at b25ed960 leave six rows
+// renumbered to DeviceAttestationValidator.ts at db91886c leave six rows
 // (measured by make cite-report). 423 after P4b-C. 422 after P4b-REG:
 // script.go's scripted applyDelay re-cited to InProcessControllerAdapter.ts
 // :775-789 at b25ed960 leaves the list (measured by make cite-report).
@@ -179,7 +179,15 @@ import (
 // (fable-read-reg-w1 stale pin (b)) is drift only because its sentence
 // names StatusResponse and the collector finds that name nearest at :999
 // (measured by make cite-report).
-const citecheckDriftRatchet = 410
+// 416 at the pin lift b25ed960 → db91886c (phase 9 P0): the changed
+// upstream files move ten citations into the drift rows (client/interaction
+// write.go, the write/invoke/report parity tests, client/peer/connection.go,
+// client/handshake/case.go, controller/client/cluster.go,
+// controller/attestation/policy_test.go, cluster/camera's requestor parity
+// test) and four out of it; the P1 units that touch those files re-read
+// them (measured by make cite-report).
+// Phase 9 P1-G re-cuts cluster/camera's requestor citations to db91886c: 415.
+const citecheckDriftRatchet = 415
 
 // citecheckOffPinRatchet is the number of line citations checked at a
 // matter.js commit other than the pin: their sentence names that commit
@@ -231,9 +239,9 @@ const citecheckDriftRatchet = 410
 // one more (controller/commissioner/fabric.go's MaxLabelLength). Wave P3
 // relabelled 15 more at b25ed960 in the files its units touched (A 10, C 2,
 // D 3). Wave P3c relabelled 27 more (units A, E, F and the register pass).
-// Wave P4-S relabelled 12 more at b25ed960: bridge/conn.go's eight
+// Wave P4-S relabelled 12 more at db91886c: bridge/conn.go's eight
 // ExchangeManager.ts citations and four in controller/attestation
-// (validate.go 3, policy.go 1). Wave P5-C relabelled 3 more at b25ed960
+// (validate.go 3, policy.go 1). Wave P5-C relabelled 3 more at db91886c
 // (bridge/securechannel.go's CloseSession sender), its fix round 8 more
 // (securechannel.go #deleteSession, bridge.go's two ExchangeManager.ts
 // cites, the CloseSession tests, commissioning_window.go's
@@ -253,7 +261,22 @@ const citecheckDriftRatchet = 410
 // Phase 8's gate repair: the stale pins of fable-read-reg-w1 and
 // fable-diff-a1 N7 re-cited at b25ed960 (measured by make cite-report:
 // 2650 → 2641) (2641).
-const citecheckOffPinRatchet = 2638
+// 3372 at the pin lift b25ed960 → db91886c (phase 9 P0): the 2692
+// citations labelled "at b25ed960" were checked at a commit other than the
+// pin from this lift on; the scripted relabel by the same whole-file rule
+// as the lift before (the helper of pin-b25ed960, re-run) rewrote 2292
+// labels "at b25ed960" → "at db91886c" (1958 line citations, now at the
+// pin); 734 stay at b25ed960 because a bound file changed upstream or a
+// bare part binds no file. binding/manager.go's ClientGroupInteraction.ts
+// range is re-cut to :33-81 (#5069 shortened the class by one line).
+// Pin lift db91886c (review II phase 9): the units P1-A…F and P1-H/I re-read
+// the citations their changes touch and relabel them at db91886c (client/peer
+// Busy, ClusterDerivation.ts, SelectDefaultValue.ts, ClientStructure.ts, the
+// Thermostat MSCH/TSUGGEST ones, the im request codecs, client/interaction's
+// report interruption, the commissioner's cancel and expiry); the forward-gate
+// citations are gone with the gate; P1-G moves the WebRtcTransportRequestorServer.ts
+// citations of controller/serve.go, controller/camera and node/ from db021da0 to the pin: 3305 (measured after merging P1-G).
+const citecheckOffPinRatchet = 3305
 
 // offPinRowRE reads the off-pin row of summary.md.
 var offPinRowRE = regexp.MustCompile(`(?m)^\| ` + regexp.QuoteMeta(offPinRow) + ` \| (\d+) \|$`)

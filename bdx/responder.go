@@ -154,7 +154,7 @@ func (r *Responder) SetClock(c clock.Clock) {
 // ([ScopeConfig.AdditionalMrpDelay]); a negative d clears it. Mirrors
 // matter.js's BDX margin of the node's network profile,
 // LimitsConfig.bdxAdditionalMrpDelay (NetworkServer.ts:152-153 at
-// b25ed960; NetworkProfile.ts:156-159, `bdx: limits.bdxAdditionalMrpDelay
+// db91886c; NetworkProfile.ts:156-159, `bdx: limits.bdxAdditionalMrpDelay
 // ?? additionalMrpDelay`), which MessageExchange #sendAdditionalDelay reads
 // for a BDX exchange (MessageExchange.ts:1259-1262).
 func (r *Responder) SetAdditionalMrpDelay(d time.Duration) {
@@ -260,7 +260,7 @@ func (r *Responder) DisablePeerForScope(peer Peer, scope string, force bool) err
 // disabled while it runs ([Responder.DisablePeerForScope] with force) —
 // an OTA provider's ApplyUpdateRequest closing a transfer it does not know
 // as completed. The transfer reports cancelled, as matter.js reports a
-// closed flow (flow/Flow.ts:137-138 at b25ed960).
+// closed flow (flow/Flow.ts:137-138 at db91886c).
 var ErrScopeDisabled = errors.New("bdx: BDX protocol scope disabled")
 
 // SessionFor returns the running transfer of peer in scope, nil when none
@@ -494,7 +494,7 @@ type ServerSession struct {
 // received it on the exchange: the line matter.js's exchange writes for
 // every message (`Message « for: BDX/…`, `Message » for: …`), which the
 // cert suite reads a transfer's counters and lengths from
-// (support/chip-testing/test/cert/tc-bdx-support.ts:271-294 at b25ed960).
+// (support/chip-testing/test/cert/tc-bdx-support.ts:271-294 at db91886c).
 // Payload is the message's; [Decode] reads a BDX one.
 type MessageEvent struct {
 	// Sent is true for a message this side sent, false for one the peer

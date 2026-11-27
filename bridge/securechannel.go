@@ -539,7 +539,7 @@ func (b *Bridge) dispatchSecureChannel(src net.Addr, requestHdr *message.Header,
 		// Success throws on another message type and force-closes the
 		// session (SecureChannelMessenger.ts:94-98,
 		// packages/protocol/src/session/case/CaseServer.ts:204-210 at
-		// b25ed960).
+		// db91886c).
 		b.endAwaitedResume(handshakeKeyOf(requestHdr, proto.ExchangeID))
 	}
 
@@ -610,7 +610,7 @@ func (b *Bridge) dispatchSecureChannel(src net.Addr, requestHdr *message.Header,
 		// message type and force-closes the session
 		// (SecureChannelMessenger.ts:94-98,
 		// packages/protocol/src/session/case/CaseServer.ts:204-210 at
-		// b25ed960); a copy is a duplicate there and never read
+		// db91886c); a copy is a duplicate there and never read
 		// (ExchangeManager.ts:353-359, MessageExchange.ts:514-524).
 		b.endAwaitedResume(key)
 		// The handshake holds a TCP connection it runs on open until it
@@ -912,7 +912,7 @@ func (b *Bridge) dispatchPase(
 // paseMaxErrors is the number of failed commissioning attempts within a
 // commissioning window that closes the window ([Bridge.recordFailedAttempt]).
 // Mirrors matter.js packages/protocol/src/protocol/DeviceCommissioner.ts:44
-// at b25ed960 (MAX_FAILED_COMMISSIONING_ATTEMPTS = 20). Without this cap an
+// at db91886c (MAX_FAILED_COMMISSIONING_ATTEMPTS = 20). Without this cap an
 // attacker on the LAN could hammer passcode guesses for the whole window
 // — up to 900 s commissioned, or 48 h for an uncommissioned bridge.
 const paseMaxErrors = 20
@@ -1670,7 +1670,7 @@ func (b *Bridge) handleCase(
 		debugReplyError(b.logger, "send_"+stage, src, err)
 		if installed != 0 {
 			// matter.js closes the session when the Sigma2_Resume cannot
-			// be sent (CaseServer.ts:207-210 at b25ed960).
+			// be sent (CaseServer.ts:207-210 at db91886c).
 			if id, ok := resumer.takeAwaitedResume(key); ok && !b.failResume(resumer, id) {
 				b.closeUnacknowledgedResume(id)
 			}
@@ -1678,7 +1678,7 @@ func (b *Bridge) handleCase(
 		if establisher != nil {
 			// The Success did not go out: the session, still
 			// establishing, is closed and the handshake fails (matter.js
-			// CaseServer.ts:332-336 at b25ed960).
+			// CaseServer.ts:332-336 at db91886c).
 			establisher.completeEstablishment(establishing, false)
 		}
 		return err
@@ -1687,7 +1687,7 @@ func (b *Bridge) handleCase(
 		// The Success went out for the first time: the session is
 		// established, before its acknowledgement is awaited — the
 		// initiator may use it from now on (matter.js CaseServer.ts:329-331
-		// at b25ed960, the send's onTransmitted hook). A session closed
+		// at db91886c, the send's onTransmitted hook). A session closed
 		// meanwhile stays closed (:344, :367-376).
 		if !establisher.completeEstablishment(establishing, true) {
 			b.logger.Debug("matter.rx.sc.case_closed_before_established",
@@ -1745,7 +1745,7 @@ func caseAdapterOf(handler any) *CaseAdapter {
 // session waits on changes nothing. The handler is resolved without
 // building one: a provider is asked only for a key whose Sigma1 record it
 // still holds. Mirrors matter.js
-// packages/protocol/src/session/case/CaseServer.ts:204-210 at b25ed960
+// packages/protocol/src/session/case/CaseServer.ts:204-210 at db91886c
 // (waitForSuccess, then completeEstablishmentOf; a failure force-closes the
 // session) and SecureChannelMessenger.ts:247-272 (what counts as Success).
 func (b *Bridge) settleAwaitedResume(key HandshakeKey, payload []byte) {
@@ -1773,7 +1773,7 @@ func (b *Bridge) settleAwaitedResume(key HandshakeKey, payload []byte) {
 // Sigma1, which its own case judges — a copy of the Sigma1 that began the
 // resumption (same bytes, [Bridge.markSigma1Replied]) leaves the wait, as
 // matter.js never reads a duplicate (ExchangeManager.ts:353-359,
-// MessageExchange.ts:514-524 at b25ed960), and any other Sigma1 ends it.
+// MessageExchange.ts:514-524 at db91886c), and any other Sigma1 ends it.
 func endsAwaitedResume(opcode uint8) bool {
 	switch opcode {
 	case mrp.SCOpcodeStatusReport, mrp.StandaloneAckOpcode, mrp.SCOpcodeSigma1:
@@ -1808,7 +1808,7 @@ func (b *Bridge) awaitingResumeAdapter(key HandshakeKey) *CaseAdapter {
 // returned — acknowledged over MRP, written over a connection — and on its
 // expiry force-closes the session
 // (packages/protocol/src/session/case/CaseServer.ts:204-210,
-// MessageExchange.ts:894-917 at b25ed960), the timeout the responder's
+// MessageExchange.ts:894-917 at db91886c), the timeout the responder's
 // wait for Sigma3 has too ([Bridge.caseSigma3Wait]). Over a connection
 // (overConn) it runs from the send. Over UDP it runs from the
 // acknowledgement ([Bridge.unsecuredReplyAcknowledged]); armed at the send
@@ -1854,7 +1854,7 @@ func (b *Bridge) endAwaitedResume(key HandshakeKey) (sessionID uint16, byEntry b
 // before it was established: through a's host hook, which closes the
 // installed session itself and not whatever holds its id by then (decision
 // 159) — a force close, no CloseSession (matter.js CaseServer.ts:207-210 at
-// b25ed960); for a host without the hook nothing here: it installed the
+// db91886c); for a host without the hook nothing here: it installed the
 // session established, and the callers close it by id where they did
 // before ([Bridge.closeUnacknowledgedResume]). It
 // reports whether the session was closed by entry.
@@ -2768,7 +2768,7 @@ type SessionRegistry interface {
 // [SessionRegistry] implements to receive the bridge's outbound
 // CloseSession sender. The operational manager fires it once per
 // session before zeroising the keys on graceful teardown — the Go
-// translation of matter.js ExchangeManager.ts:767 (at b25ed960) observing
+// translation of matter.js ExchangeManager.ts:767 (at db91886c) observing
 // session.gracefulClose and shipping the report via #sendCloseSession.
 type gracefulCloseNotifierSetter interface {
 	SetGracefulCloseNotifier(fn func(sessionID uint16, sess *channel.Session))
@@ -2915,7 +2915,7 @@ func (b *Bridge) handleSecureChannelStatusReport(src net.Addr, requestHdr *messa
 	// Deferred: the route goes after the session, and with the session's
 	// last route a TCP connection — matter.js closes the channel from
 	// #deleteSession, after the session left the table
-	// (ExchangeManager.ts:770-788 at b25ed960).
+	// (ExchangeManager.ts:770-788 at db91886c).
 	defer b.unbindSessionRoute(requestHdr.SessionID)
 	// Every exchange the session carried dies with it, so any timed
 	// deadline it registered can never be consumed. [Bridge.SessionClosed]
@@ -2967,7 +2967,7 @@ func (b *Bridge) handleSecureChannelStatusReport(src net.Addr, requestHdr *messa
 //
 // Returns nil when the peer address was never observed; the caller
 // skips the notification (best-effort, matching the try/catch around
-// matter.js ExchangeManager.ts:790-800 #sendCloseSession at b25ed960).
+// matter.js ExchangeManager.ts:790-800 #sendCloseSession at db91886c).
 func (b *Bridge) resolveSessionPeerAddr(sessionID uint16) net.Addr {
 	if raw, ok := b.sessionPeerAddrs.Load(sessionID); ok {
 		if addr, ok := raw.(net.Addr); ok && !isNilRoute(addr) {
@@ -3007,9 +3007,9 @@ func (b *Bridge) resolveSessionPeerAddr(sessionID uint16) net.Addr {
 // (unknown peer address, encrypt error, socket error) is logged at
 // debug and swallowed — matter.js wraps the same send in a
 // try/catch-and-warn (ExchangeManager.ts:790-800 #sendCloseSession at
-// b25ed960).
+// db91886c).
 //
-// Wire shape mirrors matter.js SecureChannelMessenger.ts:199-204 at b25ed960
+// Wire shape mirrors matter.js SecureChannelMessenger.ts:199-204 at db91886c
 // (sendCloseSession → #sendStatusReport(Success, CloseSession,
 // suppressAck: true)): the report is NOT MRP-tracked, the peer does not
 // ack a farewell.
@@ -3125,7 +3125,7 @@ type serviceRetransmitter interface {
 // waits for it before the advertiser closes. No-op once the bridge
 // stopped — matter.js shuts the advertiser down before removing
 // sessions to prevent exactly this re-announce
-// (ServerNetworkRuntime.ts:450-453 at b25ed960).
+// (ServerNetworkRuntime.ts:450-453 at db91886c).
 func (b *Bridge) triggerSessionReannounce(fabricIndex uint8) {
 	if fabricIndex == 0 {
 		return

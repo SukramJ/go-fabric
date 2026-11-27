@@ -62,7 +62,7 @@ func TestCertificatesFallbackVendorIDProductID(t *testing.T) {
 		certificatesID(t, "vendorId", pai.vendorID, 0x135d)
 	})
 	t.Run("parses fallback VendorID from a DAC issuer commonName", func(t *testing.T) {
-		// CertificatesTest.ts:345-350 at b25ed960: dac.cert.issuer.vendorId.
+		// CertificatesTest.ts:345-350 at db91886c: dac.cert.issuer.vendorId.
 		dac := certificatesParse(t, certificatesDER(t, certificatesNukiDAC), true)
 		vid, pid, err := IssuerMatterIDs(dac.x509)
 		if err != nil {
@@ -157,7 +157,7 @@ func TestCertificatesPaaFromAsn1(t *testing.T) {
 	}
 }
 
-// The fixtures below are matter.js at b25ed960, verbatim:
+// The fixtures below are matter.js at db91886c, verbatim:
 // ChipPAAuthorities.ts:20-39 (TestCert_PAA_NoVID_Cert, TestCert_PAA_FFF1_Cert,
 // TestCert_WithoutAuthKeyId, base64) and CertificatesTest.ts:317-322
 // (NUKI_DAC_ASN1, NUKI_PAI_ASN1).

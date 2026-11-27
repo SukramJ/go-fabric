@@ -54,7 +54,7 @@ const ClusterRevision = closuredef.Revision
 // a ventilation stop advertises: Positioning plus Ventilation.
 //
 // Ventilation carries conformance "[PS]" (matter.js
-// closure-control.element.ts:29 at b25ed960), so it is never advertised
+// closure-control.element.ts:29 at db91886c), so it is never advertised
 // alone.
 const PositioningVentilationFeatureMap = wire.ClosureControlFeaturePositioning |
 	wire.ClosureControlFeatureVentilation
@@ -267,7 +267,7 @@ func New(cfg Config) (*ControlServer, error) {
 		mover: cfg.Mover,
 		// SetupRequired, not Stopped: the drive has reported nothing yet,
 		// and Stopped is a claim about a device we have not heard from.
-		// Mirrors matter.js closure-control.element.ts:114 at b25ed960
+		// Mirrors matter.js closure-control.element.ts:114 at db91886c
 		// MainStateEnum.
 		mainState: wire.ClosureMainStateSetupRequired,
 		errorList: wire.ClosureErrorList{},

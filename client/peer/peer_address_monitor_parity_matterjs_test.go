@@ -282,7 +282,7 @@ func TestPeerAddressMonitorBackoff(t *testing.T) {
 }
 
 // TestPeerAddressMonitorSleepingLITICD ports the four sleeping-LIT-ICD
-// cases of PeerAddressMonitorTest.ts (:280-344 at b25ed960): the peer
+// cases of PeerAddressMonitorTest.ts (:280-344 at db91886c): the peer
 // awaits an ICD check-in (SetICDAwait), no probe answers, and the monitor
 // neither probes nor closes the session; it adopts a discovered address
 // on trust, in the session's IP family first, and keeps one still

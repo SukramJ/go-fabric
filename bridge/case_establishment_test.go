@@ -162,7 +162,7 @@ func setResumeCompletion(t *testing.T, rr *resumeRig, provided bool, rec *comple
 // Another message than a StatusReport on the exchange fails it at once; so
 // does the Sigma2_Resume's give-up.
 // matter.js packages/protocol/src/session/case/CaseServer.ts:204-210,
-// MessageExchange.ts:894-917, SecureChannelMessenger.ts:94-98 at b25ed960
+// MessageExchange.ts:894-917, SecureChannelMessenger.ts:94-98 at db91886c
 // (Fable post-read M1, L1, L4).
 func TestCASEResumeWaitsForSuccessUntilItsDeadline(t *testing.T) {
 	t.Parallel()

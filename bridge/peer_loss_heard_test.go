@@ -130,7 +130,7 @@ func (r *heardRig) requireFailed(t *testing.T) {
 
 // TestInitiatedExchangePeerLossDeclarationParity ports matter.js
 // packages/protocol/test/protocol/MessageExchangeTest.ts:106-124 at
-// b25ed960 ("peer loss declaration" / "send()") by meaning onto an exchange
+// db91886c ("peer loss declaration" / "send()") by meaning onto an exchange
 // this node opened (the OTA requestor's, ota_provider_link.go): a message
 // given up reports the peer lost — every session with it force-closed —
 // only when the exchange never heard from the peer. Mirrors matter.js

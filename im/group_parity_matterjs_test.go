@@ -15,6 +15,8 @@ import (
 	"slices"
 	"sync"
 	"testing"
+
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // groupFakeDispatcher hosts cluster 6 (commands 0..2) on endpoints 2, 3
@@ -227,7 +229,13 @@ func TestGroupWriteParityMatterJS(t *testing.T) {
 	}{
 		{"handleWriteRequest: MoreChunkedMessages with SuppressResponse", WriteRequest{SuppressResponse: true, MoreChunkedMessages: true, Writes: []AttributeWrite{attr}}, []uint16{2}, nil, StatusInvalidAction, nil},
 		{"handleWriteRequest: a TimedRequest flag mismatches", WriteRequest{SuppressResponse: true, TimedRequest: true, Writes: []AttributeWrite{attr}}, []uint16{2}, nil, StatusTimedRequestMismatch, nil},
-		{"handleWriteRequest: a group write needs SuppressResponse", WriteRequest{Writes: []AttributeWrite{attr}}, []uint16{2}, nil, StatusInvalidAction, nil},
+		// InteractionProtocolTest.ts:2058-2097 at db91886c: an absent
+		// SuppressResponse counts as true (InteractionServer.ts:410-413),
+		// so a chunked one is refused as SuppressResponse with
+		// MoreChunkedMessages; an explicit false is refused.
+		{"writes a group write that leaves out SuppressResponse without answering it", WriteRequest{Writes: []AttributeWrite{attr}}, []uint16{2}, nil, StatusSuccess, []uint16{2}},
+		{"refuses a chunked group write that leaves out SuppressResponse", WriteRequest{MoreChunkedMessages: true, Writes: []AttributeWrite{attr}}, []uint16{2}, nil, StatusInvalidAction, nil},
+		{"refuses a group write with SuppressResponse false", WriteRequest{HasSuppressResponse: true, Writes: []AttributeWrite{attr}}, []uint16{2}, nil, StatusInvalidAction, nil},
 		{"process: group writes can not be concrete paths", WriteRequest{SuppressResponse: true, Writes: []AttributeWrite{concrete}}, []uint16{2}, nil, StatusInvalidAction, nil},
 		{"process: writes before a concrete path have run", WriteRequest{SuppressResponse: true, Writes: []AttributeWrite{attr, concrete}}, []uint16{2}, nil, StatusInvalidAction, []uint16{2}},
 		{"process: WildcardPathFlags are not allowed in write interactions", WriteRequest{SuppressResponse: true, Writes: []AttributeWrite{flagged}}, []uint16{2}, nil, StatusInvalidAction, nil},
@@ -252,6 +260,56 @@ func TestGroupWriteParityMatterJS(t *testing.T) {
 	}
 	if got := HandleGroupWriteRequest(WithFabricFilter(context.Background(), true, 7), &groupFakeDispatcher{}, WriteRequest{SuppressResponse: true, Writes: []AttributeWrite{attr}}); got != StatusSuccess {
 		t.Errorf("write without a Group subject: %v", got)
+	}
+}
+
+// TestGroupWriteSuppressResponsePresenceFromTheDecoder: the presence
+// [HandleGroupWrite] reads comes from [UnmarshalWriteRequestTLV] — a group
+// write on the wire without SuppressResponse and TimedRequest is written
+// (InteractionProtocolTest.ts:2058-2070 at db91886c), the same write with
+// SuppressResponse false is refused (:2086-2097).
+func TestGroupWriteSuppressResponsePresenceFromTheDecoder(t *testing.T) {
+	t.Parallel()
+	encode := func(suppress *bool) []byte {
+		enc := tlv.NewEncoder()
+		enc.StartStruct(tlv.AnonymousTag())
+		if suppress != nil {
+			enc.PutBool(tlv.ContextTag(tagWriteReqSuppressResponse), *suppress)
+		}
+		enc.StartArray(tlv.ContextTag(tagWriteReqWriteRequests))
+		enc.StartStruct(tlv.AnonymousTag())
+		ConcreteAttributePath{Cluster: 6, Attribute: 0x4001, HasCluster: true, HasAttribute: true}.MarshalTLV(enc, tlv.ContextTag(tagAttributeDataPath))
+		enc.PutUint(tlv.ContextTag(tagAttributeDataValue), 1)
+		_ = enc.EndContainer()
+		_ = enc.EndContainer()
+		_ = enc.EndContainer()
+		b, err := enc.Bytes()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return b
+	}
+	explicitFalse := false
+	for _, tc := range []struct {
+		name     string
+		suppress *bool
+		want     StatusCode
+		wrote    []uint16
+	}{
+		{"absent", nil, StatusSuccess, []uint16{2}},
+		{"explicit false", &explicitFalse, StatusInvalidAction, nil},
+	} {
+		req, err := UnmarshalWriteRequestTLV(tlv.NewDecoder(encode(tc.suppress)), nil)
+		if err != nil {
+			t.Fatalf("%s: decode: %v", tc.name, err)
+		}
+		d := &groupFakeDispatcher{}
+		if got := HandleGroupWrite(groupCtx(2), d, req).Status; got != tc.want {
+			t.Errorf("%s: status %v, want %v", tc.name, got, tc.want)
+		}
+		if !slices.Equal(d.written, tc.wrote) {
+			t.Errorf("%s: wrote %v, want %v", tc.name, d.written, tc.wrote)
+		}
 	}
 }
 

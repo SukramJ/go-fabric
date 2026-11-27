@@ -197,8 +197,10 @@ var hostCases = map[uint32]hostCase{
 	h_grid.ClusterID:  {kit: kitOf[*energy.GridConditionsServer](), covered: []string{"SetCurrentConditions", "SetForecastConditions", "SetLocalGenerationAvailable"}},
 	h_tui.ClusterID:   {kit: kitOf[*thermo.ThermostatUIServer]()},
 	h_meter.ClusterID: {kit: kitOf[*energy.CommodityMeteringServer](), covered: []string{"MaximumMeteredQuantities", "MeteredQuantity", "MeteredQuantityTimestamp", "SetMaximumMeteredQuantities", "SetMeteredQuantity", "SetMeteredQuantityTimestamp", "SetTariffUnit", "TariffUnit"}},
-	// The camera servers (cluster/camera).
-	h_wr.ClusterID: {kit: kitOf[*camera.Requestor](), host: hostOf[h_wr.Host](h_wr.Wrap), covered: []string{"Sessions"}},
+	// The camera servers (cluster/camera). HoldUnknownSignals is the kit's
+	// own (decision 744: wrdef.Host stays unchanged), not reached through
+	// the facade yet.
+	h_wr.ClusterID: {kit: kitOf[*camera.Requestor](), host: hostOf[h_wr.Host](h_wr.Wrap), covered: []string{"Sessions"}, deferred: []string{"HoldUnknownSignals"}},
 	// The Thread border router (cluster/threadbr): BorderRouter is the
 	// host's own port, the fail-safe methods the node's wiring.
 	h_tbrm.ClusterID: {kit: kitOf[*threadbr.ManagementServer](), host: hostOf[h_tbrm.Host](h_tbrm.Wrap), covered: []string{

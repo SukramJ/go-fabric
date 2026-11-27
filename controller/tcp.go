@@ -58,7 +58,7 @@ type TCPConfig struct {
 
 // maxMessageSize is the TCP message bound t selects: the configured one,
 // sessionparams.DefaultMaxTCPMessageSize for zero or without a TCP role
-// (resolveTcpConfig, NetworkServer.ts:277-288 at b25ed960).
+// (resolveTcpConfig, NetworkServer.ts:277-288 at db91886c).
 func (t TCPConfig) maxMessageSize() int {
 	if t.MaxMessageSize == 0 || (!t.Incoming && !t.Outgoing) {
 		return int(sessionparams.DefaultMaxTCPMessageSize)
@@ -69,7 +69,7 @@ func (t TCPConfig) maxMessageSize() int {
 // validMessageSize reports whether t's MaxMessageSize is one its roles
 // may use: anything without a TCP role, else zero or a whole number from
 // exchange.MaxUDPMessageSize to the uint32 maximum
-// (SessionParameters.ts:128-137 at b25ed960).
+// (SessionParameters.ts:128-137 at db91886c).
 func (t TCPConfig) validMessageSize() bool {
 	if (!t.Incoming && !t.Outgoing) || t.MaxMessageSize == 0 {
 		return true

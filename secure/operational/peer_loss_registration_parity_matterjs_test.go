@@ -4,7 +4,7 @@
 package operational
 
 // A port of matter.js packages/protocol/test/session/SessionManagerTest.ts
-// :1128-1235 at b25ed960, describe "peer loss by registration order", on the
+// :1128-1235 at db91886c, describe "peer loss by registration order", on the
 // device side's session table. matter.js's handlePeerShutdown(peer, keep)
 // and sessionsRegisteredSince(session) have no device-side subject (the
 // device never shuts a peer down by a session it keeps); their cases run by

@@ -689,7 +689,7 @@ func TestPutUintWidth_PanicOnBadWidth(t *testing.T) {
 // structures and an array of structures.
 // Mirrors matter.js packages/types/test/tlv/TlvSchemaTest.ts:96-131
 // (testTlvSchemaEncode / testTlvSchemaDecode, "TlvObject: nested struct and
-// array of struct") at b25ed960.
+// array of struct") at db91886c.
 func TestObjectParity_Schema_NestedStructs(t *testing.T) {
 	t.Parallel()
 	want := hexB(t, "1535012c010574657374312c020574657374321835022c010574657374332c02057465737434183603152c0505746573743518152c0505746573743618152c05057465737437181818")
@@ -732,7 +732,7 @@ func TestObjectParity_Schema_NestedStructs(t *testing.T) {
 // TestObjectParity_Complex_WithoutWrappedFields locks the wire bytes for the
 // complex schema without its two wrapper fields (tags 4 and 5).
 // Mirrors matter.js packages/types/test/tlv/TlvComplexTest.ts:75-84
-// (the vector "an object without wrapped fields") at b25ed960.
+// (the vector "an object without wrapped fields") at db91886c.
 func TestObjectParity_Complex_WithoutWrappedFields(t *testing.T) {
 	t.Parallel()
 	got := buildWire(t, func(e *Encoder) {

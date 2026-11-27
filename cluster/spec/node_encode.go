@@ -10,7 +10,7 @@ import (
 )
 
 // EncodeTLV writes the node tree at tag, integers at their minimal width
-// (as matter.js encodes every integer, TlvNumber.ts:247-297 at b25ed960).
+// (as matter.js encodes every integer, TlvNumber.ts:247-297 at db91886c).
 // It makes a decoded value [Encodable] again.
 func (n Node) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) { writeNode(enc, tag, n) }
 

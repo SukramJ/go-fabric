@@ -52,7 +52,7 @@ type LocalizationConfigurationConfig struct {
 // localizationconfiguration, ADR 0013).
 //
 // Mirrors matter.js packages/node/src/behaviors/localization-configuration/
-// LocalizationConfigurationServer.ts initialize (:16-33 at b25ed960): an
+// LocalizationConfigurationServer.ts initialize (:16-33 at db91886c): an
 // empty or unset SupportedLocales is seeded with [ActiveLocale], the
 // detected locale when none is set (:17-21); an ActiveLocale that is set
 // and supported is kept (:22-25); otherwise the detected locale when the
@@ -71,7 +71,7 @@ type LocalizationConfigurationConfig struct {
 // CONSTRAINT_ERROR: the attribute's model constraint is
 // "in supportedLocales", which matter.js's validator enforces
 // (packages/node/src/behavior/state/validation/constraint.ts:157-168 at
-// b25ed960, packages/model/src/aspects/Constraint.ts test :164-170) and the
+// db91886c, packages/model/src/aspects/Constraint.ts test :164-170) and the
 // generated runtime evaluates before the sink sees the value
 // (spec.Instance.ValidateWrite); connectedhomeip answers the same
 // (src/app/clusters/localization-configuration-server/

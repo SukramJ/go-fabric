@@ -15,7 +15,7 @@
 // request arrives on C1, and the session — with its handshake response —
 // starts when the central subscribes to C2. A C2 subscribe before the
 // handshake request starts nothing, as that server throws on it
-// (BlenoBleServer.ts:288-291 at b25ed960: "Subscription request received
+// (BlenoBleServer.ts:288-291 at db91886c: "Subscription request received
 // before handshake Request"); this peripheral then stores the request
 // written after such a subscribe and does not answer it. A peripheral can
 // also play the stalled peer matter.js's channel tests model
@@ -581,7 +581,7 @@ func (c *connection) SubscribeC2(_ context.Context, on func([]byte)) error {
 // UnsubscribeC2 implements ble.Connection: the peripheral's BTP session
 // ends (§4.19.4.10) and the GATT server takes a new handshake, as
 // matter.js's server closes on the unsubscribe (BlenoBleServer.ts:81-84 at
-// b25ed960). A served session's end drops the connection, as that server's
+// db91886c). A served session's end drops the connection, as that server's
 // close does; a stalled session's end leaves it, as the fake peer of
 // NobleBleChannelTest.ts does.
 func (c *connection) UnsubscribeC2(ctx context.Context) error {

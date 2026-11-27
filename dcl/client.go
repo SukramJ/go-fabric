@@ -29,7 +29,7 @@ import (
 
 // The ledger's REST endpoints — matter.js DclConfig.production and
 // DclConfig.test (packages/protocol/src/dcl/DclConfig.ts:17-25 at
-// b25ed960).
+// db91886c).
 const (
 	ProductionURL = "https://on.dcl.csa-iot.org"
 	TestNetURL    = "https://on.test-net.dcl.csa-iot.org"

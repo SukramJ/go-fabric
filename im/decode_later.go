@@ -10,7 +10,7 @@ import "errors"
 // bounds (a [StatusCodeError] of ConstraintError) or a mandatory field
 // missing ([ErrMissingField]). matter.js decodes a request first and
 // validates it afterwards (packages/types/src/schema/Schema.ts:18-24 at
-// b25ed960): every type error is thrown while it decodes, bounds and
+// db91886c): every type error is thrown while it decodes, bounds and
 // mandatory fields only when it validates, so a request with an
 // out-of-range integer ahead of a mistyped field answers the type error's
 // FAILURE, not CONSTRAINT_ERROR (review II, 5a-2 A1-d).

@@ -4,7 +4,7 @@
 package attestation
 
 // The keys that may sign a Certification Declaration, as CHIP trusts them —
-// matter.js packages/protocol/src/certificate/CdSigners.ts at b25ed960:
+// matter.js packages/protocol/src/certificate/CdSigners.ts at db91886c:
 //
 //   - the CSA "Certification Declaration Signing Key" 001 to 005, built in
 //     ([KnownCDSigner]);
@@ -33,15 +33,15 @@ import (
 
 // csaCDRootSKID is the subject key identifier of the CSA "Matter
 // Certification and Testing CA", the root every CD signing key chains to
-// (CdSigners.ts:11-12 at b25ed960).
+// (CdSigners.ts:11-12 at db91886c).
 var csaCDRootSKID = mustHex("97E469D0C50414C26FC701F77E947739098DF6A5")
 
-// csaCDRootPublicKey is that root's key (CdSigners.ts:14-17 at b25ed960).
+// csaCDRootPublicKey is that root's key (CdSigners.ts:14-17 at db91886c).
 var csaCDRootPublicKey = mustHex("04384a3ac3aa5dbecb720fe6211d3cad48626ff711a0a4929fadd860f8e277ffc0de1f3eb6337a34847b5a3a056ea8710e9377eeedee251703fdd9350125cb8e48")
 
 // csaCDSigningKeys are the CSA "Certification Declaration Signing Key" 001
 // to 005 by subject key identifier, as CHIP ships them built in
-// (CdSigners.ts:19-43 at b25ed960).
+// (CdSigners.ts:19-43 at db91886c).
 var csaCDSigningKeys = map[string]string{
 	"FE343F959947763B61EE4539131338494FE67D8E": "04cdeee93e44f8b72be3d1a9c07e21968b9afff3b403f05e1669d7b1e5caee6fc7714b42e7e23695e92cd7635473a280ae688f37bb9489e11629b9b94ff7b09929",
 	"DD04DB585B214C1C581587E6568DF487B6DDC701": "04031937e8f94251045df27457bb46253ee3754e8c12ae28557d8027b9d4c356d91b408cff32275017b25f8c8ba20516d5c83af2b724128013dfcc8f95d200a90b",
@@ -51,7 +51,7 @@ var csaCDSigningKeys = map[string]string{
 }
 
 // The CSA CD root's validity in Matter epoch seconds, 2022-07-07T19:28:04Z
-// to 2122-06-13T19:28:04Z (CdSigners.ts:45-47 at b25ed960).
+// to 2122-06-13T19:28:04Z (CdSigners.ts:45-47 at db91886c).
 const (
 	csaCDRootNotBefore int64 = 710537284
 	csaCDRootNotAfter  int64 = 3864137284
@@ -75,7 +75,7 @@ func p256Point(b []byte) *ecdsa.PublicKey {
 }
 
 // CDSigner is a trusted Certification Declaration signer — matter.js
-// CdSigners.Signer (CdSigners.ts:64-74 at b25ed960).
+// CdSigners.Signer (CdSigners.ts:64-74 at db91886c).
 type CDSigner struct {
 	// PublicKey verifies the CD signature.
 	PublicKey *ecdsa.PublicKey
@@ -102,7 +102,7 @@ var (
 	}()
 )
 
-// KnownCDSigner is CdSigners.known (CdSigners.ts:76-83 at b25ed960): the
+// KnownCDSigner is CdSigners.known (CdSigners.ts:76-83 at db91886c): the
 // built-in CSA signing key or the Matter test CD signer skid names. Each
 // call hands out its own key.
 func KnownCDSigner(skid []byte) (CDSigner, bool) {
@@ -116,13 +116,13 @@ func KnownCDSigner(skid []byte) (CDSigner, bool) {
 }
 
 // IsTestCDSigner is CdSigners.isTestSigner (CdSigners.ts:85-88 at
-// b25ed960): skid names the Matter test CD signer of Appendix F.
+// db91886c): skid names the Matter test CD signer of Appendix F.
 func IsTestCDSigner(skid []byte) bool {
 	return bytes.Equal(skid, testCDSignerSKID)
 }
 
 // VerifyCDSignerCertificate is CdSigners.verifyCertificate (CdSigners.ts:
-// 90-136 at b25ed960): der is a CD signer for skid when its subject key
+// 90-136 at db91886c): der is a CD signer for skid when its subject key
 // identifier is skid, it is not the CSA CD root itself, its authority key
 // identifier is the root's and the root's key verifies its signature, and
 // the root was valid when the certificate became valid (CHIP validates the
@@ -154,7 +154,7 @@ func VerifyCDSignerCertificate(der, skid []byte) (*ecdsa.PublicKey, error) {
 // lookupCDSigner is the validator's signer lookup (DeviceAttestationValidator.ts
 // :460-463 at db021da0): the built-in signers, then — with a trust store —
 // what the store knows, which mirrors DclCertificateService.lookupCdSigner
-// (dcl/DclCertificateService.ts:901-970 at b25ed960): a CSA-issued
+// (dcl/DclCertificateService.ts:901-970 at db91886c): a CSA-issued
 // certificate, never the test signer, so a store's answer is no test
 // signer.
 func lookupCDSigner(store PAAStore, skid []byte) (CDSigner, bool) {

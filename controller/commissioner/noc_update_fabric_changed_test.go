@@ -26,7 +26,7 @@ import (
 // matter.js's FabricChangedError, exported from @matter/protocol — and
 // not as transient, as matter.js's class extends PeerCommunicationError
 // (packages/protocol/src/peer/PeerCommunicationError.ts:105-112 at
-// b25ed960). The read is held pending by dropping the device's datagrams
+// db91886c). The read is held pending by dropping the device's datagrams
 // from its request on until the disconnect has run.
 func TestCertificateUpdateForceCloseCauseIsErrFabricChanged(t *testing.T) {
 	p := newOCUPair(t, ocuOptions{})

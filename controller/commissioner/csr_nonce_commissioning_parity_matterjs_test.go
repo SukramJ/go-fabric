@@ -315,7 +315,7 @@ func (onlySignature) EncodeTLV(e *tlv.Encoder, tag tlv.Tag) {
 // TestCertificatesMissingNOCSRElements: a CSRResponse that leaves out
 // NOCSRElements decodes, and is the NOCSR check FieldMissing as a
 // commissioning error — not unexpected data (NocsrValidator.ts:82-84 at
-// b25ed960; matter.js decodes a command response without a check against
+// db91886c; matter.js decodes a command response without a check against
 // its schema).
 func TestCertificatesMissingNOCSRElements(t *testing.T) {
 	t.Parallel()

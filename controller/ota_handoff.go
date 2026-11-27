@@ -16,7 +16,7 @@ import (
 // each, within its ctx, until its NodeDeleted returned — the only release.
 // Since C-17 NodeDeleted reports no event for the deleted node — its
 // queued update ends silently (#forgetPeer,
-// SoftwareUpdateManager.ts:312-342 at b25ed960) — but its queue run may
+// SoftwareUpdateManager.ts:312-342 at db91886c) — but its queue run may
 // still report another node's update failed (a stalled update whose
 // consent is gone, reset at that run): that callback runs on the
 // hand-off goroutine, and it releases no hand-off — not even the other

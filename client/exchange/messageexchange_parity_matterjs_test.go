@@ -646,7 +646,7 @@ func TestMessageExchangeAckWaitAbort(t *testing.T) {
 }
 
 // TestMessageExchangeOnTransmitted ports describe "onTransmitted"
-// (MessageExchangeTest.ts:1005-1070 at b25ed960): Exchange.send's onTransmitted
+// (MessageExchangeTest.ts:1005-1070 at db91886c): Exchange.send's onTransmitted
 // (exchangeseam.SendNotifyingTransmission).
 func TestMessageExchangeOnTransmitted(t *testing.T) {
 	t.Parallel()

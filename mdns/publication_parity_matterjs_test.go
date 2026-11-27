@@ -147,7 +147,7 @@ func expectStrings(t *testing.T, what string, got, want []string) {
 }
 
 // TestMdnsServerGoodbye is the describe "Goodbye" of MdnsServerTest.ts
-// (:1663-2640 at b25ed960) for the goodbye scope: a goodbye names only the
+// (:1663-2640 at db91886c) for the goodbye scope: a goodbye names only the
 // records no remaining service publishes (InterfaceResponder.ts
 // #goodbyesFor, :492-510), in the publication that announces the rest
 // (:445-490).
@@ -352,7 +352,7 @@ func TestMdnsServerGoodbye(t *testing.T) {
 }
 
 // TestMdnsServerTransport ports the goodbye retry of
-// MdnsServerTransportTest.ts (:215-541 at b25ed960): a goodbye that did not
+// MdnsServerTransportTest.ts (:215-541 at db91886c): a goodbye that did not
 // leave is sent again a second later, then at twice the interval up to a
 // minute, with only the goodbyes, until it leaves or peers dropped the
 // records (InterfaceResponder.ts #retryGoodbyes and #settleGoodbyes,

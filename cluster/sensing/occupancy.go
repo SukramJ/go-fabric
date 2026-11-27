@@ -54,7 +54,7 @@ type OccupancyConfig struct {
 	// construction with CONSTRAINT_ERROR, as matter.js validates the
 	// configured state at initialization
 	// (packages/node/test/node/DotQualifiedConstraintTest.ts:189 at
-	// b25ed960); chip clamps it (OccupancySensingCluster.cpp:100).
+	// db91886c); chip clamps it (OccupancySensingCluster.cpp:100).
 	HoldTime *uint16
 	// Clock is the device's clock: the hold timer; nil is the system
 	// clock.
@@ -75,7 +75,7 @@ type OccupancyConfig struct {
 //   - The sensor type and its bitmap follow the detector features when
 //     the host leaves them unset (matter.js
 //     packages/node/src/behaviors/occupancy-sensing/OccupancySensingServer.ts:27-65
-//     at b25ed960; [OccupancySensorTypeFor]).
+//     at db91886c; [OccupancySensorTypeFor]).
 //   - With OccupancyEvent (OCCEVENT) every change of Occupancy emits
 //     OccupancyChanged with the new bitmap, whoever made it — the host's
 //     Set or the hold timer (OccupancySensingServer.ts:67-74, :88-90:
@@ -178,7 +178,7 @@ var holdTimeAliases = []uint32{
 // OccupancySensorTypeFor is matter.js's sync of OccupancySensorTypeBitmap
 // and OccupancySensorType from the detector features
 // (packages/node/src/behaviors/occupancy-sensing/OccupancySensingServer.ts:34-55
-// at b25ed960): the bitmap from PIR, Ultrasonic and PhysicalContact, the
+// at db91886c): the bitmap from PIR, Ultrasonic and PhysicalContact, the
 // type PirAndUltrasonic, Pir, else PhysicalContact. ok is false when none
 // of the three is selected; typed is false when the bitmap leaves the type
 // unset (Ultrasonic alone), as there.

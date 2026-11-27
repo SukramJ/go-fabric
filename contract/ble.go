@@ -95,7 +95,7 @@ type BLEAdvertisement struct {
 	// Data is the complete advertising payload, AD structures included:
 	// the flags and the service data of the Matter service — what
 	// matter.js hands its peripheral (BtpCodec.encodeBleAdvertisementData,
-	// packages/protocol/src/codec/BtpCodec.ts:296-316 at b25ed960). A
+	// packages/protocol/src/codec/BtpCodec.ts:296-316 at db91886c). A
 	// platform that builds the payload itself from fields takes them from
 	// these structures.
 	Data []byte

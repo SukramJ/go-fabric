@@ -141,13 +141,13 @@ func TestPASEStaysOpenDuringCommissioning(t *testing.T) {
 
 // TestFailSafeExpiredClosesThePASESessionsParity pins the fail-safe
 // rollback's step 1, matter.js
-// packages/protocol/src/common/FailsafeContext.ts:281-283 at b25ed960
+// packages/protocol/src/common/FailsafeContext.ts:281-283 at db91886c
 // (closePaseSession), on a bridge without the node facade: a timer expiry
 // clears the PASE sessions at once, an expiry inside an interaction
 // (ArmFailSafe with expiry 0) on the PASE session after its response, and
 // one inside an interaction on another session at once — the force close
 // defers only for the current exchange among the PASE session's own
-// (packages/protocol/src/session/Session.ts:336-339 at b25ed960).
+// (packages/protocol/src/session/Session.ts:336-339 at db91886c).
 func TestFailSafeExpiredClosesThePASESessionsParity(t *testing.T) {
 	t.Parallel()
 	t.Run("timer", func(t *testing.T) {

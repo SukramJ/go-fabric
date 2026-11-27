@@ -1,5 +1,5 @@
 {
-  "commit": "b25ed9604f2825857b8de28a3c29cae8124a7e49",
+  "commit": "db91886cbe742f28d2d6ae513dfc33988436bf02",
   "roots": [
     "packages/general/test",
     "packages/model/test",
@@ -1020,8 +1020,8 @@
     },
     {
       "path": "packages/model/test/logic/SelectDefaultValueTest.ts",
-      "lines": 149,
-      "sha": "f99a4168d33b85da0716569737eaed4e31d2c764",
+      "lines": 180,
+      "sha": "857d24d62cf6c0f5b6c263485e0b77a874b8d86c",
       "describes": [
         "MandatoryDefaultValue",
         "SelectDefaultValue",
@@ -1232,8 +1232,8 @@
     },
     {
       "path": "packages/node/test/behavior/cluster/ClusterBehaviorFeaturesTest.ts",
-      "lines": 236,
-      "sha": "963e5672f0f7fe9e6371f0f78c83abd96d549499",
+      "lines": 342,
+      "sha": "55983c9e99088a4023faff622031dc74855a4d3a",
       "describes": [
         "cluster behavior feature selection"
       ]
@@ -1248,8 +1248,8 @@
     },
     {
       "path": "packages/node/test/behavior/cluster/ClusterBehaviorTest.ts",
-      "lines": 550,
-      "sha": "f28cbf8d54f772e74610dabe55e652a463d28249",
+      "lines": 557,
+      "sha": "2180172bf32b5e3fd68eb8d778899a7deac0fd45",
       "describes": [
         "ClusterBehavior"
       ]
@@ -1494,8 +1494,8 @@
     },
     {
       "path": "packages/node/test/behavior/system/controller/discovery/DiscoveryCancelTest.ts",
-      "lines": 674,
-      "sha": "1613033bcf3b348c3340969c197ef12d366c0995",
+      "lines": 745,
+      "sha": "34cc59d1b1534483ef1995d531648166133eee42",
       "describes": [
         "Discovery interruption"
       ]
@@ -2047,8 +2047,8 @@
     },
     {
       "path": "packages/node/test/behaviors/thermostat/AtomicWriteHandlerTest.ts",
-      "lines": 545,
-      "sha": "8f76d9d476de93a37f2bfe43e6292f345faa3d75",
+      "lines": 543,
+      "sha": "e882508aae38b841836b9613c77edf511dcba27a",
       "describes": [
         "AtomicWriteHandler"
       ]
@@ -2087,33 +2087,32 @@
     },
     {
       "path": "packages/node/test/behaviors/thermostat/SchedulesAtomicWriteTest.ts",
-      "lines": 574,
-      "sha": "d0f0bb2eb0a59fd33d8dcb130cd3d53a51209c8e",
+      "lines": 572,
+      "sha": "659f2c7143dfb65ee702d5fdf47412b872e717dc",
       "describes": [
         "Schedules atomic write"
       ]
     },
     {
       "path": "packages/node/test/behaviors/thermostat/SchedulesConfigurationTest.ts",
-      "lines": 340,
-      "sha": "5c5cf03cdf5945ded0f988e6f74c24f9f14e0314",
+      "lines": 322,
+      "sha": "7fb1a234546a54cf25d228829c49307532d58d5e",
       "describes": [
-        "MatterScheduleConfiguration without the thermostat-msch forward feature",
         "Schedules configuration"
       ]
     },
     {
       "path": "packages/node/test/behaviors/thermostat/SchedulesLocalWriteTest.ts",
-      "lines": 931,
-      "sha": "91c305f9170077193576e820d519632f31b7f413",
+      "lines": 929,
+      "sha": "1eadbbcadfa86f0113f58c4a513fb878c075d364",
       "describes": [
         "Schedules local write"
       ]
     },
     {
       "path": "packages/node/test/behaviors/thermostat/ThermostatBehaviorTest.ts",
-      "lines": 531,
-      "sha": "11e14b7fde55b5074a44d7f08d49e7e0ba1cd3ab",
+      "lines": 552,
+      "sha": "e9bb7fbed934e893515c05ae804cce38dfc59392",
       "describes": [
         "ThermostatBehavior"
       ]
@@ -2121,7 +2120,7 @@
     {
       "path": "packages/node/test/behaviors/thermostat/ThermostatEventsTest.ts",
       "lines": 923,
-      "sha": "d0308bd5290ee4b9a9057e628ef8bfb578a609bf",
+      "sha": "9e8d2ed9c891550c2deb0247b447b4c74a4610f9",
       "describes": [
         "Thermostat events",
         "Thermostat events without the thermostat-events forward feature"
@@ -2169,8 +2168,8 @@
     },
     {
       "path": "packages/node/test/behaviors/web-rtc-transport-requestor/WebRtcTransportRequestorServerTest.ts",
-      "lines": 731,
-      "sha": "b66454fc910134053cca43849ba3dd9aa729c00b",
+      "lines": 1549,
+      "sha": "0b460c2ad6b117602ee2229790318100017e0486",
       "describes": [
         "WebRtcTransportRequestorServer"
       ]
@@ -2310,8 +2309,8 @@
     },
     {
       "path": "packages/node/test/endpoint/server/InteractionProtocolTest.ts",
-      "lines": 2769,
-      "sha": "35735557f10029f24896788242447a6db8cb9879",
+      "lines": 2842,
+      "sha": "1222a615f3e682803d4882932b3c79456416611b",
       "describes": [
         "InteractionProtocol"
       ]
@@ -2530,8 +2529,8 @@
     },
     {
       "path": "packages/node/test/node/ClientAttestationTest.ts",
-      "lines": 795,
-      "sha": "7c8ce4d9b7c67d834fcc8aa5736a771f5645680b",
+      "lines": 834,
+      "sha": "52ed65c64b296b77f87f1178512e5cacb5f37e7f",
       "describes": [
         "device attestation during commissioning"
       ]
@@ -2585,8 +2584,8 @@
     },
     {
       "path": "packages/node/test/node/ClientEventNotificationTest.ts",
-      "lines": 1290,
-      "sha": "ecbc8fd99b9a8c1953544b108f0bb65a4126f379",
+      "lines": 1406,
+      "sha": "1bd3786a8dbad8c7797ad1637c4afd3ce3ad7f3c",
       "describes": [
         "Client Event Notification"
       ]
@@ -2601,16 +2600,16 @@
     },
     {
       "path": "packages/node/test/node/ClientGroupTest.ts",
-      "lines": 170,
-      "sha": "11a2406561a62d7f73d1dc938a7c676e6e2fd55f",
+      "lines": 200,
+      "sha": "67717df0390a896433f66b8900970a21cacf9fbf",
       "describes": [
         "ClientGroup"
       ]
     },
     {
       "path": "packages/node/test/node/ClientInvokeTest.ts",
-      "lines": 1005,
-      "sha": "981d5fb9dafc6ec7505f1b5c2940d1ea62ccd96d",
+      "lines": 1006,
+      "sha": "e4bb5e36921852ec597d711bec312d1cf020cf86",
       "describes": [
         "ClientInvoke"
       ]
@@ -2720,6 +2719,14 @@
       ]
     },
     {
+      "path": "packages/node/test/node/CommissioningCancelTest.ts",
+      "lines": 402,
+      "sha": "dee6d5e9d96150aea3487fd0112d667049b055ce",
+      "describes": [
+        "Commissioning cancel"
+      ]
+    },
+    {
       "path": "packages/node/test/node/CommissioningClosedSessionReArmTest.ts",
       "lines": 72,
       "sha": "b08e549f5ba36963dec113deac0cc568c0fd2151",
@@ -2729,8 +2736,8 @@
     },
     {
       "path": "packages/node/test/node/CommissioningFailsafeExpiryTest.ts",
-      "lines": 203,
-      "sha": "de0fb0b540bc0dc97c8bce3416ad518867e1c335",
+      "lines": 215,
+      "sha": "982e496bbe50eb54d79116d4c085796c050979fa",
       "describes": [
         "Commissioning failsafe expiry"
       ]
@@ -2985,8 +2992,8 @@
     },
     {
       "path": "packages/node/test/node/SplitCommissioningTest.ts",
-      "lines": 394,
-      "sha": "d891eb17597311ef293584b301a8fd74ba18ab57",
+      "lines": 425,
+      "sha": "60a2ef797d0a088f95f648600143dff9ee7fc8ef",
       "describes": [
         "split commissioning"
       ]
@@ -3146,8 +3153,8 @@
     },
     {
       "path": "packages/nodejs-ble/test/NobleBleChannelTest.ts",
-      "lines": 1138,
-      "sha": "a503a1d478babcb72040f4f5dbaac2cbabef83ad",
+      "lines": 1150,
+      "sha": "3d7bdbcae226bbd9c432df2d53311a39de1afd95",
       "describes": [
         "NobleBleCentralInterface",
         "NobleBleChannel.create"
@@ -3341,12 +3348,13 @@
     },
     {
       "path": "packages/protocol/test/action/client/ClientInteractionInvokeTest.ts",
-      "lines": 902,
-      "sha": "501b3a3570c0c93de6ce67f0ea5dfb310b4b3e56",
+      "lines": 1014,
+      "sha": "607d821387aeef518e3e631002ade96f19141fb6",
       "describes": [
         "ClientInteraction invoke response reconciliation",
         "ClientInteraction invoke commandRef wire handling",
         "ClientInteraction invoke DelayReportData",
+        "ClientInteraction request flags",
         "ClientInteraction invoke response without InteractionModelRevision",
         "ClientInteraction invoke status origin"
       ]
@@ -3354,7 +3362,7 @@
     {
       "path": "packages/protocol/test/action/client/ClientInteractionSubscribeTest.ts",
       "lines": 424,
-      "sha": "3208cf7822dfaeb118e49e676e0a10565016f343",
+      "sha": "b6973b7ffb35e98ac521606a93eaebc792956ebf",
       "describes": [
         "ClientInteraction subscribe"
       ]
@@ -3385,8 +3393,8 @@
     },
     {
       "path": "packages/protocol/test/action/client/subscription/ClientSubscriptionHandlerTest.ts",
-      "lines": 157,
-      "sha": "15da7483d8ab539dd4de5c4f962a856e303add3e",
+      "lines": 209,
+      "sha": "e2f5b028323b3382c0339d8b848783359cb59fe4",
       "describes": [
         "ClientSubscriptionHandler"
       ]
@@ -3401,8 +3409,8 @@
     },
     {
       "path": "packages/protocol/test/action/client/subscription/PeerSubscriptionTest.ts",
-      "lines": 105,
-      "sha": "c38a12eee3806a38c9dc5d01ec9657d50c16929e",
+      "lines": 114,
+      "sha": "d0e5bcddcb58c10007d852aed00720205cea3efe",
       "describes": [
         "PeerSubscription"
       ]
@@ -3457,8 +3465,8 @@
     },
     {
       "path": "packages/protocol/test/action/request/WriteTest.ts",
-      "lines": 347,
-      "sha": "6fa95b7cd28e80cabd81e8714fd9eded1c8e1a1b",
+      "lines": 361,
+      "sha": "986d306340e45e12ea40db5ab64bab03d260371d",
       "describes": [
         "Write"
       ]
@@ -3956,10 +3964,11 @@
     },
     {
       "path": "packages/protocol/test/interaction/InteractionClientMessengerTest.ts",
-      "lines": 806,
-      "sha": "f55d0921b2a0e9d917cc846ad2266ada1e3413b1",
+      "lines": 944,
+      "sha": "7425830d17a78d570959d77a01bb9fb20cd590a1",
       "describes": [
-        "InteractionClientMessenger"
+        "InteractionClientMessenger",
+        "InteractionClientMessenger.requestFlagsForSending"
       ]
     },
     {
@@ -4037,8 +4046,8 @@
     },
     {
       "path": "packages/protocol/test/peer/CommissioningConnectionTest.ts",
-      "lines": 837,
-      "sha": "d3586377ccff4baf8eba7579339e8ba55ce72ca5",
+      "lines": 859,
+      "sha": "4dc9e970ca51938c50a80f0790b831e68b72018b",
       "describes": [
         "CommissioningConnection"
       ]
@@ -4090,6 +4099,14 @@
       "sha": "9e03dac5a4c1594eb0490afab2d97cca5e6187cf",
       "describes": [
         "Peer.connect timeout semantics"
+      ]
+    },
+    {
+      "path": "packages/protocol/test/peer/PeerConnectionBusyTest.ts",
+      "lines": 443,
+      "sha": "c1416b757fb64dbd01fc93771f4632b31b975551",
+      "describes": [
+        "PeerConnection BUSY"
       ]
     },
     {
@@ -5098,10 +5115,18 @@
     },
     {
       "path": "packages/types/test/protocol/TlvInvokeRequestTest.ts",
-      "lines": 85,
-      "sha": "a128398457c1e9540f4ec396692315b36f110286",
+      "lines": 96,
+      "sha": "1ee2a8f6ade2c5664c1d6ea3223bd473e3a5b821",
       "describes": [
         "TlvInvokeRequest"
+      ]
+    },
+    {
+      "path": "packages/types/test/protocol/TlvWriteRequestTest.ts",
+      "lines": 24,
+      "sha": "f383cf710e4e86c35af975b9853d84b8436fa745",
+      "describes": [
+        "TlvWriteRequest"
       ]
     },
     {

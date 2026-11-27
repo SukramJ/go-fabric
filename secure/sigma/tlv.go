@@ -91,7 +91,7 @@ func sigmaTLVDecoder(b []byte) *sigmaDecoder {
 // Array or a List is refused as well, not read as if it were one — the
 // rule [sessionParamsOf] states for the nested session parameters
 // (R2-P6-wire-0101). Mirrors matter.js, which refuses another top-level
-// type (packages/types/src/tlv/TlvObject.ts:205-207 at b25ed960);
+// type (packages/types/src/tlv/TlvObject.ts:205-207 at db91886c);
 // connectedhomeip does the same for TBE2 and TBE3
 // (src/protocols/secure_channel/CASESession.cpp:1651-1653, :2069-2070 at
 // 6170af84).
@@ -181,7 +181,7 @@ func octetsOf(v sigmaValue, want int) ([]byte, error) {
 // it must be a structure — any other element, an array or a list
 // included, refuses the message, as matter.js refuses an element of
 // another type at a structure field (packages/types/src/tlv/TlvObject.ts:206-207
-// at b25ed960). The member is the messages' optional session-parameters
+// at db91886c). The member is the messages' optional session-parameters
 // structure (packages/protocol/src/session/case/CaseMessages.ts:34, :46,
 // :55).
 func sessionParamsOf(dec *sigmaDecoder, v sigmaValue) (SessionParameters, error) {

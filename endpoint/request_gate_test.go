@@ -110,7 +110,7 @@ func TestRequestGateReachesEveryServer(t *testing.T) {
 		{"ColorControl MoveHue, undefined MoveMode", color, ccdef.CmdMoveHue, ccdef.MoveHueRequest{MoveMode: 9, Rate: 1}, true, im.StatusConstraintError},
 		{"ICDManagement RegisterClient, undefined ClientType", icd, icddef.CmdRegisterClient, icddef.RegisterClientRequest{Key: make([]byte, 16), ClientType: 9}, true, im.StatusConstraintError},
 		// TriggerEffect's two enum fields are relaxed (IdentifyServer.ts:162-166
-		// at b25ed960): nothing the gate refuses or warns of.
+		// at db91886c): nothing the gate refuses or warns of.
 		{"Identify TriggerEffect, undefined EffectIdentifier (relaxed)", identify, identifydef.CmdTriggerEffect, identifydef.TriggerEffectRequest{EffectIdentifier: 0x42}, false, im.StatusSuccess},
 		// A request without fields is judged as {}: IdentifyTime is missing.
 		{"Identify Identify, without fields", identify, identifydef.CmdIdentify, nil, true, im.StatusSuccess},

@@ -64,6 +64,25 @@ WebRtcTransportRequestor:
 6. The host calls `Requestor.RemoveSession` when it tears a stream down
    itself.
 
+The provider allocates the session id, and it may signal before its
+SolicitOffer or ProvideOffer response reaches the host. A host that
+registers the session only after the response holds the provider's
+signals meanwhile: `release := Requestor.HoldUnknownSignals(fabricIndex,
+peerNodeID)` before it sends the request, `release()` after it tried
+to register the session and before any cleanup that ends the session at
+the provider. While a hold for the peer exists, a signal for a session
+the requestor does not track waits for the registration — at most
+`camera.EarlySignalHoldTime` (5 s) from its arrival, timed on
+`RequestorConfig.Clock` — and is refused as in step 4 when the hold is
+released, the time runs out or the bridge quiesces the server. A
+waiting signal does not hold up the peer's other messages on the same
+CASE session. Signals held for one session reach the port in no
+particular order once it is registered, as in matter.js: candidates may
+arrive before their Offer, and a held End may remove the session before
+a held Offer, which is then refused. The module's controller (`controller/camera`) takes no
+hold: it registers the session when the response arrives, before the
+provider's next message on that session is handled.
+
 A removed fabric's sessions leave `CurrentSessions` when the node removes
 the fabric, as matter.js strips a fabric-sensitive list on the fabric's
 deletion, and the port's `End` is told of each with UnknownReason, so the

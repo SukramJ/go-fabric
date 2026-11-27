@@ -9,9 +9,10 @@
 //   - [Requestor] serves WebRtcTransportRequestor (0x0554) after matter.js's
 //     WebRtcTransportRequestorServer
 //     (packages/node/src/behaviors/web-rtc-transport-requestor/
-//     WebRtcTransportRequestorServer.ts at 862ad75f): the session table, the
-//     peer's identity checks on Offer, Answer, IceCandidates and End, and the
-//     signalling handed to the host's [RequestorPort].
+//     WebRtcTransportRequestorServer.ts at db91886c): the session table, the
+//     peer's identity checks on Offer, Answer, IceCandidates and End, the
+//     hold of a provider's signals that arrive before their session is
+//     registered, and the signalling handed to the host's [RequestorPort].
 //   - [Chime] serves Chime (0x0556) and [AvSettings] serves
 //     CameraAvSettingsUserLevelManagement (0x0552). matter.js serves both
 //     with the generated behaviour only (ChimeServer.ts,
@@ -28,7 +29,7 @@
 //     capture, reference-counted for the transports.
 //   - [Zones] serves ZoneManagement (0x0550) after matter.js
 //     (packages/node/src/behaviors/zone-management/ZoneManagementServer.ts
-//     and TwoDCartesianGeometry.ts at b25ed960): the zones and triggers
+//     and TwoDCartesianGeometry.ts at db91886c): the zones and triggers
 //     behind the [ZonePort], the zone IDs the server assigns
 //     ([ZonesConfig].LastZoneID or the port's [LastZoneIDSource]), the
 //     polygon rules ([ZoneSelfIntersecting]); the configuration limits and

@@ -181,7 +181,7 @@ func (b *Bridge) reestablishPeer(ctx context.Context, k peerKey, recs []subscrip
 	// Newest first: an older record is likelier the one the peer dropped,
 	// and InvalidSubscription ends this peer's loop. recs is in the
 	// store's order, least recently saved first. Mirrors matter.js
-	// SubscriptionsServer.ts:323-325 at b25ed960
+	// SubscriptionsServer.ts:323-325 at db91886c
 	// (`peerSubscriptions.reverse()`); review II, R2-P2-sess-01.
 	for _, rec := range slices.Backward(recs) {
 		if block.has(k) {

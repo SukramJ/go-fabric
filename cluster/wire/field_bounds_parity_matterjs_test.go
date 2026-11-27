@@ -17,7 +17,7 @@ import (
 // wrong TLV type with INVALID_ACTION, where they used to mask the value
 // into a different, valid one — matter.js
 // packages/types/src/tlv/TlvNumber.ts:145-156 and
-// packages/types/src/common/ValidationError.ts:35-38 at b25ed960
+// packages/types/src/common/ValidationError.ts:35-38 at db91886c
 // (W3-clucore-08). The sentinel stays reachable through errors.Is.
 func TestParityMatterJS_DecoderFieldBounds(t *testing.T) {
 	t.Parallel()

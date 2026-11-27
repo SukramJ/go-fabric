@@ -22,7 +22,7 @@ import (
 // entry maximum, "max 3[max 4]") and in a struct — as matter.js's
 // datasource shortens stored values at load
 // (packages/node/src/behavior/state/managed/Datasource.ts:124-220 at
-// b25ed960, #4995); a value within its bounds, and a bound that is not a
+// db91886c, #4995); a value within its bounds, and a bound that is not a
 // number, cut nothing.
 func TestRestoreShortensStoredStrings(t *testing.T) {
 	t.Parallel()

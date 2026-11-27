@@ -438,7 +438,7 @@ func (s *ThermostatServer) rollbackWrite(ctx context.Context, req tdef.AtomicReq
 }
 
 // commitWrite is matter.js AtomicWriteHandler.commitWrite
-// (AtomicWriteHandler.ts:279-346 at b25ed960): every staged value is
+// (AtomicWriteHandler.ts:279-346 at db91886c): every staged value is
 // validated and applied as one unit, in the CommitWrite request's order,
 // an attribute the peer did not write reporting SUCCESS; a failure
 // discards all of them, and the command reports FAILURE with the reasons

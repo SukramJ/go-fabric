@@ -60,9 +60,9 @@ type LivenessKick struct {
 // scheduled attempt lies further away than the peer's active threshold —
 // a peer that stays awake that long loses nothing to the schedule. The
 // caller stops the timer and retransmits when it reports true.
-// Mirrors matter.js packages/protocol/src/protocol/MessageExchange.ts:593-629 at b25ed960
+// Mirrors matter.js packages/protocol/src/protocol/MessageExchange.ts:593-629 at db91886c
 // (#kickRetransmissionForLiveness, its checks before the retransmission),
-// called at packages/protocol/src/protocol/MessageExchange.ts:514-523 at b25ed960
+// called at packages/protocol/src/protocol/MessageExchange.ts:514-523 at db91886c
 // (a duplicate requiring an ack: the standalone ack only when nothing was kicked).
 func ShouldKickForLiveness(k LivenessKick) bool {
 	if !k.BDX || k.Closed {

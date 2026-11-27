@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// retransmissionsWithin is MessageExchangeTest.ts:428-482 at b25ed960 on the
+// retransmissionsWithin is MessageExchangeTest.ts:428-482 at db91886c on the
 // bridge's reliable tracker: one message of an exchange of this node's,
 // tracked with margin on the base interval base, its retransmissions
 // counted over window in 500 ms ticks of the schedule's clock.
@@ -32,7 +32,7 @@ func retransmissionsWithin(t *testing.T, bdxExchange bool, base, margin, window 
 
 // TestBDXRetransmissionIntervalCap ports matter.js
 // packages/protocol/test/protocol/MessageExchangeTest.ts:420-531 at
-// b25ed960 (describe "BDX retransmission interval cap"). PADDED's local
+// db91886c (describe "BDX retransmission interval cap"). PADDED's local
 // additional delay of 20 s is the exchange's margin here, FAST_PEER's and
 // SLEEPY's schedule the base interval the session resolver states: the
 // tracker selects active or idle itself, so SLEEPY (threshold 0, nominally

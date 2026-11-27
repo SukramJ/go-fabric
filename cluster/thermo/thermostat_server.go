@@ -12,10 +12,9 @@
 // the optional TemperatureSetpointHold (with TemperatureSetpointHoldDuration)
 // and ThermostatRunningState. MatterScheduleConfiguration (the device's
 // week programs, the active one, SetActiveScheduleRequest and the atomic
-// write of Schedules) follows matter.js, which implements it behind its
-// forward feature thermostat-msch (ThermostatServer.ts:177-178, :267-271
-// at b25ed960), behind the extension BD-chip-Thermostat-Schedules and a
-// [SchedulePort] (schedules.go); and ThermostatSuggestions (the presets a
+// write of Schedules) follows matter.js, which serves it released since
+// #5044 (no forward gate at db91886c), with a [SchedulePort]
+// (schedules.go); and ThermostatSuggestions (the presets a
 // controller suggests for a span of time, the one the thermostat follows)
 // after connectedhomeip's ThermostatSuggestions, on the node's Matter time
 // ([ThermostatServer.AttachMatterTime], suggestions.go).
@@ -2040,7 +2039,7 @@ func (s *ThermostatServer) MatterEvents() []uint32 { return s.inst.MatterEvents(
 // afterwards, and it closes every atomic write in progress with its
 // timeout, as matter.js's [Symbol.asyncDispose] closes the
 // AtomicWriteHandler (ThermostatServer.ts:3088-3091 at b25ed960; its close,
-// AtomicWriteHandler.ts:92-97 at b25ed960). A LocalTemperatureChange
+// AtomicWriteHandler.ts:92-97 at db91886c). A LocalTemperatureChange
 // waiting for the end of its window is dropped, as a closed node runs no
 // timer (ThermostatEventsTest.ts:795-812 at b25ed960, "generates no event
 // after the node closed"). The server stays usable: the

@@ -310,7 +310,7 @@ func (s *Site) Settle(ctx context.Context) error { return s.quiet(ctx, nil, s.wa
 // [Site.Fake]().Advance while the stack may be working: the clock would
 // move under a host still handling a message. It is matter.js's mock
 // clock `advance(ms)`, awaited (packages/testing/src/mocks/time.ts:638-663
-// at b25ed960), between two waits for the task queue to drain. Without a
+// at db91886c), between two waits for the task queue to drain. Without a
 // fake clock it fails.
 func (s *Site) Step(ctx context.Context, d time.Duration) error {
 	if s.fake == nil {
@@ -604,7 +604,7 @@ func pollSleep(wall clock.Clock, d time.Duration, done <-chan struct{}) {
 // it logs abandoned counted work (which this check does not touch).
 // matter.js MockTime abandons a host operation the same way
 // (MAX_HOST_ASYNC_MS, packages/testing/src/mocks/time.ts:63-70 at
-// b25ed960). The site logs the first time it moves on in one wait.
+// db91886c). The site logs the first time it moves on in one wait.
 func (s *Site) busyHolds(samples []metrics.Sample, still time.Duration, starved *bool) bool {
 	if !busy(samples, &s.inSyscall, true) {
 		return false

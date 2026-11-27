@@ -228,7 +228,7 @@ type Config struct {
 	// Sessions sets the session intervals the controller reports in its
 	// handshakes (PBKDFParamRequest / Sigma1 SessionParameters) —
 	// matter.js's sessions.intervals fed into the SessionManager
-	// (ServerNetworkRuntime.ts:362-367 at b25ed960), the controller-side
+	// (ServerNetworkRuntime.ts:362-367 at db91886c), the controller-side
 	// counterpart of node.Config.Sessions. nil is the Matter defaults
 	// (500 ms / 300 ms / 4000 ms); an interval outside whole milliseconds
 	// from 0 to the field's bound is [ErrConfiguration].
@@ -237,7 +237,7 @@ type Config struct {
 	// connections: exchange.TransportTCP is a soft hint — a connection
 	// falls back to UDP when the peer does not serve TCP — and needs
 	// TCP.Outgoing; anything else is UDP (NetworkServer.ts:225-228,
-	// NetworkClient.ts:73-79 at b25ed960).
+	// NetworkClient.ts:73-79 at db91886c).
 	TransportPreference exchange.Transport
 	// PeerTiming sets the connection timing of the controller's peer set,
 	// every parameter [client.Timing] names: the connection timeout, the
@@ -1140,9 +1140,10 @@ type PairOptions struct {
 	// independently of the search's bound: a ctx without a deadline keeps
 	// [DefaultPairTimeout] on the search and this on what follows it. A
 	// commissioning that outlasts it is given up as a caller's
-	// cancellation is — the fail-safe disarmed within
-	// commissioner.FailSafeMaxSendTime — and ends with an error that is
-	// context.DeadlineExceeded.
+	// cancellation is — the fail-safe's expiry waited for at most 2 s
+	// (matter.js CANCELED_EXPIRY_WAIT) — and ends with an error that is
+	// context.DeadlineExceeded; once CommissioningComplete was sent it no
+	// longer ends the commissioning (matter.js's commit cut-off).
 	// Zero (or less) sets none, as matter.js's commissionNode sets no
 	// overall deadline (CommissioningController.ts:465-511 at db021da0);
 	// ctx, the commissioner's own budgets and the fail-safe still apply

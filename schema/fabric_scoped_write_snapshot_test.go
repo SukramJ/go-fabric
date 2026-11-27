@@ -16,7 +16,7 @@ import (
 // the attributes whose effective access in parity/schema.json is writable
 // (an rw other than "R", matter.js Access.writable) and fabric-scoped or
 // fabric-sensitive (matter.js limits.fabricScoped,
-// packages/protocol/src/action/server/AccessControl.ts:524 at b25ed960),
+// packages/protocol/src/action/server/AccessControl.ts:524 at db91886c),
 // across every cluster of the snapshot. A stale attribute_access_gen.go
 // fails here.
 func TestFabricScopedWriteMatchesSnapshot(t *testing.T) {
@@ -71,7 +71,7 @@ func TestFabricScopedWriteMatchesSnapshot(t *testing.T) {
 // exactly the attributes whose effective access in parity/schema.json is
 // readable (an rw other than "W", matter.js Access.readable) and
 // fabric-scoped or fabric-sensitive (matter.js limits.fabricScoped,
-// packages/protocol/src/action/server/AccessControl.ts:524 at b25ed960),
+// packages/protocol/src/action/server/AccessControl.ts:524 at db91886c),
 // across every cluster of the snapshot. A stale attribute_access_gen.go
 // fails here.
 func TestFabricScopedReadMatchesSnapshot(t *testing.T) {

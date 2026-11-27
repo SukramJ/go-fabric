@@ -218,7 +218,7 @@ func (d *Decoder) readValue(el *Element) error { //nolint:funlen // wire/dispatc
 		if i := bytes.IndexByte(body, 0x1F); i >= 0 {
 			// The length a bounded consumer checks first, in UTF-8 bytes
 			// of the decoded string (U+FFFD for an ill-formed sequence),
-			// as matter.js TlvString.ts:69-77 at b25ed960 measures the
+			// as matter.js TlvString.ts:69-77 at db91886c measures the
 			// decoded value with byteLengthOf before it slices.
 			n := uint64(len(decodeUTF8(body)))
 			if n > math.MaxUint32 {

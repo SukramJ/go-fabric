@@ -4,7 +4,7 @@
 package interaction_test
 
 // A port of matter.js packages/node/test/node/ClientRequireExistingSessionTest.ts
-// at b25ed960 (#4928): ClientRequest.requireExistingSession on the
+// at db91886c (#4928): ClientRequest.requireExistingSession on the
 // controller's interaction with a commissioned peer — a read over the
 // session that exists, a read that fails instead of connecting when the
 // peer has none, and the refusal for a sustained subscription.
@@ -60,7 +60,7 @@ func TestClientRequireExistingSession(t *testing.T) {
 			return err
 		})
 		// matter.js's SessionClosedError "No existing session to <address>"
-		// (PeerExchangeProvider.ts:116-118 at b25ed960) is ErrNoSession.
+		// (PeerExchangeProvider.ts:116-118 at db91886c) is ErrNoSession.
 		if !errors.Is(err, interaction.ErrNoSession) {
 			t.Fatalf("read without a session: %v, want ErrNoSession", err)
 		}

@@ -2089,8 +2089,8 @@
       "path": "packages/model/test/logic/SelectDefaultValueTest.ts",
       "status": "excluded",
       "class": "js-runtime-only",
-      "reason": "Choice of a default value for a model element when matter.js instantiates TypeScript behavior state; the Go generator writes the snapshot's defaults into the definitions.",
-      "snapshotSha": "f99a4168d33b85da0716569737eaed4e31d2c764"
+      "reason": "Choice of a default value for a model element when matter.js instantiates TypeScript behavior state; the Go generator writes the snapshot's defaults into the definitions. Pin lift db91886c (#5058): the three new cases (null for a nullable struct and for a nullable bitmap rather than a value built from their members' defaults, the stated default of a nullable bitmap) test the model function SelectDefaultValue; in Go only their outcome exists — no nullable struct or bitmap attribute of the snapshot carries a generated non-null default (13 state null, 19 none), and the device layer's fallback gives a listed nullable attribute null — held for the served servers by cluster/energy:TestParityMatterJS_ClusterBehaviorNullableStructDefault.",
+      "snapshotSha": "857d24d62cf6c0f5b6c263485e0b77a874b8d86c"
     },
     {
       "path": "packages/model/test/logic/ValidateModelTest.ts",
@@ -2277,10 +2277,28 @@
         "alter retains feature selection",
         "enable retains feature selection",
         "retain features enabled as a matter.js implementation decision",
-        "enable only features matter.js implements unconditionally"
+        "enable only features matter.js implements unconditionally",
+        "set defaults the model leaves undefined only where pinned"
       ],
-      "reason": "The published-behaviors cases on the device kit (device/cluster_features_parity_matterjs_test.go): LevelControl selects nothing and serves no Lighting element, a PowerSource selection breaking the FeatureMap conformance (none, or Wired and Battery) is refused while Wired builds, a Thermostat serves only the selected feature. Left out: with()/for()/alter()/enable(), TypeScript's behavior-type algebra (the Go form is a declaration's Features), and the walk over matter.js's exported behavior classes.",
-      "snapshotSha": "963e5672f0f7fe9e6371f0f78c83abd96d549499"
+      "reason": "The published-behaviors cases on the device kit (device/cluster_features_parity_matterjs_test.go): LevelControl selects nothing and serves no Lighting element, a PowerSource selection breaking the FeatureMap conformance (none, or Wired and Battery) is refused while Wired builds, a Thermostat serves only the selected feature. Pin lift db91886c (P1-F, #5057): \"drops the default the schema selected\" is ported (device:TestClusterBehaviorFeaturesParityMatterJS, ThermostatRunningMode served Off with AutoMode and Events, not served with AutoMode alone); Go has no derivation chain — an attribute is served when mandatory under the features or declared, and a stated default is filled only for a served one (cluster/spec instance.go, server.go). Left out: with()/for()/alter()/enable(), TypeScript's behavior-type algebra (the Go form is a declaration's Features), and the walk over matter.js's exported behavior classes. The case of the defaults the model leaves undefined (SERVER_ONLY_DEFAULTS) is missing and unclassified, what the Go servers serve there not read.",
+      "snapshotSha": "55983c9e99088a4023faff622031dc74855a4d3a",
+      "left": [
+        {
+          "it": "does not restore the default the schema selected after a derivative dropped the attribute",
+          "class": "js-runtime-only",
+          "reason": "a chain of .with() derivations restoring the base's defaults (ClusterDerivation); Go builds one Instance per definition, features and declaration, with no derivation chain (cluster/spec instance.go)"
+        },
+        {
+          "it": "keeps a default the application set",
+          "class": "js-runtime-only",
+          "reason": "a default the application set on the behavior class with .set(), carried through a derivation; Go has no class-level defaults to carry — a host states an initial value per server, and cluster/thermo offers no declaration of ThermostatRunningMode without TEVT"
+        },
+        {
+          "it": "restores a default the application set after a derivative dropped the attribute",
+          "class": "js-runtime-only",
+          "reason": "a chain of .with() derivations restoring a default the application set with .set(); Go has no derivation chain and no class-level defaults (cluster/spec instance.go)"
+        }
+      ]
     },
     {
       "path": "packages/node/test/behavior/cluster/ClusterBehaviorSemanticsTest.ts",
@@ -2291,10 +2309,99 @@
     },
     {
       "path": "packages/node/test/behavior/cluster/ClusterBehaviorTest.ts",
-      "status": "excluded",
-      "class": "js-runtime-only",
-      "reason": "The ClusterBehavior class mechanism (for/set/alter/with, ID derivation, method carry-forward, quiet event classes).",
-      "snapshotSha": "f28cbf8d54f772e74610dabe55e652a463d28249"
+      "status": "ported",
+      "go": [
+        "cluster/energy:TestParityMatterJS_ClusterBehaviorNullableStructDefault"
+      ],
+      "reason": "Pin lift db91886c (#5058): a nullable struct attribute without a stated default starts null — CommodityPrice CurrentPrice, and DeviceEnergyManagement Forecast with PowerForecastReporting (cluster/energy:TestParityMatterJS_ClusterBehaviorNullableStructDefault). Left: the ClusterBehavior class mechanism (for/set/alter/with, ID derivation, method carry-forward, quiet event classes), which has no Go counterpart.",
+      "snapshotSha": "2180172bf32b5e3fd68eb8d778899a7deac0fd45",
+      "left": [
+        {
+          "it": "ClusterBehavior > base class",
+          "class": "js-runtime-only",
+          "reason": "TypeScript type-level checks of the base class's state types"
+        },
+        {
+          "it": "ClusterBehavior > for > exposes mandatory properties for enabled cluster elements",
+          "class": "js-runtime-only",
+          "reason": "the ClusterBehavior class mechanism: .for() and the properties it exposes"
+        },
+        {
+          "it": "ClusterBehavior > for > maintains ID after second for",
+          "class": "js-runtime-only",
+          "reason": "the ClusterBehavior class mechanism: behavior ID derivation"
+        },
+        {
+          "it": "ClusterBehavior > for > exposes optional properties for disabled cluster elements",
+          "class": "js-runtime-only",
+          "reason": "the ClusterBehavior class mechanism: .for() and the properties it exposes"
+        },
+        {
+          "it": "ClusterBehavior > for > quieter element whose quality is inherited from the element it overrides",
+          "class": "js-runtime-only",
+          "reason": "the ClusterBehavior class mechanism: quiet event classes"
+        },
+        {
+          "it": "ClusterBehavior > for > quieter element a derived schema adds to a base behavior without it",
+          "class": "js-runtime-only",
+          "reason": "the ClusterBehavior class mechanism: quiet event classes"
+        },
+        {
+          "it": "ClusterBehavior > for > instance exposes values for enabled cluster elements",
+          "class": "js-runtime-only",
+          "reason": "the ClusterBehavior class mechanism: a behavior instance's state properties"
+        },
+        {
+          "it": "ClusterBehavior > for > instance does not expose values for disabled cluster elements",
+          "class": "js-runtime-only",
+          "reason": "the ClusterBehavior class mechanism: a behavior instance's state properties"
+        },
+        {
+          "it": "ClusterBehavior > for > instance allows standard method override",
+          "class": "js-runtime-only",
+          "reason": "the ClusterBehavior class mechanism: method override on a derived class"
+        },
+        {
+          "it": "ClusterBehavior > for > assigns correct default values",
+          "class": "js-runtime-only",
+          "reason": "the ClusterBehavior class mechanism: the defaults of a derived behavior class; the Go generator writes the snapshot's defaults into the definitions"
+        },
+        {
+          "it": "ClusterBehavior > for > carries forward non-command methods",
+          "class": "js-runtime-only",
+          "reason": "TypeScript type-level checks of method carry-forward"
+        },
+        {
+          "it": "ClusterBehavior > set",
+          "class": "js-runtime-only",
+          "reason": "the ClusterBehavior class mechanism: .set() recreating the type"
+        },
+        {
+          "it": "ClusterBehavior > alter",
+          "class": "js-runtime-only",
+          "reason": "the ClusterBehavior class mechanism: .alter(), ID derivation and event classes"
+        },
+        {
+          "it": "ClusterBehavior > with",
+          "class": "js-runtime-only",
+          "reason": "the ClusterBehavior class mechanism: .with() feature extension and overrides"
+        },
+        {
+          "it": "ClusterBehavior > non-Matter methods",
+          "class": "js-runtime-only",
+          "reason": "the ClusterBehavior class mechanism: methods that are not Matter commands kept out of the command lists"
+        },
+        {
+          "it": "ClusterBehavior > enable",
+          "class": "js-runtime-only",
+          "reason": "the ClusterBehavior class mechanism: .enable() of events and properties"
+        },
+        {
+          "it": "ClusterBehavior > typesOf",
+          "class": "js-runtime-only",
+          "reason": "the ClusterBehavior class mechanism: typesOf over behavior types"
+        }
+      ]
     },
     {
       "path": "packages/node/test/behavior/cluster/ClusterBehaviorVarianceTest.ts",
@@ -3013,10 +3120,15 @@
           "it": "rejects with the cancel reason when the node fails to start after the cancel",
           "class": "js-runtime-only",
           "reason": "a Go discovery session starts no node: the outcome after a cancel is the cancel reason with nothing left to fail (matter.js's ClientNode start inside the discovery, Discovery.ts:333-357)"
+        },
+        {
+          "it": "reports settled when first read after the discovery ${outcome}",
+          "class": "js-runtime-only",
+          "reason": "#5051: matter.js made the settled promise lazily in its getter, so a first read after the end never resolved; a Go session makes its done channel in the constructor and closes it at the end (client/discovery/session.go, start and run), and a closed channel reads as closed whenever it is first read — nothing to port."
         }
       ],
-      "reason": "The interruption of a discovery session (client/discovery Session, matter.js Discovery.ts:37-483 at 862ad75f) on fixed and failing transports: a cancel, the timeout and the caller's context before the result close the race, an interruption after it is ignored, the first reason stays, the outcome waits for the aborted attempts, and the failure of one transport against all. The three real-device cases run a commissioning race against a fabrictest device whose PASE answers fabrictest.Network.Filter holds until the interruption (TestDiscoveryCancelWithRealDeviceParity). Left: the node's start (a Go session starts no node).",
-      "snapshotSha": "1613033bcf3b348c3340969c197ef12d366c0995"
+      "reason": "The interruption of a discovery session (client/discovery Session, matter.js Discovery.ts:37-483 at 862ad75f) on fixed and failing transports: a cancel, the timeout and the caller's context before the result close the race, an interruption after it is ignored, the first reason stays, the outcome waits for the aborted attempts, and the failure of one transport against all. The three real-device cases run a commissioning race against a fabrictest device whose PASE answers fabrictest.Network.Filter holds until the interruption (TestDiscoveryCancelWithRealDeviceParity). Left: the node's start (a Go session starts no node). Pin lift db91886c, P1-D (#5049, #5051): the two cases after the PASE win renamed (\"… despite a cancel …\"), and two added — the winner's operation stopping on the cancel rejects with its reason, and a decided race aborts the losers but not the winner (raceKind.onCancel); left: the lazily created settled promise (#5051).",
+      "snapshotSha": "34cc59d1b1534483ef1995d531648166133eee42"
     },
     {
       "path": "packages/node/test/behavior/system/controller/discovery/DiscoveryErrorTest.ts",
@@ -4259,7 +4371,7 @@
         "accepts an attribute whose atomic quality is inherited from the element it overrides"
       ],
       "reason": "BeginWrite's command-level and per-attribute answers, the timeout and the BUSY of a write another peer holds run over the wire on fabrictest (a second peer is a second controller on its own fabric, the PASE peer a PASE session). The five CommitWrite cases of more than one attribute run in the package on a thermostat serving Presets and Schedules (MatterScheduleConfiguration, mirrored from matter.js behind its forward feature, BD-chip-Thermostat-Schedules): the values are staged through the server's write, the Schedules value the write refuses (TransitionTime 1440) on the atomic-write state as matter.js's stageAs does; Missing: the inherited-quality case, js-runtime-only: a TypeScript schema extension of a behavior class (the atomic quality is the generated definition's). Pin lift b25ed960 (P3-A): the Schedules write of another peer answers INVALID_IN_STATE, ported over the wire; \"validates an attribute once the other pending attributes are staged\" is the Presets $AtomicChanged check (atomicChanged) reading the unit's staged Schedules (AtomicWriteHandler.ts:314-320).",
-      "snapshotSha": "8f76d9d476de93a37f2bfe43e6292f345faa3d75"
+      "snapshotSha": "e882508aae38b841836b9613c77edf511dcba27a"
     },
     {
       "path": "packages/node/test/behaviors/thermostat/AtomicWriteStateTest.ts",
@@ -4365,7 +4477,7 @@
         }
       ],
       "reason": "Every other case runs over the wire on fabrictest (BeginWrite, the write as REPLACE-ALL plus ADDs, CommitWrite/RollbackWrite); the write a matter.js client rejects is the WriteStatuses entry with that status; the controller's cache is a subscription; the helpers of schedule-helpers.ts are schedule_helpers_parity_matterjs_test.go (newScheduleTransition, newSchedule, schedulesConfig, heatingOnlySchedulesConfig, recordThermostatChanges). Left, js-runtime-only: an application observer on persistedSchedules$Changing that rewrites the value in flight, matter.js's behavior-state observer; the Go server has no such seam. Pin lift b25ed960, unit P3-A (#4467, decision 291).",
-      "snapshotSha": "d0f0bb2eb0a59fd33d8dcb130cd3d53a51209c8e"
+      "snapshotSha": "659f2c7143dfb65ee702d5fdf47412b872e717dc"
     },
     {
       "path": "packages/node/test/behaviors/thermostat/SchedulesConfigurationTest.ts",
@@ -4379,11 +4491,6 @@
         "starts with more stored schedules and transitions than the limits allow and raises the limits"
       ],
       "left": [
-        {
-          "it": "refuses to start",
-          "class": "by-design",
-          "reason": "the Go gate is the extension BD-chip-Thermostat-Schedules (surface.Policies.Extensions), pinned by device/surface_ahead_test.go and the reference bridge's TestDemoThermostatSchedulesAreGated"
-        },
         {
           "it": "serves schedules a behavior type supplies as its own default",
           "class": "js-runtime-only",
@@ -4400,8 +4507,8 @@
           "reason": "plants a value under the attribute's pre-accessor key of matter.js's behavior storage; the Go server never stored schedules anywhere but behind its SchedulePort"
         }
       ],
-      "reason": "The configured schedules and ScheduleTypes are ThermostatConfig's, held to the write rules at start; the remote case runs over the wire on a commissioned fabrictest pair; the helpers of schedule-helpers.ts are schedule_helpers_parity_matterjs_test.go (newScheduleTransition, newSchedule, schedulesConfig, heatingOnlySchedulesConfig, recordThermostatChanges). \"validates a local write when the application configured no schedules\" is adapted: its first refusal is a content rule (a transition SystemMode equal to the schedule's), not NOT_FOUND, because the host's SetSchedules is not held to the lifecycle rules (BD-Thermostat-HostSchedules); the NOT_FOUND-before-count order (ThermostatServer.ts:2728-2734 before :2793) has no test of its own on the Matter path (a controller's ADDs validate one by one). Missing: the two restarts on stored schedules. Pin lift b25ed960 (P3-A): the Go server keeps schedules in memory or behind the host's SchedulePort; persisting them is a unit of its own (coordinator decision C-7).",
-      "snapshotSha": "5c5cf03cdf5945ded0f988e6f74c24f9f14e0314"
+      "reason": "The configured schedules and ScheduleTypes are ThermostatConfig's, held to the write rules at start; the remote case runs over the wire on a commissioned fabrictest pair; the helpers of schedule-helpers.ts are schedule_helpers_parity_matterjs_test.go (newScheduleTransition, newSchedule, schedulesConfig, heatingOnlySchedulesConfig, recordThermostatChanges). \"validates a local write when the application configured no schedules\" is adapted: its first refusal is a content rule (a transition SystemMode equal to the schedule's), not NOT_FOUND, because the host's SetSchedules is not held to the lifecycle rules (BD-Thermostat-HostSchedules); the NOT_FOUND-before-count order (ThermostatServer.ts:2728-2734 before :2793) has no test of its own on the Matter path (a controller's ADDs validate one by one). Missing: the two restarts on stored schedules. Pin lift b25ed960 (P3-A): the Go server keeps schedules in memory or behind the host's SchedulePort; persisting them is a unit of its own (coordinator decision C-7). Pin lift db91886c (P1-F, #5044): matter.js deleted \"refuses to start\" with the forward gate; the extension BD-chip-Thermostat-Schedules is retired.",
+      "snapshotSha": "7fb1a234546a54cf25d228829c49307532d58d5e"
     },
     {
       "path": "packages/node/test/behaviors/thermostat/SchedulesLocalWriteTest.ts",
@@ -4455,7 +4562,7 @@
         }
       ],
       "reason": "Local writes are the server's SetSchedules (Schedules and persistedSchedules alike), local presets writes SetPresets, a local SetActiveScheduleRequest the command without a peer; the helpers of schedule-helpers.ts are schedule_helpers_parity_matterjs_test.go (newScheduleTransition, newSchedule, schedulesConfig, heatingOnlySchedulesConfig, recordThermostatChanges). \"checks every schedule's own rules before the schedule count limits\" is adapted: the second schedule's own refusal is an unknown preset, a content rule, where matter.js uses an unknown handle (BD-Thermostat-HostSchedules); the NOT_FOUND-before-count order (ThermostatServer.ts:2728-2734 before :2793) has no test of its own on the Matter path (a controller's ADDs validate one by one). Left: five JavaScript state-layer cases and three lifecycle rules the host's replace is not held to (owner decision O-8). Missing: the restart. Pin lift b25ed960 (P3-A): the Go server keeps schedules in memory or behind the host's SchedulePort; persisting them is a unit of its own (coordinator decision C-7).",
-      "snapshotSha": "91c305f9170077193576e820d519632f31b7f413"
+      "snapshotSha": "1eadbbcadfa86f0113f58c4a513fb878c075d364"
     },
     {
       "path": "packages/node/test/behaviors/thermostat/ThermostatBehaviorTest.ts",
@@ -4465,8 +4572,8 @@
         "cluster/thermo:TestParityMatterJS_ThermostatBehaviorTest",
         "cluster/thermo:TestThermostatRequestCheckParityMatterJS"
       ],
-      "reason": "Every case runs on a fabrictest device with matter.js's vectors (cluster/thermo:TestParityMatterJS_ThermostatBehaviorTest): the configured user limits, deadband and presets are ThermostatConfig fields, a local write of a setpoint or a user limit is MatterWrite inside Device.Act and of an absolute limit SetAbsoluteSetpointLimit, the errors carry matter.js's texts. Pin lift b25ed960: the Heat case through the interaction layer (#5012) is ported (cluster/thermo:TestThermostatRequestCheckParityMatterJS); the SetpointRaiseLower case that refuses an undefined mode runs through the request gate spec.AdmitRequest (cluster/thermo:TestThermostatRequestCheckParityMatterJS; P2-H, decision 339). The six ControlSequenceOfOperation cases (#5000) are left by design (BD-Matter-Thermostat-ControlSequenceFromFeatures, coordinator decision C-3).",
-      "snapshotSha": "11e14b7fde55b5074a44d7f08d49e7e0ba1cd3ab",
+      "reason": "Every case runs on a fabrictest device with matter.js's vectors (cluster/thermo:TestParityMatterJS_ThermostatBehaviorTest): the configured user limits, deadband and presets are ThermostatConfig fields, a local write of a setpoint or a user limit is MatterWrite inside Device.Act and of an absolute limit SetAbsoluteSetpointLimit, the errors carry matter.js's texts. Pin lift b25ed960: the Heat case through the interaction layer (#5012) is ported (cluster/thermo:TestThermostatRequestCheckParityMatterJS); the SetpointRaiseLower case that refuses an undefined mode runs through the request gate spec.AdmitRequest (cluster/thermo:TestThermostatRequestCheckParityMatterJS; P2-H, decision 339). The six ControlSequenceOfOperation cases (#5000) are left by design (BD-Matter-Thermostat-ControlSequenceFromFeatures, coordinator decision C-3). Pin lift db91886c (P1-F, #5057): the two ThermostatRunningMode cases are ported (cluster/thermo:TestParityMatterJS_ThermostatBehaviorTest, subtest ThermostatRunningMode); the reheat cases' new thermostatRunningMode Off stays with their by-design entries.",
+      "snapshotSha": "e9bb7fbed934e893515c05ae804cce38dfc59392",
       "left": [
         {
           "it": "refuses heating modes with CoolingWithReheat",
@@ -4507,7 +4614,7 @@
         "cluster/thermo:TestParityMatterJS_ThermostatEventsTest"
       ],
       "reason": "Pin lift b25ed960, unit P4-A: the Thermostat events behind matter.js's forward feature thermostat-events (#4990, decision 291), 44 of 46 cases by meaning on a fake clock (node start = the bridge's SetEndpoint, node close = MatterQuiesce, application writes = the host setters); NaN/Inf thresholds have no int16 form; \"first measurement at startup\" is the host's first SetMeasuredTemperature; \"timer expires early\" by a clock whose next timer fires 1 ms early. Replaces events_chip_test.go.",
-      "snapshotSha": "d0308bd5290ee4b9a9057e628ef8bfb578a609bf",
+      "snapshotSha": "9e8d2ed9c891550c2deb0247b447b4c74a4610f9",
       "left": [
         {
           "it": "generates nothing and does not fail when the events are not enabled",
@@ -4690,11 +4797,17 @@
     },
     {
       "path": "packages/node/test/behaviors/web-rtc-transport-requestor/WebRtcTransportRequestorServerTest.ts",
-      "status": "ported",
+      "status": "partial",
       "go": [
         "cluster/camera:TestParityMatterJS_RequestorUpsertRemove",
         "cluster/camera:TestParityMatterJS_RequestorCommands",
-        "cluster/camera:TestParityMatterJS_RequestorACLInstall"
+        "cluster/camera:TestParityMatterJS_RequestorACLInstall",
+        "cluster/camera:TestParityMatterJS_RequestorHoldUnknownSignals",
+        "cluster/camera:TestParityMatterJS_RequestorSignalsAgainstChanges",
+        "cluster/camera:TestParityMatterJS_RequestorHeldSignalsOverTheWire"
+      ],
+      "missing": [
+        "ACL install adds an entry for a requestor endpoint added to a node that is online with a fabric"
       ],
       "left": [
         {
@@ -4721,10 +4834,25 @@
           "it": "logs the signal it refused with the peer and its own endpoint",
           "class": "js-runtime-only",
           "reason": "the text of matter.js's debug log line for a refused signal (#4996), which its own chip-testing harness matches"
+        },
+        {
+          "it": "throws ImplementationError for an endpoint without the requestor",
+          "class": "by-design",
+          "reason": "HoldUnknownSignals is a method of camera.Requestor, so a host cannot name an endpoint without the server; BD-Matter-Camera-RequestorRegistersAtArrival"
+        },
+        {
+          "it": "delivers the signals of one session in the order they arrived while they wait for the lock",
+          "class": "js-runtime-only",
+          "reason": "the order of matter.js's transaction-lock waiters (the case documents current behaviour, not a guarantee); Offer, Answer and IceCandidates wait for an End's removal on the requestor's delivery lock (cluster/camera/requestor.go, deliver) without leaving their CASE session's turn — only a held signal leaves it — so the bridge's session order (bridge/session_order.go) keeps one session's messages in arrival order"
+        },
+        {
+          "it": "registers a session inside a transaction that already locked the requestor",
+          "class": "js-runtime-only",
+          "reason": "the reentrancy of matter.js's transaction lock (the case documents current behaviour, not a guarantee); UpsertSession must not be called from the server's own change notification (cluster/camera/requestor.go)"
         }
       ],
-      "reason": "28 of the 33 cases run on cluster/camera's Requestor (brief 26-A1): upsert and remove by session key, the four commands' identity checks under the context the bridge stamps for a CASE invoke (matter.js's mocked remote actor), the refused, empty-candidate and end cases, the signalling handed to the RequestorPort; the ACL install over the wire on fabrictest, the repeated online event a device restart (cluster/camera/requestor_parity_matterjs_test.go).",
-      "snapshotSha": "b66454fc910134053cca43849ba3dd9aa729c00b"
+      "reason": "37 of the 45 cases run on cluster/camera's Requestor (brief 26-A1, phase 9 P1-G): upsert and remove by session key, the four commands' identity checks under the context the bridge stamps for a CASE invoke (matter.js's mocked remote actor), the refused, empty-candidate and end cases, the signalling handed to the RequestorPort; the hold of early signals on a driven clock (HoldUnknownSignals, its release, the 5 s from the arrival, MatterQuiesce for the node going offline and the endpoint closing or resetting, :978, :1013 and :1024 in one subtest; :858 and :873 in one); the End's lookup-and-removal and the registrations against a change that holds the requestor's publication lock; the held offer and end and a signal for another session behind a held one over the wire on fabrictest; the ACL install over the wire, the repeated online event a device restart (cluster/camera/requestor_parity_matterjs_test.go, requestor_hold_parity_matterjs_test.go). Missing: the ACL entry for a requestor endpoint a reassembly adds while the node is online with a fabric — node/ installs the entry at Start and after CommissioningComplete only (node/webrtc_provider_peers.go, node/node.go), outside #5045 (phase 9 P1-G, open question).",
+      "snapshotSha": "0b460c2ad6b117602ee2229790318100017e0486"
     },
     {
       "path": "packages/node/test/behaviors/window-covering/WindowCoveringServerTest.ts",
@@ -4883,8 +5011,10 @@
         "im:TestChunkedWriteHoldParityMatterJS",
         "im:TestGroupInvokeParityMatterJS",
         "im:TestGroupWriteParityMatterJS",
+        "im:TestGroupWriteSuppressResponsePresenceFromTheDecoder",
         "node:TestInteractionProtocolParityMatterJS",
-        "node:TestWildcardPathFlagsParityMatterJS"
+        "node:TestWildcardPathFlagsParityMatterJS",
+        "bridge:TestRequestWithoutFlagsParityMatterJS"
       ],
       "missing": [
         "does not answer the subscriber's error status for the initial report with a status",
@@ -4911,8 +5041,8 @@
           "reason": "matter.js log-line text of a unicast invoke"
         }
       ],
-      "reason": "The version filters, path ceilings, wildcard writes, the timed-interaction gates and the invoke-batch checks are covered on the Go IM paths; chunked-write holds, group dispatch, response chunking and the remaining read/subscribe cases are not ported case by case. Pin lift b25ed960: under SuppressResponse no InvokeResponse is sent also when a CommandDataIB was produced (#5011, P1-C; findings F-b25ed960-6 closed); the two held-response cases it replaces are gone upstream and from the Go subtests, and the suppressed cases (command throws, only a status, a CommandDataIB) are ported.",
-      "snapshotSha": "35735557f10029f24896788242447a6db8cb9879"
+      "reason": "The version filters, path ceilings, wildcard writes, the timed-interaction gates and the invoke-batch checks are covered on the Go IM paths; chunked-write holds, group dispatch, response chunking and the remaining read/subscribe cases are not ported case by case. Pin lift b25ed960: under SuppressResponse no InvokeResponse is sent also when a CommandDataIB was produced (#5011, P1-C; findings F-b25ed960-6 closed); the two held-response cases it replaces are gone upstream and from the Go subtests, and the suppressed cases (command throws, only a status, a CommandDataIB) are ported. Pin lift db91886c (#5047, P1-A): a Write without TimedRequest and an Invoke without SuppressResponse and TimedRequest are processed and answered (bridge, over the secure receive path), and a group write without SuppressResponse counts it as true — written and unanswered, refused when chunked — while an explicit false is refused (im, on HandleGroupWrite and from the decoder).",
+      "snapshotSha": "1222a615f3e682803d4882932b3c79456416611b"
     },
     {
       "path": "packages/node/test/endpoint/server/ProtocolServiceTest.ts",
@@ -5490,7 +5620,8 @@
         "controller/client:TestClientAttestationNoTrustStoreParity",
         "controller/client:TestClientAttestationTrustStoreParity",
         "controller/client:TestClientAttestationCallbackContractParity",
-        "controller/commissioner:TestClientAttestationBasicInformationVendorIDParity"
+        "controller/commissioner:TestClientAttestationBasicInformationVendorIDParity",
+        "controller/commissioner:TestClientAttestationCancelParity"
       ],
       "missing": [
         "self-heals a corrupt cached PAA by re-fetching from DCL",
@@ -5502,8 +5633,8 @@
         "commissions when policy accepts",
         "reports DacFormatInvalid and rejects when policy rejects"
       ],
-      "reason": "Accepting and rejecting a failed attestation and commissioning against the DCL trust store keep their commissioner and dcl tests; the matter.js cases run through the client registry on fabrictest (controller/client:TestClientAttestation*): without a trust store (DclServiceUnavailable), with the device's PAA trusted, trusted as a test root only, or another PAA trusted, under every form of onAttestationFailure and the callback contract (the reason as the CommissioningError's message with the cause kept, an error returned verbatim, one invocation). The trust store is an attestation.StaticStore with the case's roots and the CSA test CD signer (fabrictest.ControllerOptions.Attestation, NoAttestationStore). Missing: the corrupt cached PAA (self-healed by a DCL re-fetch, or surfaced as a ValidationError finding when the re-fetch is blocked) and the revocation cases (a CRL served by the DCL revoking the PAI, one revoking other serials, the on-demand revocation-point fetch): they need the DclCertificateService over a mocked DCL, which the dcl package tests cover with their fake ledger (TestCertificateStoreSelfHeal, the revocation tests) but not through a commissioning on fabrictest. Pin lift b25ed960 (P2-D): the BasicInformation VendorID that does not match the CD (#4939/#4940) runs through the flow's attestation step on the commissioner's scripted device (TestClientAttestationBasicInformationVendorIDParity), BasicInformation set to 0xFFF2 in the collected data instead of on a MockSite device; the rejection message naming every error finding is also asserted by controller/client:TestClientAttestationTrustStoreParity (ClientAttestationTest.ts:524). The test-only PAA case asserts both TrustedAsTestCertificate errors, the PAA's and the test CD signer's (ClientAttestationTest.ts:519-530 at b25ed960; P2b-K).",
-      "snapshotSha": "7c8ce4d9b7c67d834fcc8aa5736a771f5645680b"
+      "reason": "Accepting and rejecting a failed attestation and commissioning against the DCL trust store keep their commissioner and dcl tests; the matter.js cases run through the client registry on fabrictest (controller/client:TestClientAttestation*): without a trust store (DclServiceUnavailable), with the device's PAA trusted, trusted as a test root only, or another PAA trusted, under every form of onAttestationFailure and the callback contract (the reason as the CommissioningError's message with the cause kept, an error returned verbatim, one invocation). The trust store is an attestation.StaticStore with the case's roots and the CSA test CD signer (fabrictest.ControllerOptions.Attestation, NoAttestationStore). Missing: the corrupt cached PAA (self-healed by a DCL re-fetch, or surfaced as a ValidationError finding when the re-fetch is blocked) and the revocation cases (a CRL served by the DCL revoking the PAI, one revoking other serials, the on-demand revocation-point fetch): they need the DclCertificateService over a mocked DCL, which the dcl package tests cover with their fake ledger (TestCertificateStoreSelfHeal, the revocation tests) but not through a commissioning on fabrictest. Pin lift b25ed960 (P2-D): the BasicInformation VendorID that does not match the CD (#4939/#4940) runs through the flow's attestation step on the commissioner's scripted device (TestClientAttestationBasicInformationVendorIDParity), BasicInformation set to 0xFFF2 in the collected data instead of on a MockSite device; the rejection message naming every error finding is also asserted by controller/client:TestClientAttestationTrustStoreParity (ClientAttestationTest.ts:524). The test-only PAA case asserts both TrustedAsTestCertificate errors, the PAA's and the test CD signer's (ClientAttestationTest.ts:519-530 at b25ed960; P2b-K). Pin lift db91886c, P1-D (#5049): the cancel during a DCL lookup runs through the flow's attestation step with a trust store whose revocation lookup cancels and blocks (TestClientAttestationCancelParity): the wait ends with the cancel's reason.",
+      "snapshotSha": "52ed65c64b296b77f87f1178512e5cacb5f37e7f"
     },
     {
       "path": "packages/node/test/node/ClientBridgeStructureTest.ts",
@@ -5587,7 +5718,8 @@
         "controller/client:TestClientEventNotificationEventNumbersParity",
         "controller/client:TestHostReadDoesNotEmitEvents",
         "controller/client:TestClientEventNotificationLocalParity",
-        "controller/client:TestClientEventNotificationResolvedTimestampsParity"
+        "controller/client:TestClientEventNotificationResolvedTimestampsParity",
+        "controller/client:TestParityMatterJS_ClientEventNotificationDelayed"
       ],
       "missing": [
         "ignores events and event numbers of a replaced default subscription",
@@ -5595,8 +5727,8 @@
         "does not store the number of an event dropped because the node is being deleted",
         "warns once per kind of failure when a change observer fails for each event report"
       ],
-      "reason": "A switch's InitialPress, ShortRelease and MultiPressComplete delivered to the client node's event hook with their payloads, in order, and the event number the node stores — after the hook received the event, once, above the commissioning read's events, never lowered, asked above by a replacement subscription and after a controller restart — run on fabrictest (controller/client:TestClientEventNotification*; the switch is bridged, the Go root serves no Switch). A host's own read or subscription returns its events to the caller only and a sustained one resubscribes above the last event it delivered (controller/client:TestHostReadDoesNotEmitEvents, TestClientEventNotificationLocalParity). Left: ChangeNotificationService, the observer set and the emit job queue (js-runtime-only). Missing: the events of a held report of a replaced default subscription (its other callbacks are held by TestClientSubscribeDefaultSubscriptionParity), a read failing after its reports (no hook aborts a read mid-stream) and an event of a node being deleted (no hook inside Registry.Decommission). Pin lift wave P4 (#433): a system timestamp and two system deltas of one report reach Hooks.Event with the wire delta and the resolved absolute time (controller/client:TestClientEventNotificationResolvedTimestampsParity). Pin lift b25ed960: events are not delivered again when the device drops the subscription and the session stays (d7e3a454f, a test-only commit; on the Go client the replacement subscription asks above the stored event number) (controller/client:TestClientEventNotificationEventNumbersParity).",
-      "snapshotSha": "ecbc8fd99b9a8c1953544b108f0bb65a4126f379",
+      "reason": "A switch's InitialPress, ShortRelease and MultiPressComplete delivered to the client node's event hook with their payloads, in order, and the event number the node stores — after the hook received the event, once, above the commissioning read's events, never lowered, asked above by a replacement subscription and after a controller restart — run on fabrictest (controller/client:TestClientEventNotification*; the switch is bridged, the Go root serves no Switch). A host's own read or subscription returns its events to the caller only and a sustained one resubscribes above the last event it delivered (controller/client:TestHostReadDoesNotEmitEvents, TestClientEventNotificationLocalParity). Left: ChangeNotificationService, the observer set and the emit job queue (js-runtime-only). Missing: the events of a held report of a replaced default subscription (its other callbacks are held by TestClientSubscribeDefaultSubscriptionParity), a read failing after its reports (no hook aborts a read mid-stream) and an event of a node being deleted (no hook inside Registry.Decommission). Pin lift wave P4 (#433): a system timestamp and two system deltas of one report reach Hooks.Event with the wire delta and the resolved absolute time (controller/client:TestClientEventNotificationResolvedTimestampsParity). Pin lift b25ed960: events are not delivered again when the device drops the subscription and the session stays (d7e3a454f, a test-only commit; on the Go client the replacement subscription asks above the stored event number) (controller/client:TestClientEventNotificationEventNumbersParity). Pin lift db91886c (#5030): an event arriving with its cluster's data is emitted once the cluster has its behaviour, an event for a cluster the endpoint does not hold is delayed behind the report's change, and the events of a report keep the device's order when an earlier one is delayed (controller/client:TestParityMatterJS_ClientEventNotificationDelayed, on the structure: Go merges a report's chunks and applies its data before its events, so the first case is pinned in its merged form); the helper's move of eventOn from Switch to BasicInformation needs no Go counterpart, no Go event test relied on immediate emission for an unknown cluster.",
+      "snapshotSha": "1bd3786a8dbad8c7797ad1637c4afd3ce3ad7f3c",
       "left": [
         {
           "it": "emits EventOccurrence for MS initialPress",
@@ -5691,8 +5823,8 @@
       "path": "packages/node/test/node/ClientGroupTest.ts",
       "status": "excluded",
       "class": "js-runtime-only",
-      "reason": "The TypeScript ClientGroup refusing endpoint state accessors and state writes.",
-      "snapshotSha": "11a2406561a62d7f73d1dc938a7c676e6e2fd55f"
+      "reason": "The TypeScript ClientGroup refusing endpoint state accessors and state writes; and (pin lift db91886c, #5069) a group invoke leaving the caller's request object unchanged — the Go group sender (groups.Sender.Invoke) takes path, fields and options by value and builds a fresh request, so there is no caller-owned request to mutate (its OmitFalseFlags is groups:TestSenderOmitFalseFlags, an own test).",
+      "snapshotSha": "67717df0390a896433f66b8900970a21cacf9fbf"
     },
     {
       "path": "packages/node/test/node/ClientInvokeTest.ts",
@@ -5714,8 +5846,8 @@
           "reason": "beforeDispatch is `Server only` in matter.js's own words (Invoke.ts:52-55 at 862ad75f): it reaches ClientInvoke through the shared Invoke type and the client reads it nowhere but isBatchable; a Go client option nothing dispatches would copy the type-sharing artefact, not a behaviour."
         }
       ],
-      "reason": "The batcher of single commands (client/interaction Interaction.Invoke, ClientInteraction.#invokeWithBatching at 862ad75f) on the scripted rig — one InvokeRequest per batch window and network lane, numbered by CommandRef, its bypasses (MaxPathsPerInvoke 1, endpoint 0, timed, suppressed, expected processing time, extended fail-safe timeout, MRP delay, Large Message, NoBatch, a non-default InvokeOptions.InteractionModelRevision, a DelayReportData, a ClientRequest.AddressOverride whose exchange carries it — isBatchable, ClientInteraction.ts:185-213), duplicate paths in separate batches, a split by MaxPathsPerInvoke, the interaction's default network (interaction.Config.Network, `request.network ?? this.#network` :765, :1250) sharing a lane with a command naming it, close and abort, a close while the batcher's connect is held (interaction.HoldConnect, export_test.go) — and the commands through it on fabrictest (controller/client:TestClientInvokeParity). The network of the direct, batched and split exchange (TestInvokeNetworkParity) is observed on a provider that records each exchange's network (interaction.RecordNetworks, export_test.go), matter.js's spy on NetworkProfiles.select; the request names \"unlimited\", which matter.js's ClientNodeInteraction.invoke supplies (ClientNodeInteraction.ts:213-216). Left: the maxPathsPerInvoke cache (none in Go) and beforeDispatch (a server-only field of the shared Invoke type). The requireExistingSession bypass (ClientRequest.RequireExistingSession, ClientInteraction.ts:229 at b25ed960) is TestInvokeBatcherParity's row requireExistingSession (pin-lift unit P3-D).",
-      "snapshotSha": "981d5fb9dafc6ec7505f1b5c2940d1ea62ccd96d"
+      "reason": "The batcher of single commands (client/interaction Interaction.Invoke, ClientInteraction.#invokeWithBatching at 862ad75f) on the scripted rig — one InvokeRequest per batch window and network lane, numbered by CommandRef, its bypasses (MaxPathsPerInvoke 1, endpoint 0, timed, suppressed, expected processing time, extended fail-safe timeout, MRP delay, Large Message, NoBatch, a non-default InvokeOptions.InteractionModelRevision, a DelayReportData, a ClientRequest.AddressOverride whose exchange carries it — isBatchable, ClientInteraction.ts:185-213), duplicate paths in separate batches, a split by MaxPathsPerInvoke, the interaction's default network (interaction.Config.Network, `request.network ?? this.#network` :765, :1250) sharing a lane with a command naming it, close and abort, a close while the batcher's connect is held (interaction.HoldConnect, export_test.go) — and the commands through it on fabrictest (controller/client:TestClientInvokeParity). The network of the direct, batched and split exchange (TestInvokeNetworkParity) is observed on a provider that records each exchange's network (interaction.RecordNetworks, export_test.go), matter.js's spy on NetworkProfiles.select; the request names \"unlimited\", which matter.js's ClientNodeInteraction.invoke supplies (ClientNodeInteraction.ts:213-216). Left: the maxPathsPerInvoke cache (none in Go) and beforeDispatch (a server-only field of the shared Invoke type). The requireExistingSession bypass (ClientRequest.RequireExistingSession, ClientInteraction.ts:229 at b25ed960) is TestInvokeBatcherParity's row requireExistingSession (pin-lift unit P3-D). Pin lift db91886c (#5069, P1-B): InvokeOptions.OmitFalseFlags is a bypass row of TestInvokeBatcherParity (isBatchable, ClientInteraction.ts:223).",
+      "snapshotSha": "e4bb5e36921852ec597d711bec312d1cf020cf86"
     },
     {
       "path": "packages/node/test/node/ClientNestedStructStateTest.ts",
@@ -6309,6 +6441,17 @@
       "snapshotSha": "f5ffae1edecf26ffec59bfd5cc5d9e2112783317"
     },
     {
+      "path": "packages/node/test/node/CommissioningCancelTest.ts",
+      "status": "ported",
+      "go": [
+        "controller/commissioner:TestCommissioningCancelParity",
+        "controller/commissioner:TestFlowDisarmsFailsafeStartedNotAnswered",
+        "controller/commissioner:TestFlowReconnectAbort"
+      ],
+      "reason": "The cancel after PASE (#5049) on the commissioner's flow over a scripted device and the fake clock: the caller's context is matter.js's abort signal and its cancel alike, so the two cases of the loop over \"abort signal\" and \"cancel\" are one. A canceled step ends the fail-safe once and rejects with the cancel's reason; a withheld read and a withheld expiry settle within the 2 s canceled-expiry wait; no step runs after a step that did not observe the cancel; a cancel after CommissioningComplete was sent reaches nothing, and a CommissioningComplete failure is reported as itself; a cancel during an external finalization leaves it to complete, one during the re-arm before it starts none; a cancel during the expiry after a failed step ends the wait. \"ends a failsafe the device armed before the cancel abandoned the ArmFailSafe response\" is TestFlowDisarmsFailsafeStartedNotAnswered, \"stops the operational CASE connection\" TestFlowReconnectAbort. Pin lift db91886c, P1-D.",
+      "snapshotSha": "dee6d5e9d96150aea3487fd0112d667049b055ce"
+    },
+    {
       "path": "packages/node/test/node/CommissioningClosedSessionReArmTest.ts",
       "status": "ported",
       "go": [
@@ -6323,15 +6466,8 @@
       "go": [
         "controller/commissioner:TestCommissioningFailsafeExpiry"
       ],
-      "left": [
-        {
-          "it": "sends no expiry before the commissioner armed the failsafe",
-          "class": "by-design",
-          "reason": "BD-chip-Commissioner-AbortDisarmsFailSafe (Every exit after PASE): the flow also ends the fail-safe the device armed when the PASE session was established; pinned by controller/commissioner:TestCommissioningFailsafeExpiry/ahead of matter.js: ends the PASE session's fail-safe before the flow armed."
-        }
-      ],
-      "reason": "The flow over a scripted device: which step failures send ArmFailSafe(0) and which leave the fail-safe to expire (#expireFailsafe). Left, by design: the expiry before the flow armed. Pin lift b25ed960, unit P3-D (#4928).",
-      "snapshotSha": "de0fb0b540bc0dc97c8bce3416ad518867e1c335"
+      "reason": "The flow over a scripted device: which step failures send ArmFailSafe(0) and which leave the fail-safe to expire (#expireFailsafe), the fail-safe the device armed at PASE ended before the commissioner armed it, and no expiry after CommissioningComplete succeeded. Pin lift b25ed960, unit P3-D (#4928); pin lift db91886c, unit P1-D (#5049): matter.js's #failSafeMayBeArmed caught up with the expiry before the flow armed, which is no longer left by design.",
+      "snapshotSha": "982e496bbe50eb54d79116d4c085796c050979fa"
     },
     {
       "path": "packages/node/test/node/CommissioningPaseLifetimeTest.ts",
@@ -7088,15 +7224,16 @@
       "path": "packages/node/test/node/SplitCommissioningTest.ts",
       "status": "partial",
       "go": [
-        "controller/client:TestSplitCommissioningParity"
+        "controller/client:TestSplitCommissioningParity",
+        "controller/commissioner:TestSplitCommissioningHandOffOutlastsTimeLimit"
       ],
       "missing": [
         "throws CommissioningError and removes the peer when CommissioningComplete returns a non-Ok errorCode",
         "keeps the device's CommissioningComplete status as the cause of the CommissioningError",
         "aborts and leaves no node if the fabric cannot be persisted"
       ],
-      "reason": "Registry.CompleteCommissioning ports Peers.completeCommissioning (Peers.ts:236-359 at 862ad75f): the hand-off of the commissioner's FinalizeCommissioning completed — the node created on the shared fabric, its peer seeded, started, CommissioningComplete with the extended fail-safe timeout, the device's fail-safe disarmed and the default subscription up; a second completion refused (ErrAlreadyCommissioned) without touching the node; no phantom node when it cannot be reached; a fabric the registry does not hold refused (ErrForeignFabric). matter.js runs the halves on two controllers sharing a fabric; fabrictest gives each controller its own CA and fabric, so the port runs both on one controller. Missing: the non-Ok errorCode and the status cause need a device that answers CommissioningComplete so (the Go device answers Ok once its fail-safe is armed by the same fabric); the fabric persistence failure has no Go shape (commissioner.NewFabric persists at creation).",
-      "snapshotSha": "d891eb17597311ef293584b301a8fd74ba18ab57"
+      "reason": "Registry.CompleteCommissioning ports Peers.completeCommissioning (Peers.ts:236-359 at 862ad75f): the hand-off of the commissioner's FinalizeCommissioning completed — the node created on the shared fabric, its peer seeded, started, CommissioningComplete with the extended fail-safe timeout, the device's fail-safe disarmed and the default subscription up; a second completion refused (ErrAlreadyCommissioned) without touching the node; no phantom node when it cannot be reached; a fabric the registry does not hold refused (ErrForeignFabric). matter.js runs the halves on two controllers sharing a fabric; fabrictest gives each controller its own CA and fabric, so the port runs both on one controller. Missing: the non-Ok errorCode and the status cause need a device that answers CommissioningComplete so (the Go device answers Ok once its fail-safe is armed by the same fabric); the fabric persistence failure has no Go shape (commissioner.NewFabric persists at creation). Pin lift db91886c, P1-D (#5049): \"completes when the hand-off outlasts the commissioning time limit\" runs on the commissioner's flow — the Reconnect step's external finalization moves the fake clock past MaxCumulativeFailsafeSeconds and Stop ends the loop before the time-limit check (TestSplitCommissioningHandOffOutlastsTimeLimit).",
+      "snapshotSha": "60a2ef797d0a088f95f648600143dff9ee7fc8ef"
     },
     {
       "path": "packages/node/test/node/client/CacheFabricFilterTest.ts",
@@ -7262,6 +7399,11 @@
       ],
       "left": [
         {
+          "it": "opens channels again after it was closed and a listener registered again",
+          "class": "js-runtime-only",
+          "reason": "noble's central is one long-lived object whose close() sets #closed and onData clears it again (#5052, NobleBleChannel.ts:491-493 at db91886c); controller/ble's Central has no close and no closed state and ble.Dial builds a new Channel per dial, so the controller has nothing to reopen"
+        },
+        {
           "it": "retries a connect reported as failed and gives up after three attempts",
           "class": "js-runtime-only",
           "reason": "noble's connect retries, interview and abort handling in NobleBleCentralInterface.openChannel (NobleBleChannel.ts:91-517): the platform's, behind the ble.Central seam — ble/bluez and ble/esphome connect on their own stacks and carry their own tests"
@@ -7348,7 +7490,7 @@
         }
       ],
       "reason": "controller/ble/channel_parity_matterjs_test.go ports the ATT_MTU settle wait and the BTP renegotiation after a stall by meaning (phase 39): the bletest peripheral's Stall and Faults play handshakeOnlyMatterService, a synctest bubble on clocktest plays MockTime, a goroutine the parked send. The left cases are noble's connect handling, the platform's behind the ble.Central seam, and one recorded difference.",
-      "snapshotSha": "a503a1d478babcb72040f4f5dbaac2cbabef83ad"
+      "snapshotSha": "3d7bdbcae226bbd9c432df2d53311a39de1afd95"
     },
     {
       "path": "packages/nodejs-ble/test/ScanControlTest.ts",
@@ -7639,7 +7781,8 @@
         "client/interaction:TestInvokeBatchRefusals",
         "client/interaction:TestInvokeBatchSplitsRefLessParity",
         "client/interaction:TestClientInteractionInvokeLargeMessageInference",
-        "client/interaction:TestInvokeBatcherCloseParity"
+        "client/interaction:TestInvokeBatcherCloseParity",
+        "client/interaction:TestClientInteractionRequestFlags"
       ],
       "missing": [
         "does not synthesize NO_COMMAND_RESPONSE for an unanswered wildcard command (no concrete path)",
@@ -7647,8 +7790,8 @@
         "sends DelayReportData in its own message",
         "refuses a request with DelayReportData before anything is sent"
       ],
-      "reason": "15 cases ported on the scripted rig for the Go single-command Invoke (no commandRef on the wire, abort during and before the exchange with no retransmission after, a read's abort, suppressResponse, concurrent single invokes, no DelayReportData, a response without InteractionModelRevision, received vs local error statuses, the largeMessage inference on a copy of the caller's options); the multi-command invoke through Interaction.InvokeBatch (client/interaction:TestInvokeBatch*: NoCommandResponse for an unanswered command, a stray CommandDataIB discarded, the ref-less split for a MaxPathsPerInvoke-1 peer, the refusal below one path; ClientInteraction.ts:510-517, :616-700 at 862ad75f); the batcher's close cases (client/interaction:TestInvokeBatcherCloseParity: an in-flight batch aborted with the close reason, the batch queued behind it rejected with it). Missing: the wildcard command (a Go invoke names a concrete path), the stray CommandStatusIB passed up (InvokeBatch returns one Result per command, so a status for no sent command has no slot) and DelayReportData sending.",
-      "snapshotSha": "501b3a3570c0c93de6ce67f0ea5dfb310b4b3e56"
+      "reason": "15 cases ported on the scripted rig for the Go single-command Invoke (no commandRef on the wire, abort during and before the exchange with no retransmission after, a read's abort, suppressResponse, concurrent single invokes, no DelayReportData, a response without InteractionModelRevision, received vs local error statuses, the largeMessage inference on a copy of the caller's options); the multi-command invoke through Interaction.InvokeBatch (client/interaction:TestInvokeBatch*: NoCommandResponse for an unanswered command, a stray CommandDataIB discarded, the ref-less split for a MaxPathsPerInvoke-1 peer, the refusal below one path; ClientInteraction.ts:510-517, :616-700 at 862ad75f); the batcher's close cases (client/interaction:TestInvokeBatcherCloseParity: an in-flight batch aborted with the close reason, the batch queued behind it rejected with it). Missing: the wildcard command (a Go invoke names a concrete path), the stray CommandStatusIB passed up (InvokeBatch returns one Result per command, so a status for no sent command has no slot) and the two DelayReportData cases: the client sends one (InvokeOptions.DelayReportData under tag 3, on its own — client/interaction:TestInvokeBatcherParity row delayReportData; client/interaction:TestClientInteractionInvokeDelayReportData holds that an invoke without it sends none), but neither case is ported here, and the refusal before anything is sent has no Go counterpart (no forward-feature switch, BD-Matter-DelayReportData). Pin lift db91886c (#5069, P1-B): the request flags group (an invoke and a write with OmitFalseFlags, an invoke without it sending both flags false) is client/interaction:TestClientInteractionRequestFlags.",
+      "snapshotSha": "607d821387aeef518e3e631002ade96f19141fb6"
     },
     {
       "path": "packages/protocol/test/action/client/ClientInteractionSubscribeTest.ts",
@@ -7666,8 +7809,8 @@
         "does not wait on close for a BDX exchange whose creation failed",
         "aborts the creation of a BDX exchange on close"
       ],
-      "reason": "Interaction.Close (ClientInteraction.ts:264-297 at 862ad75f), its in-flight set and the abandoned establishment (:1084-1097, InteractionMessenger.ts:1116-1137) run on the scripted peer: an aborted subscribe returns at once and Close ends the wait for its report; a report that arrives after the abort, and one being processed when the interaction closes, are answered INVALID_SUBSCRIPTION once. Missing: the reuse of an abandoned subscribe's request object (Go requests are values) and a failing exchange close (the Go exchange's Close cannot fail) have no Go shape; the three BDX cases need the client-side BDX initiation (ClientInteraction.initBdx, :1185-1215), which the Go client has not. The compact-priming group (#4943) runs through the scripted subscribe and an unacknowledged final report status (pin lift b25ed960, P2b-E).",
-      "snapshotSha": "3208cf7822dfaeb118e49e676e0a10565016f343"
+      "reason": "Interaction.Close (ClientInteraction.ts:264-297 at 862ad75f), its in-flight set and the abandoned establishment (:1084-1097, InteractionMessenger.ts:1116-1137) run on the scripted peer: an aborted subscribe returns at once and Close ends the wait for its report; a report that arrives after the abort, and one being processed when the interaction closes, are answered INVALID_SUBSCRIPTION once. Missing: the reuse of an abandoned subscribe's request object (Go requests are values) and a failing exchange close (the Go exchange's Close cannot fail) have no Go shape; the three BDX cases need the client-side BDX initiation (ClientInteraction.initBdx, :1185-1215), which the Go client has not. The compact-priming group (#4943) runs through the scripted subscribe and an unacknowledged final report status (pin lift b25ed960, P2b-E). Pin lift db91886c (#5046, P1-B): the seam is reportInterrupted with final-unacknowledged (interaction.ReportInterrupted).",
+      "snapshotSha": "b6973b7ffb35e98ac521606a93eaebc792956ebf"
     },
     {
       "path": "packages/protocol/test/action/client/InputChunkTest.ts",
@@ -7706,8 +7849,8 @@
       "go": [
         "client/interaction:TestClientSubscriptionHandlerParity"
       ],
-      "reason": "All 6 cases ported on the scripted rig (#4943, pin lift b25ed960, P2b-E): the peer never acknowledges our StatusResponse to a keepalive, so the exchange's MRP gives up as on the wire. The compact priming comes from the subscribe request (OnOff compact, wildcard not). The 'another reason' case fails the send at the socket (ErrNetwork), because a Go send has no PeerUnresponsiveError other than the ack-missing one.",
-      "snapshotSha": "15da7483d8ab539dd4de5c4f962a856e303add3e"
+      "reason": "All 9 cases ported on the scripted rig (#4943, pin lift b25ed960, P2b-E; #5046, pin lift db91886c, P1-B): the peer never acknowledges our StatusResponse to a keepalive, so the exchange's MRP gives up as on the wire; or it acknowledges our status to a report chunk and never sends the next one, so the exchange's receive wait ends in PeerMessageMissingError. The compact priming comes from the subscribe request (OnOff compact, wildcard not). The 'another reason' cases fail the status send at the socket (ErrNetwork), because a Go send has no PeerUnresponsiveError other than the ack-missing one, and answer the next chunk's wait with a StatusResponse Failure; the surfaced error is the registry's report_failed log line. The shutdown case of the missing chunk (:186) lets the wait expire and blocks the registry at the end of the report, before the handler asks IsBlocked (interaction.BlockAtReportEnd), because a Go shutdown would end the wait itself; it asserts the report_interrupted_during_shutdown line.",
+      "snapshotSha": "e2f5b028323b3382c0339d8b848783359cb59fe4"
     },
     {
       "path": "packages/protocol/test/action/client/subscription/ClientSubscriptionsTest.ts",
@@ -7728,10 +7871,10 @@
       "path": "packages/protocol/test/action/client/subscription/PeerSubscriptionTest.ts",
       "status": "ported",
       "go": [
-        "client/interaction:TestPeerSubscriptionReportStatusUnacknowledgedParity"
+        "client/interaction:TestPeerSubscriptionReportInterruptedParity"
       ],
-      "reason": "All 6 cases ported as an internal test on Subscription.reportStatusUnacknowledged / nextReportNumber (#4943, pin lift b25ed960, P2b-E). The loss log is captured from the subscription's slog.Logger.",
-      "snapshotSha": "c38a12eee3806a38c9dc5d01ec9657d50c16929e"
+      "reason": "All 7 cases ported as an internal test on Subscription.reportInterrupted / nextReportNumber (#4943, pin lift b25ed960, P2b-E; #5046 chunk-missing, pin lift db91886c, P1-B). The loss logs are captured from the subscription's slog.Logger; the chunk-missing loss has its own key (subscription_lost_report_chunk_missing) as matter.js's has its own text.",
+      "snapshotSha": "d0e5bcddcb58c10007d852aed00720205cea3efe"
     },
     {
       "path": "packages/protocol/test/action/client/subscription/SustainedSubscriptionTest.ts",
@@ -7854,8 +7997,8 @@
         "uses custom interaction model revision",
         "replaces a secret attribute value"
       ],
-      "reason": "The WriteRequest read off the wire of Interaction.Write (paths, encoded values, timed flag and TimedRequest timeout, data versions, moreChunkedMessages, list chunking default, the revision) and its refusals before sending (a DataVersion on a wildcard endpoint, through the one numeric surface both the reified and the raw case map to; an empty write) are ported; missing are the call without an argument (Write always takes a writes slice; the empty one is ported) and a custom revision (Go always stamps its own). Pin lift b25ed960: the redaction of a secret attribute value in the request's log output (#4931) is open, unit P4-B.",
-      "snapshotSha": "6fa95b7cd28e80cabd81e8714fd9eded1c8e1a1b"
+      "reason": "The WriteRequest read off the wire of Interaction.Write (paths, encoded values, timed flag and TimedRequest timeout, data versions, moreChunkedMessages, list chunking default, the revision) and its refusals before sending (a DataVersion on a wildcard endpoint, through the one numeric surface both the reified and the raw case map to; an empty write) are ported; missing are the call without an argument (Write always takes a writes slice; the empty one is ported) and a custom revision (Go always stamps its own). Pin lift b25ed960: the redaction of a secret attribute value in the request's log output (#4931) is open, unit P4-B. Pin lift db91886c (#5069, P1-B): omitFalseFlags carried to the request is TestWriteRequestBuildBasic's first case, read off the wire (the false TimedRequest left out).",
+      "snapshotSha": "986d306340e45e12ea40db5ab64bab03d260371d"
     },
     {
       "path": "packages/protocol/test/action/response/InvokeResultTest.ts",
@@ -9095,7 +9238,9 @@
         "im:TestMessengerParity_ReadRequestFitsPayload",
         "im:TestMessengerParity_ReadRequestWithManyDataVersionFilters",
         "im:TestMessengerParity_SubscribeRequestRoundTrip",
-        "im:TestMessengerParity_SubscribeRequestWithManyDataVersionFilters"
+        "im:TestMessengerParity_SubscribeRequestWithManyDataVersionFilters",
+        "client/interaction:TestInteractionClientMessengerReportInterruption",
+        "im:TestRequestFlagsForSendingParityMatterJS"
       ],
       "missing": [
         "throws a received error when the peer answers a read with a StatusResponse ${status}",
@@ -9112,8 +9257,8 @@
         "does not consider a report with SuppressResponse as waiting for a status",
         "does not consider a report waiting for a status once it was answered"
       ],
-      "reason": "Read, subscribe, the read refused by a StatusResponse (UnsupportedAccess and Success) and every write that fits one message or is refused are ported through Interaction against a scripted peer; missing are the 0x7777 StatusResponse variant (a Go status is a uint8, im/status.go:61), the report iterator split between iteration and close (Go has no iterator; Read returns after the final ack), the abandonSubscription group (no Go counterpart, InteractionMessenger.ts:1116-1137). The write chunking across messages runs through Interaction.Write (client/interaction:TestInteractionClientMessengerWriteChunking; fix: InteractionMessenger.ts:1269-1450). The abandonSubscription group's behaviour is ported through the abandoned subscribe (client/interaction:TestClientInteractionSubscribe*), not as messenger-level cases. The allDataVersionFiltersSent result of the two subscribe cases is held through the compact-priming estimate in client/interaction:TestInteractionClientMessengerSubscribe (pin lift b25ed960, P2b-E).",
-      "snapshotSha": "f55d0921b2a0e9d917cc846ad2266ada1e3413b1"
+      "reason": "Read, subscribe, the read refused by a StatusResponse (UnsupportedAccess and Success) and every write that fits one message or is refused are ported through Interaction against a scripted peer; missing are the 0x7777 StatusResponse variant (a Go status is a uint8, im/status.go:61), the report iterator split between iteration and close (Go has no iterator; Read returns after the final ack), the abandonSubscription group (no Go counterpart, InteractionMessenger.ts:1116-1137). The write chunking across messages runs through Interaction.Write (client/interaction:TestInteractionClientMessengerWriteChunking; fix: InteractionMessenger.ts:1269-1450). The abandonSubscription group's behaviour is ported through the abandoned subscribe (client/interaction:TestClientInteractionSubscribe*), not as messenger-level cases. The allDataVersionFiltersSent result of the two subscribe cases is held through the compact-priming estimate in client/interaction:TestInteractionClientMessengerSubscribe (pin lift b25ed960, P2b-E). Pin lift db91886c (#5069, #5046, P1-B): the forced omitFalseFlags write — one message and every chunk without the false flags, the flags decided before chunking — runs through Interaction.Write; the eight requestFlagsForSending rows run on im.RequestFlagsForSending (the characterization at this module's own revision 12 included); the reportInterruption group runs on the rule readDataReports applies to a failed chunk wait (client/interaction:TestInteractionClientMessengerReportInterruption), its effect over the scripted peer in client/interaction:TestClientSubscriptionHandlerParity.",
+      "snapshotSha": "7425830d17a78d570959d77a01bb9fb20cd590a1"
     },
     {
       "path": "packages/protocol/test/mdns/CommissionableMdnsScannerTest.ts",
@@ -9378,13 +9523,14 @@
         "controller/commissioner:TestConnectionErrorClasses",
         "controller/commissioner:TestCommissioningConnection",
         "controller/commissioner:TestCommissioningConnectionStagger",
-        "controller/commissioner:TestCommissioningConnectionScripted"
+        "controller/commissioner:TestCommissioningConnectionScripted",
+        "controller/commissioner:TestConnectionLosingGiveUpHoldsTheRun"
       ],
       "missing": [
         "keeps trying the other addresses when ${failure}"
       ],
-      "reason": "Every CommissioningConnection case ported on clocktest.Fake: the credential drop and its late-success close cause (inverted, ahead of matter.js: a confirmation failure ends the address, not the device, review II R2-P6-fsm-1806), invalid PASE data, the concurrent-winner and timeout session closes, the winner not waiting for an abort-unresponsive loser, external and budget aborts reaching the attempt's ctx, the per-address stagger (global across devices, cancelled by a winner, default 10 s, a third address within 30 s), the responder hold (bounded at the delay, ahead of matter.js, R2-P6-fsm-1806) and the five scripted stagger/hold timelines. Pin lift b25ed960: a BLE address that closes during PASE or cannot be opened ending the address, not the device (#4908, #4922), is open, unit P3-D.",
-      "snapshotSha": "d3586377ccff4baf8eba7579339e8ba55ce72ca5"
+      "reason": "Every CommissioningConnection case ported on clocktest.Fake: the credential drop and its late-success close cause (inverted, ahead of matter.js: a confirmation failure ends the address, not the device, review II R2-P6-fsm-1806), invalid PASE data, the concurrent-winner and timeout session closes, the winner not waiting for an abort-unresponsive loser, external and budget aborts reaching the attempt's ctx, the per-address stagger (global across devices, cancelled by a winner, default 10 s, a third address within 30 s), the responder hold (bounded at the delay, ahead of matter.js, R2-P6-fsm-1806) and the five scripted stagger/hold timelines. Pin lift b25ed960: a BLE address that closes during PASE or cannot be opened ending the address, not the device (#4908, #4922), is open, unit P3-D. Pin lift db91886c, P1-D (#5053): \"rejects only after a session that completed after the timeout has been closed\" is TestConnectionLosingGiveUpHoldsTheRun — a session established after the budget is given up before the run returns.",
+      "snapshotSha": "4dc9e970ca51938c50a80f0790b831e68b72018b"
     },
     {
       "path": "packages/protocol/test/peer/InitialContactScheduleTest.ts",
@@ -9468,6 +9614,19 @@
       ],
       "reason": "The default timeout, the default and the caller's timeout under a cancellable context (matter.js's abort) and the unbounded Forever wait are ported through Peer.Connect; non-positive timeouts cannot be normalised to Instant because Go's ConnectOptions.ConnectionTimeout encodes 0 as unset (the default) and a negative value as Forever, so Instant has no encoding.",
       "snapshotSha": "9e03dac5a4c1594eb0490afab2d97cca5e6187cf"
+    },
+    {
+      "path": "packages/protocol/test/peer/PeerConnectionBusyTest.ts",
+      "status": "ported",
+      "go": [
+        "client/peer:TestPeerConnectionBusyParity",
+        "client/peer:TestIssue507_BusyDeadline",
+        "client/peer:TestIssue507_BusyIgnoresTheHandlersDelay",
+        "client/peer:TestBusyAtAnUnprovenAddressHoldsOnlyItsAttempt",
+        "client/peer:TestBusyAtAnotherAddressOfTheProvenHostHoldsOnlyItsAttempt"
+      ],
+      "reason": "All nine cases ported by meaning through the connection process on the fake clock. The rig keeps the harness's random 0.5, so every wait ends 2 s after matter.js's; a BUSY holds every address only when it came from the proven operational address (BD-Matter-PeerBusyDeadline), so the cases whose BUSY holds another address take it from there, the second BUSY of the extension case is the hold its handling records, and the later-end cases measure the address held by both the peer's and its own attempt's deadline. The socket re-check runs on a TCP dial, the one step that blocks between the attempt's first wait and its Sigma1.",
+      "snapshotSha": "c1416b757fb64dbd01fc93771f4632b31b975551"
     },
     {
       "path": "packages/protocol/test/peer/PeerConnectionErrorHandlerTest.ts",
@@ -10897,14 +11056,11 @@
     },
     {
       "path": "packages/types/test/protocol/TlvInvokeRequestTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
+        "im:TestInvokeClientRequestOptionsParityMatterJS",
         "im:TestTlvInvokeRequestParityMatterJS",
         "node:TestDelayReportDataParity"
-      ],
-      "missing": [
-        "encodes DelayReportDataIB with context tags 0 and 1",
-        "round-trips DelayReportData in context tag 3"
       ],
       "left": [
         {
@@ -10913,8 +11069,18 @@
           "reason": "a second TLV schema object without the field; the module's one InvokeRequest decoder reads tag 3 and skips other unknown context tags"
         }
       ],
-      "reason": "The decode side of DelayReportData on im.UnmarshalInvokeRequestTLV: tag 3 with its two fields (the decode half of the round trip), a request without it, a missing field as 0, a value that is not a structure refused. Missing: the module has no DelayReportData encoder (its client sends none), so the encoded bytes are not asserted.",
-      "snapshotSha": "a128398457c1e9540f4ec396692315b36f110286"
+      "reason": "The CHIP SDK's group invoke without SuppressResponse and TimedRequest decodes with both false (pin lift db91886c, #5047), and the decode side of DelayReportData on im.UnmarshalInvokeRequestTLV: tag 3 with its two fields (the decode half of the round trip), a request without it, a missing field as 0, a value that is not a structure refused. The encode half is im:TestInvokeClientRequestOptionsParityMatterJS: tag 3 with both fields from the client encoder, decoded back, and matter.js's two literals — 35032500e8032501e80318 for {1000, 1000} (:55) and the IB of :38 for {200, 500} inside tag 3 (35032400c82501f40118); the IB alone has no Go encoder, the module writes it only as tag 3.",
+      "snapshotSha": "1ee2a8f6ade2c5664c1d6ea3223bd473e3a5b821"
+    },
+    {
+      "path": "packages/types/test/protocol/TlvWriteRequestTest.ts",
+      "status": "ported",
+      "go": [
+        "im:TestTlvWriteRequestParityMatterJS",
+        "im:TestMandatoryWriteInvokeFieldParity"
+      ],
+      "reason": "A WriteRequest that carries only WriteRequests decodes on im.UnmarshalWriteRequestTLV with SuppressResponse absent and TimedRequest false (pin lift db91886c, #5047).",
+      "snapshotSha": "f383cf710e4e86c35af975b9853d84b8436fa745"
     },
     {
       "path": "packages/types/test/schema/Base38SchemaTest.ts",

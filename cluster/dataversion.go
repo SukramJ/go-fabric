@@ -34,7 +34,7 @@ import (
 // 0 is a version like any other: neither the generator nor the wrap
 // skips it, as matter.js's entropy.randomUint32
 // (packages/general/src/util/Entropy.ts:26-28) and advanceVersion
-// (Datasource.ts:862-864) do not, at b25ed960 (owner decision 146).
+// (Datasource.ts:862-864) do not, at db91886c (owner decision 146).
 //
 // See [contract.DataVersionTracker] for the counter itself.
 //

@@ -172,7 +172,7 @@ type Config struct {
 // New returns the interaction over session s of mgr — matter.js
 // DedicatedChannelExchangeProvider
 // (packages/protocol/src/protocol/ExchangeProvider.ts:123-165 at
-// b25ed960). A nil
+// db91886c). A nil
 // logger is slog.Default().
 func New(mgr *exchange.Manager, s *exchange.Session, log *slog.Logger) *Interaction {
 	return Bind(SessionProvider(mgr, s), Config{Logger: log})
@@ -336,33 +336,35 @@ type messenger struct {
 	// holds ([Config].MaxReportBytesPerSession); zero is the default.
 	maxReport int
 	// reportAwaitsStatus and reportSubscriptionID are matter.js's
-	// #reportAwaitsStatus (InteractionMessenger.ts:988 at b25ed960) and
-	// #subscriptionId (InteractionMessenger.ts:990 at b25ed960), set in
-	// readDataReports (InteractionMessenger.ts:1019-1032 at b25ed960): a
+	// #reportAwaitsStatus (InteractionMessenger.ts:994 at db91886c) and
+	// #subscriptionId (InteractionMessenger.ts:996 at db91886c), set in
+	// readDataReports (InteractionMessenger.ts:1025-1062 at db91886c): a
 	// report was read whose status is still owed, and the subscription it
 	// named.
 	reportAwaitsStatus   bool
 	reportSubscriptionID uint32
-	// unacknowledgedReportStatus is #unacknowledgedReportStatus
-	// (InteractionMessenger.ts:989 at b25ed960): which of our Success
-	// statuses to a data report the peer never acknowledged, "" when it
-	// acknowledged all of them.
-	unacknowledgedReportStatus unacknowledgedReportStatus
+	// reportInterruption is #reportInterruption
+	// (InteractionMessenger.ts:995 at db91886c): why the data report the
+	// peer sent did not complete, "" when it completed or failed for
+	// another reason.
+	reportInterruption reportInterruption
 }
 
-// unacknowledgedReportStatus is matter.js UnacknowledgedReportStatus
-// (InteractionMessenger.ts:981-985 at b25ed960): our Success status to a
-// report chunk that more chunks follow, or the one to the final chunk.
-type unacknowledgedReportStatus string
+// reportInterruption is matter.js ReportInterruption
+// (InteractionMessenger.ts:982-991 at db91886c): the peer did not
+// acknowledge our status to a chunk that more follow, or to the final
+// chunk, or it sent no next chunk after our status to a chunk.
+type reportInterruption string
 
 const (
-	reportStatusChunk unacknowledgedReportStatus = "chunk"
-	reportStatusFinal unacknowledgedReportStatus = "final"
+	reportChunkUnacknowledged reportInterruption = "chunk-unacknowledged"
+	reportFinalUnacknowledged reportInterruption = "final-unacknowledged"
+	reportChunkMissing        reportInterruption = "chunk-missing"
 )
 
 // isAckMissing reports a send the peer never acknowledged within its MRP
 // budget — matter.js PeerAckMissingError (PeerCommunicationError.ts:63-67
-// at b25ed960), which the Go exchange raises as the exact
+// at db91886c), which the Go exchange raises as the exact
 // [*exchange.PeerUnresponsiveError] (a [*exchange.PeerMessageMissingError]
 // is no match: errors.As takes the type, not its Is).
 func isAckMissing(err error) bool {
@@ -370,20 +372,43 @@ func isAckMissing(err error) bool {
 	return errors.As(err, &unresponsive)
 }
 
+// isMessageMissing reports a wait for the peer's next message that ended
+// without one — matter.js PeerMessageMissingError, thrown at
+// packages/protocol/src/protocol/MessageExchange.ts:915 at db91886c, the
+// class packages/protocol/src/peer/PeerCommunicationError.ts:55, which the Go exchange raises as the exact
+// [*exchange.PeerMessageMissingError]. errors.As takes the type: a
+// [*exchange.PeerUnresponsiveError] is no match, although
+// PeerMessageMissingError.Is matches that target.
+func isMessageMissing(err error) bool {
+	var missing *exchange.PeerMessageMissingError
+	return errors.As(err, &missing)
+}
+
 // sendReportStatus answers rd with a StatusResponse Success and records a
 // status the peer never acknowledged. Mirrors matter.js
 // IncomingInteractionClientMessenger.#sendReportStatus
-// (packages/protocol/src/interaction/InteractionMessenger.ts:1056-1068 at
-// b25ed960).
+// (packages/protocol/src/interaction/InteractionMessenger.ts:1075-1087 at
+// db91886c).
 func (m *messenger) sendReportStatus(ctx context.Context, rd *im.ReportData) error {
 	err := m.sendStatus(ctx, im.StatusSuccess)
 	if err != nil && isAckMissing(err) {
-		m.unacknowledgedReportStatus = reportStatusFinal
+		m.reportInterruption = reportFinalUnacknowledged
 		if rd.MoreChunkedMessages {
-			m.unacknowledgedReportStatus = reportStatusChunk
+			m.reportInterruption = reportChunkUnacknowledged
 		}
 	}
 	return err
+}
+
+// requestEncoding is the encoding of an Invoke's or Write's flags on m's
+// exchange: [im.RequestFlagsForSending] for a unicast request, with the
+// peer's InteractionModelRevision from the session parameters and this
+// module's own revision — the call matter.js makes before an Invoke is sent
+// and before a Write is chunked
+// (packages/protocol/src/interaction/InteractionMessenger.ts:1266, :1330 at
+// db91886c).
+func (m *messenger) requestEncoding(omitFalseFlags bool) im.RequestEncoding {
+	return im.RequestFlagsForSending(omitFalseFlags, false, m.x.Session().Parameters().InteractionModelRevision)
 }
 
 // close closes the exchange and ends its in-flight entry.

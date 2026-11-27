@@ -10,7 +10,7 @@ import (
 )
 
 // TestOperationalPortParityMatterJS ports the commissionable-node cases of
-// matter.js packages/node/test/node/ServerNodeTest.ts:326-376 at b25ed960
+// matter.js packages/node/test/node/ServerNodeTest.ts:326-376 at db91886c
 // ("operational port"): a node without an explicit port is on the standard
 // Matter port 5540 (STANDARD_MATTER_PORT), an explicit one is honoured.
 // The port is the configured one before the socket binds

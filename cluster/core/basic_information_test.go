@@ -407,7 +407,7 @@ func TestBasicInfo_RestoreNodeLabelValid(t *testing.T) {
 
 // TestBasicInfo_RestoreNodeLabelTooLong: a stored NodeLabel over its 32
 // bytes in UTF-8 restores cut to them between two runes (Datasource.ts:149-165
-// at b25ed960, #4995; decision 294) — it used to be refused, and the
+// at db91886c, #4995; decision 294) — it used to be refused, and the
 // default served instead.
 func TestBasicInfo_RestoreNodeLabelTooLong(t *testing.T) {
 	t.Parallel()
@@ -1367,7 +1367,7 @@ func TestCapabilityMinimaRev6Defaults(t *testing.T) {
 // TestBasicInfo_LocalConfigDisabledWriteIsUnsupportedAttribute: the root
 // BasicInformation does not serve the optional LocalConfigDisabled (matter.js's
 // bridge sample leaves it off the root, basic-information.element.ts:79 at
-// b25ed960, "O"), so a write answers UNSUPPORTED_ATTRIBUTE, as the
+// db91886c, "O"), so a write answers UNSUPPORTED_ATTRIBUTE, as the
 // dispatcher answers it for an unlisted attribute. The arm that accepted
 // and discarded the value was unreachable (W3-clucore-10).
 func TestBasicInfo_LocalConfigDisabledWriteIsUnsupportedAttribute(t *testing.T) {

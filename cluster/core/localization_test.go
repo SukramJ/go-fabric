@@ -20,7 +20,7 @@ import (
 
 // TestParityMatterJS_LocalizationConfiguration: SupportedLocales defaults
 // to [ActiveLocale] (matter.js LocalizationConfigurationServer.ts:17-21
-// at b25ed960);
+// at db91886c);
 // a written ActiveLocale outside it is CONSTRAINT_ERROR ("in
 // supportedLocales"; chip LocalizationConfigurationCluster.cpp:125-128).
 func TestParityMatterJS_LocalizationConfiguration(t *testing.T) {
@@ -147,7 +147,7 @@ func TestParityMatterJS_TimeFormatLocalization(t *testing.T) {
 // and SupportedTemperatureUnits to [Celsius, Fahrenheit] (matter.js
 // UnitLocalizationServer.ts:17-23, :29-31 at b25ed960); a written unit
 // outside the supported list is CONSTRAINT_ERROR (the "in" constraint,
-// unit-localization.element.ts:24-27 at b25ed960; chip
+// unit-localization.element.ts:24-27 at db91886c; chip
 // UnitLocalizationCluster.cpp:105-115).
 func TestParityMatterJS_UnitLocalization(t *testing.T) {
 	t.Parallel()

@@ -107,7 +107,7 @@ type SubscribeRequest struct {
 
 // MarshalTLV encodes r as a client sends it. Mirrors matter.js
 // packages/types/src/protocol/messages/TlvSubscribeRequest.ts:19-44 at
-// b25ed960: KeepSubscriptions (0), MinIntervalFloor (1) and
+// db91886c: KeepSubscriptions (0), MinIntervalFloor (1) and
 // MaxIntervalCeiling (2) in seconds, the optional lists —
 // AttributeRequests (3), EventRequests (4), EventFilters (5) — only with
 // members, IsFabricFiltered (7), DataVersionFilters (8) only with members,
@@ -269,7 +269,7 @@ type SubscribeResponse struct {
 // SubscriptionId keeps the fixed 4-byte form Apple's MTRDevice needs
 // (by_design L5-Apple-Width). MaxInterval is encoded at the smallest
 // fitting width, as matter.js does (TlvSubscribeResponse.ts:18 at
-// b25ed960); chip reads it with TLVReader::Get(uint16_t&), which accepts
+// db91886c); chip reads it with TLVReader::Get(uint16_t&), which accepts
 // any unsigned width that fits (src/app/MessageDef/SubscribeResponseMessage.cpp:87-90,
 // src/lib/core/TLVReader.cpp:216-226 at 6170af84), so an earlier note
 // here that a narrowed MaxInterval collapses chip-tool's liveness timer
@@ -279,7 +279,7 @@ func (sr SubscribeResponse) MarshalTLV(enc *tlv.Encoder) {
 	enc.PutUint32(tlv.ContextTag(tagSubRespSubscriptionID), sr.SubscriptionID)
 	// MaxInterval at the smallest fitting width: matter.js
 	// packages/types/src/protocol/messages/TlvSubscribeResponse.ts:18 at
-	// b25ed960 (TlvUInt16, length from the value). Only SubscriptionId
+	// db91886c (TlvUInt16, length from the value). Only SubscriptionId
 	// keeps the fixed 4-byte form (by_design L5-Apple-Width).
 	enc.PutUint(tlv.ContextTag(tagSubRespMaxInterval), uint64(sr.MaxInterval))
 	enc.PutUint(tlv.ContextTag(tagInteractionModelRevision), uint64(MatterInteractionModelRevision))

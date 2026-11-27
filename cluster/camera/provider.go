@@ -329,7 +329,7 @@ func (p *Provider) removeSessionReport(origin contract.Origin, sessionID uint16)
 // review M1, decision 682). keep runs under the spec server's lock
 // (decision 689), so it takes only mu, and no holder of mu calls the
 // spec server: the lock order is pub, then the server's, then mu.
-// Mirrors matter.js Datasource.ts at b25ed960:
+// Mirrors matter.js Datasource.ts at db91886c:
 // commit2 makes the committed values canonical (:1475-1489, the
 // assignment :1488) before postCommit emits the change events (:1520),
 // and a refused commit's values never become canonical (rollback,

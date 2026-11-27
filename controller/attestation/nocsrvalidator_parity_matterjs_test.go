@@ -4,7 +4,7 @@
 package attestation_test
 
 // A port of matter.js packages/protocol/test/certificate/NocsrValidatorTest.ts
-// at b25ed960: NocsrValidator.validate is attestation.ValidateNOCSR, its
+// at db91886c: NocsrValidator.validate is attestation.ValidateNOCSR, its
 // NocsrError with the failed NocsrCheck an *attestation.NOCSRError. The
 // CSR is Go's x509.CreateCertificateRequest for the operational key, not
 // matter.js's Certificate.createCertificateSigningRequest; the checks only

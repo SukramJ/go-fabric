@@ -278,7 +278,7 @@ func laterCases() []laterCase {
 // it — at any depth — answers FAILURE; without one the request answers the
 // kept error's status. matter.js throws every type error while it decodes
 // and validates bounds and mandatory fields afterwards
-// (packages/types/src/schema/Schema.ts:18-24 at b25ed960). Every request
+// (packages/types/src/schema/Schema.ts:18-24 at db91886c). Every request
 // decoder loop of this package is reached: the Read, Subscribe, Write,
 // Invoke and Timed requests, the StatusResponse, the attribute, event,
 // command and cluster paths, the event and data-version filters, the

@@ -15,7 +15,7 @@ import (
 
 // TestScenesManagementServerParityMatterJS ports two cases of
 // packages/node/test/behaviors/scenes-management/ScenesManagementServerTest.ts
-// at b25ed960: the remaining capacity shared across fabrics (#4963, :158-199)
+// at db91886c: the remaining capacity shared across fabrics (#4963, :158-199)
 // and the scene name bound in UTF-8 bytes (#4995, :201-213).
 func TestScenesManagementServerParityMatterJS(t *testing.T) {
 	t.Parallel()
@@ -84,7 +84,7 @@ func TestScenesManagementServerParityMatterJS(t *testing.T) {
 // 16 bytes it may hold, between two runes, as matter.js's datasource cuts
 // a stored string over its byte limit
 // (packages/node/src/behavior/state/managed/Datasource.ts:124-163 at
-// b25ed960, #4995).
+// db91886c, #4995).
 func TestScenesRestoreCutsANameOverSixteenBytes(t *testing.T) {
 	t.Parallel()
 	data, err := json.Marshal([]core.SceneEntry{

@@ -20,9 +20,9 @@ import (
 // the commissioner receives — not silently. matter.js's revoke closes the
 // PASE session gracefully
 // (packages/node/src/behaviors/administrator-commissioning/AdministratorCommissioningServer.ts:143-147
-// at b25ed960, `paseSession.initiateClose()`), and its gracefulClose is
+// at db91886c, `paseSession.initiateClose()`), and its gracefulClose is
 // answered with a CloseSession
-// (packages/protocol/src/protocol/ExchangeManager.ts:790-800 at b25ed960).
+// (packages/protocol/src/protocol/ExchangeManager.ts:790-800 at db91886c).
 // The deferral while an exchange is in flight is held at the bridge
 // (bridge:TestRevokeClosesThePASESessionWhenItIsIdle).
 func TestRevokeClosesTheFacadePASESessionWithCloseSession(t *testing.T) {

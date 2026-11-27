@@ -96,7 +96,7 @@ func handReader(path im.ConcreteCommandPath) (*spec.Cluster, handRead) {
 // validates every request against before the server runs, with the
 // server's relaxations the definition carries
 // (packages/protocol/src/action/server/CommandInvokeResponse.ts:474-487 at
-// b25ed960; [spec.Command.DecodeRequest]) — and hands the same fields to
+// db91886c; [spec.Command.DecodeRequest]) — and hands the same fields to
 // the hand-written reader. A command with fields the reader decodes is
 // handed on as a [spec.HandForm]: the generated form the definition
 // decoded, which the endpoint dispatcher's model gate judges, beside the
@@ -126,7 +126,7 @@ func heldByDefinition(def *spec.Cluster, path im.ConcreteCommandPath, dec *tlv.D
 		// the definition defines, each the element the check judged. A
 		// member the definition does not know — skipped whole by its
 		// decoder, as matter.js skips an unknown field
-		// (packages/types/src/tlv/TlvObject.ts:215-217 at b25ed960) — never
+		// (packages/types/src/tlv/TlvObject.ts:215-217 at db91886c) — never
 		// reaches a reader that would descend into it and read its inner
 		// tags as the command's own (R2-P6-wire-0440).
 		n = definedFields(n, cmd)

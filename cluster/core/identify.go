@@ -615,13 +615,13 @@ func coerceUint16(v any) (uint16, error) {
 	}
 	// A value of another type is a datatype mismatch: InvalidAction, as
 	// matter.js's ValidationDatatypeMismatchError answers it
-	// (packages/types/src/common/ValidationError.ts:35-38 at b25ed960).
+	// (packages/types/src/common/ValidationError.ts:35-38 at db91886c).
 	return 0, spec.Errorf(im.StatusInvalidAction, "core: unsupported IdentifyTime type %T", v)
 }
 
 // boundUint16 refuses a value above the uint16 range with ConstraintError
 // instead of masking it into a different, valid IdentifyTime. Mirrors
-// matter.js packages/types/src/tlv/TlvNumber.ts:151-155 at b25ed960
+// matter.js packages/types/src/tlv/TlvNumber.ts:151-155 at db91886c
 // (ValidationOutOfBoundsError, a ValidationError = ConstraintError;
 // W3-clucore-04).
 func boundUint16(x uint64) (uint16, error) {

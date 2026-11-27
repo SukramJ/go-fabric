@@ -48,7 +48,7 @@ func TestBridgedBasicInfo_ValidationEmptyUniqueID(t *testing.T) {
 // TestBridgedBasicInfo_EmptyNodeLabelAccepted: NodeLabel is optional on the
 // bridged cluster. matter.js: "All attributes are optional except for the
 // "reachable" attribute" (BridgedDeviceBasicInformationServer.ts:20 at
-// b25ed960); the attribute's conformance is "O"
+// db91886c); the attribute's conformance is "O"
 // (bridged-device-basic-information.element.ts:30).
 // A device whose host stated an empty name serves the empty string (until
 // 2026-10-30 the constructor refused it, and the bridged endpoint lost its

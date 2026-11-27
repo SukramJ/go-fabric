@@ -65,7 +65,7 @@ type sockets struct {
 // and links joins each interface as it comes (joinNew). matter.js keeps
 // its sockets when a membership fails too: NodeJsUdpSocket.addMembership
 // logs the failure per interface and goes on (NodeJsUdpSocket.ts:189-205
-// at b25ed960), and UdpMulticastServer.create fails only when the IPv6
+// at db91886c), and UdpMulticastServer.create fails only when the IPv6
 // socket cannot be created (UdpMulticastServer.ts:70-83).
 func openSockets(exclude func(string) bool, log *slog.Logger, clk *clockvar.Var, handle func([]byte, int, *net.UDPAddr)) (*sockets, error) {
 	return openSocketsOn(listMulticastInterfaces(), exclude, log, clk, handle)

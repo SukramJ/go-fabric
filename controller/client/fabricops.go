@@ -53,7 +53,7 @@ func (peerShutdownError) Error() string { return "client: peer reports shutdown"
 func (peerShutdownError) Is(target error) bool { return target == exchange.ErrTransient }
 
 // Operation kinds — matter.js FabricOperation
-// (packages/node/src/node/client/Peers.ts:80 at b25ed960).
+// (packages/node/src/node/client/Peers.ts:80 at db91886c).
 const (
 	opCommission        = "commission"
 	opDecommission      = "decommission"
@@ -61,7 +61,7 @@ const (
 )
 
 // fabricOperationVerbs are the verbs of the in-progress refusal — matter.js
-// FABRIC_OPERATION_VERBS (Peers.ts:82-86 at b25ed960).
+// FABRIC_OPERATION_VERBS (Peers.ts:82-86 at db91886c).
 var fabricOperationVerbs = map[string]string{
 	opCommission:        "commission",
 	opDecommission:      "decommission",
@@ -284,7 +284,7 @@ func (r *Registry) commission(ctx context.Context, n *Node, o CommissionOptions)
 
 // Decommission removes the node from its fabric and deletes it — matter.js
 // ClientNode.decommission (packages/node/src/node/ClientNode.ts:200-210 at
-// b25ed960) as the node's fabric operation: a commissioned node is
+// db91886c) as the node's fabric operation: a commissioned node is
 // decommissioned first (CommissioningClient.decommission,
 // CommissioningClient.ts:388-492 at b25ed960), then the node is deleted (:208). A
 // removal the peer refused, or one that was not confirmed, returns its

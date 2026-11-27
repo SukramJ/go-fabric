@@ -2,7 +2,7 @@
 // Copyright (C) 2026 SukramJ.
 
 // A port of matter.js packages/node/test/behaviors/thermostat/PresetsLocalWriteTest.ts
-// at b25ed960 (#4979 added the check-order cases): local writes of the
+// at db91886c (#4979 added the check-order cases): local writes of the
 // presets — handles, the announcement, persistence across a restart, the
 // write rules, the active preset and the built-in presets.
 //

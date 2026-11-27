@@ -5,8 +5,8 @@ package interaction
 
 // A port of matter.js
 // packages/protocol/test/action/client/subscription/PeerSubscriptionTest.ts
-// at b25ed960 (#4943): reportStatusUnacknowledged of a peer subscription
-// (PeerSubscription.ts:59-120 at b25ed960). matter.js captures the logger's
+// at db91886c (#4943, #5046): reportInterrupted of a peer subscription
+// (PeerSubscription.ts:60-126 at db91886c). matter.js captures the logger's
 // lines; the Go subscription logs through its slog.Logger, captured here.
 
 import (
@@ -32,15 +32,14 @@ func (b *logBuffer) Write(p []byte) (int, error) {
 	return b.buf.Write(p)
 }
 
-// lossLogs are the lines that report a subscription lost because the peer
-// did not acknowledge our report status — lossLogs of
-// PeerSubscriptionTest.ts:41.
+// lossLogs are the lines that report a subscription lost to an
+// interrupted report — lossLogs of PeerSubscriptionTest.ts:41 ("lost:").
 func (b *logBuffer) lossLogs() []string {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	var out []string
 	for line := range strings.SplitSeq(b.buf.String(), "\n") {
-		if strings.Contains(line, "subscription_lost_report_status_unacknowledged") {
+		if strings.Contains(line, "subscription_lost_report_") {
 			out = append(out, line)
 		}
 	}
@@ -66,7 +65,7 @@ func isSubscriptionClosed(s *Subscription) bool {
 	return s.isClosed
 }
 
-func TestPeerSubscriptionReportStatusUnacknowledgedParity(t *testing.T) {
+func TestPeerSubscriptionReportInterruptedParity(t *testing.T) {
 	t.Parallel()
 	t.Run("closes the subscription and logs the loss", func(t *testing.T) {
 		t.Parallel()
@@ -74,7 +73,7 @@ func TestPeerSubscriptionReportStatusUnacknowledgedParity(t *testing.T) {
 		closed := 0
 		s := aPeerSubscription(&log, true, func() { closed++ })
 
-		s.reportStatusUnacknowledged(s.nextReportNumber(), reportStatusFinal)
+		s.reportInterrupted(s.nextReportNumber(), reportFinalUnacknowledged)
 
 		if closed != 1 || !isSubscriptionClosed(s) {
 			t.Fatalf("closed %d times, isClosed %v", closed, isSubscriptionClosed(s))
@@ -88,7 +87,7 @@ func TestPeerSubscriptionReportStatusUnacknowledgedParity(t *testing.T) {
 		var log logBuffer
 		s := aPeerSubscription(&log, false, nil)
 
-		s.reportStatusUnacknowledged(s.nextReportNumber(), reportStatusFinal)
+		s.reportInterrupted(s.nextReportNumber(), reportFinalUnacknowledged)
 
 		if isSubscriptionClosed(s) {
 			t.Fatal("the subscription closed")
@@ -102,7 +101,7 @@ func TestPeerSubscriptionReportStatusUnacknowledgedParity(t *testing.T) {
 			slog.New(slog.NewTextHandler(&log, nil)))
 		s.id, s.maxInterval, s.maxPeerResponseTime = 1, 60, 10*time.Second
 
-		s.reportStatusUnacknowledged(s.nextReportNumber(), reportStatusFinal)
+		s.reportInterrupted(s.nextReportNumber(), reportFinalUnacknowledged)
 
 		if isSubscriptionClosed(s) {
 			t.Fatal("the subscription closed")
@@ -113,10 +112,30 @@ func TestPeerSubscriptionReportStatusUnacknowledgedParity(t *testing.T) {
 		var log logBuffer
 		s := aPeerSubscription(&log, false, nil)
 
-		s.reportStatusUnacknowledged(s.nextReportNumber(), reportStatusChunk)
+		s.reportInterrupted(s.nextReportNumber(), reportChunkUnacknowledged)
 
 		if !isSubscriptionClosed(s) {
 			t.Fatal("the subscription stayed open")
+		}
+	})
+	t.Run("closes a subscription without compact priming after a missing chunk and logs the loss", func(t *testing.T) {
+		t.Parallel()
+		var log logBuffer
+		s := aPeerSubscription(&log, false, nil)
+
+		s.reportInterrupted(s.nextReportNumber(), reportChunkMissing)
+
+		if !isSubscriptionClosed(s) {
+			t.Fatal("the subscription stayed open")
+		}
+		missing := 0
+		for _, line := range log.lossLogs() {
+			if strings.Contains(line, "subscription_lost_report_chunk_missing") {
+				missing++
+			}
+		}
+		if missing != 1 {
+			t.Fatalf("%d chunk-missing loss logs, want 1: %v", missing, log.lossLogs())
 		}
 	})
 	t.Run("keeps a subscription on which a newer report started", func(t *testing.T) {
@@ -126,7 +145,7 @@ func TestPeerSubscriptionReportStatusUnacknowledgedParity(t *testing.T) {
 		unacknowledged := s.nextReportNumber()
 		s.nextReportNumber()
 
-		s.reportStatusUnacknowledged(unacknowledged, reportStatusChunk)
+		s.reportInterrupted(unacknowledged, reportChunkUnacknowledged)
 
 		if isSubscriptionClosed(s) {
 			t.Fatal("the subscription closed")
@@ -138,7 +157,7 @@ func TestPeerSubscriptionReportStatusUnacknowledgedParity(t *testing.T) {
 		s := aPeerSubscription(&log, true, nil)
 		s.Close()
 
-		s.reportStatusUnacknowledged(s.nextReportNumber(), reportStatusFinal)
+		s.reportInterrupted(s.nextReportNumber(), reportFinalUnacknowledged)
 
 		if lines := log.lossLogs(); len(lines) != 0 {
 			t.Fatalf("loss logs %v", lines)

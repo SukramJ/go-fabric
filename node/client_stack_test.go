@@ -237,7 +237,7 @@ func TestResumedSessionKeepsTheRecordsParameters(t *testing.T) {
 		t.Fatal("the second session did not resume")
 	}
 	// The resumed session's record is saved after a's Success arrived
-	// (CaseServer.ts:205-217 at b25ed960).
+	// (CaseServer.ts:205-217 at db91886c).
 	cp.awaitResponderRecord(t)
 	rec, err := cp.b.Node().Store().GetResumptionByPeer(ctx, cp.bFabric.FabricIndex, cp.aFabric.NodeID)
 	if err != nil {

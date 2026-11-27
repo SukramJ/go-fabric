@@ -414,7 +414,7 @@ func (b *Bridge) expediteDuplicateAck(sessionID, exchangeID uint16, initiator bo
 // peer's active interval and threshold are the session's
 // ([Bridge.peerSchedule]), the defaults where it states none — as
 // matter.js reads session.parameters
-// (packages/protocol/src/protocol/MessageExchange.ts:615 at b25ed960).
+// (packages/protocol/src/protocol/MessageExchange.ts:615 at db91886c).
 // MRP runs over UDP only, so the retransmission goes out through the
 // listener as the tracker's own do ([Bridge.tickOutboundReliable]).
 func (b *Bridge) kickForLiveness(hdr *message.Header, proto message.ProtocolHeader) bool {
@@ -717,7 +717,7 @@ func (b *Bridge) tickOutboundReliable(outbound *outboundReliableTracker, now tim
 		if givenUp {
 			// The message's exchange closes with it: a revoked PASE
 			// session waiting for it may be idle now (matter.js
-			// MessageExchange.ts:995-1006 at b25ed960, the budget spent
+			// MessageExchange.ts:995-1006 at db91886c, the budget spent
 			// while closing).
 			gaveUpOn = append(gaveUpOn, r.SessionID)
 			b.noteReportUndelivered(r.SessionID, r.Counter)

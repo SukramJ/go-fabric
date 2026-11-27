@@ -896,7 +896,7 @@ func hexIDs(ids []uint32) string {
 // CHIP's UnitTesting cluster as the reference daemon serves it under
 // --unit-testing (examples/reference-bridge/unit_testing.go), after
 // matter.js support/chip-testing/src/cert/unit-testing-cluster.ts at
-// b25ed960: the cluster id (:83), its endpoint UNIT_TESTING_ENDPOINT (:64,
+// db91886c: the cluster id (:83), its endpoint UNIT_TESTING_ENDPOINT (:64,
 // the daemon's Aggregator), the attributes the data-type steps write
 // (:91-106) and LONG_OCTET_STRING_ENTRY (:70).
 const (

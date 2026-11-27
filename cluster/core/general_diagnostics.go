@@ -1144,7 +1144,7 @@ const (
 // enumerateNetworkInterfaces lists the host's own interfaces, the
 // candidates [selectNetworkInterfaces] chooses from: every non-loopback
 // interface with at least one address (matter.js NodeJsNetwork.ts:193-194
-// at b25ed960 skips an interface without addresses and an internal one),
+// at db91886c skips an interface without addresses and an internal one),
 // projected into a [NetworkInterfaceStruct]. A failed listing is nil.
 //
 // InterfaceType and IsOperational follow matter.js's
@@ -1310,14 +1310,14 @@ func (g *GeneralDiagnostics) OnAttributeChange(cb func(change contract.Change)) 
 // interfaces while its changes are observed; zero or negative disables the
 // comparison, and NetworkInterfaces is then current only on read. The
 // default is 60 s, matter.js INTERFACE_CHECK_INTERVAL (Network.ts:91-95 at
-// b25ed960).
+// db91886c).
 func (g *GeneralDiagnostics) SetInterfaceCheckInterval(d time.Duration) {
 	g.ifWatch.SetInterval(d)
 }
 
 // Stop ends the interface comparison: matter.js closes the Network, and
 // with it the periodic check, when the node's environment shuts down
-// (Network.ts close, :239-244 at b25ed960). The node calls it from Stop,
+// (Network.ts close, :239-244 at db91886c). The node calls it from Stop,
 // after which no listener registers (a stopped node is ErrStopped), so no
 // interface check stays armed on its clock; the observer count is not
 // reset, a later registration does not restart the watcher. It also
@@ -1353,7 +1353,7 @@ func (g *GeneralDiagnostics) listInterfaces() []NetworkInterfaceStruct {
 func (g *GeneralDiagnostics) interfaceSnapshot() map[string]string {
 	// A failed listing keeps the previous snapshot (nil, the Watcher's
 	// contract), as matter.js keeps its state (Network.ts:174-177 at
-	// b25ed960); listInterfaces would turn it into an empty list and
+	// db91886c); listInterfaces would turn it into an empty list and
 	// report a change twice.
 	if _, err := net.Interfaces(); err != nil {
 		return nil

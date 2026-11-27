@@ -6,6 +6,7 @@ package interaction_test
 import (
 	"bytes"
 	"errors"
+	"slices"
 	"testing"
 
 	"thingfabric.dev/go-fabric/client/exchange"
@@ -22,8 +23,9 @@ import (
 
 // chunkedWrite is one WriteRequest message the peer received.
 type chunkedWrite struct {
-	size int
-	req  im.WriteRequest
+	size    int
+	req     im.WriteRequest
+	payload []byte
 }
 
 // respondChunks answers every WriteRequest chunk of a write with a
@@ -42,7 +44,7 @@ func respondChunks(t *testing.T, s *scripted, status func(im.AttributeWrite) im.
 		if err != nil {
 			t.Fatal(err)
 		}
-		received = append(received, chunkedWrite{len(m.payload), wr})
+		received = append(received, chunkedWrite{len(m.payload), wr, m.payload})
 		if errorAt > 0 && len(received) == errorAt {
 			s.reply(t, m, im.InteractionModelProtocolID, im.OpcodeStatusResponse, statusResponse(t, im.StatusFailure))
 			return received
@@ -104,6 +106,30 @@ func TestInteractionClientMessengerWriteChunking(t *testing.T) {
 		for i := range 10 {
 			if sent[i].Path.Attribute != uint32(i) || res.res[i].Path.Attribute != uint32(i) {
 				t.Fatalf("order at %d: sent %d, status %d", i, sent[i].Path.Attribute, res.res[i].Path.Attribute)
+			}
+		}
+	})
+
+	t.Run("leaves false flags out of every chunk when forced", func(t *testing.T) {
+		t.Parallel()
+		// InteractionClientMessengerTest.ts:612-624 at db91886c (#5069): the
+		// flags are decided before the write is chunked, so no chunk carries
+		// them, and every chunk still fits the payload it was sized for.
+		s := newScripted(t)
+		c := interaction.New(s.mgr, s.session, nil)
+		writes := make([]interaction.WriteRequest, 0, 10)
+		for i := range 10 {
+			writes = append(writes, icmWrite(uint32(i), icmOctets(icmEntry)))
+		}
+		done := writeAsync(c, writes, interaction.WriteOptions{OmitFalseFlags: true})
+		received := respondChunks(t, s, nil, 0)
+		if res := await(t, done); res.err != nil || len(received) < 2 {
+			t.Fatalf("%d chunks, %v", len(received), res.err)
+		}
+		for i, r := range received {
+			tags := icmTopTags(t, r.payload)
+			if slices.Contains(tags, 0) || slices.Contains(tags, 1) || !slices.Contains(tags, 3) || r.size > exchange.MaxPayloadSize {
+				t.Fatalf("chunk %d: fields %v, %d bytes", i, tags, r.size)
 			}
 		}
 	})

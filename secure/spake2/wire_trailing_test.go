@@ -15,7 +15,7 @@ import (
 // decoder reads one top-level structure and does not look at what
 // follows its end-of-container, as matter.js decodes one element and
 // drops the reader (packages/types/src/tlv/TlvSchema.ts:48-50 at
-// b25ed960). A message with two bytes appended decodes to the same
+// db91886c). A message with two bytes appended decodes to the same
 // values as the message alone; refusing them would be stricter than
 // matter.js and is a divergence, not a fix.
 func TestPASEDecodersTakeBytesAfterTheMessageEnd(t *testing.T) {

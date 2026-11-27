@@ -596,10 +596,15 @@ func (f *flow) withChannelDropFallbackConnect(action func() (netcomm.ConnectNetw
 // is shorter, so a short FailSafeExpiryLengthSeconds does not lapse
 // between two re-arms; each re-arm runs on a context [flow.stopArmInterval]
 // cancels, and stopArmInterval awaits a re-arm in flight, so none
-// overlaps the disarm of an abort or a failure (disarmIfMayBeArmed stops
-// the timer first, expireFailsafe detaches it) or outlives the consent
+// overlaps the expiry after a failure or a cancel (expireFailsafe
+// detaches the timer and awaits or cancels the re-arm) or outlives the consent
 // wait; and the timer that ends on its own — the cumulative limit, a closed session, a failed re-arm —
-// says why on lapsed, once.
+// says why on lapsed, once. matter.js sends each periodic re-arm with the
+// caller's abort signal (#requestAbort, ControllerCommissioningFlow.ts:971
+// → :892 → :544 at db91886c); a re-arm here runs on the interval's own
+// context, so one can still leave between the caller's cancel and the
+// step's return, but never behind the expiry, which cancels and awaits it
+// first (awaitArmInterval).
 type armInterval struct {
 	timer    exchange.Timer
 	stopped  bool

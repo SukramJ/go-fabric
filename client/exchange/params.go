@@ -12,7 +12,7 @@ import (
 
 // Fallbacks for session parameters a peer did not report. Mirrors matter.js
 // packages/protocol/src/session/SessionIntervals.ts:45-49 (the intervals)
-// and SessionParameters.ts:147-188 (the rest) at b25ed960.
+// and SessionParameters.ts:147-188 (the rest) at db91886c.
 const (
 	FallbackIdleInterval             uint32 = 500  // ms, SessionIntervals.ts:46
 	FallbackActiveInterval           uint32 = 300  // ms, SessionIntervals.ts:47

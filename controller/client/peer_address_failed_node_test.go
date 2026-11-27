@@ -33,9 +33,9 @@ func corruptCommissionedAt(t *testing.T, st *client.MemoryStore, id string) {
 // TestPeerAddressOfNodeThatFailedToLoad: Node.PeerAddress answers the
 // stored address of a node that failed to load, as matter.js's
 // ClientNode.peerAddress reads storage when the commissioning state did
-// not load (packages/node/src/node/ClientNode.ts:408-418 at b25ed960),
+// not load (packages/node/src/node/ClientNode.ts:408-418 at db91886c),
 // while the node stays out of the commissioned predicate
-// (lifecycle.isCommissioned, NodeLifecycle.ts:94-96 at b25ed960;
+// (lifecycle.isCommissioned, NodeLifecycle.ts:94-96 at db91886c;
 // Peers.commissioned, Peers.ts:416-419). Go's own case (F-b25ed960-24):
 // matter.js has no test of the getter on a failed node; its by-address
 // lookup is ported in TestPeersLoadFailureByAddressParity.
@@ -82,7 +82,7 @@ func TestPeerAddressOfNodeThatFailedToLoad(t *testing.T) {
 
 // TestPeerAddressOfNodeThatFailedToLoadWithoutStoredAddress: a failed
 // node whose stored record names no address has none
-// (ClientNode.ts:420 at b25ed960, undefined).
+// (ClientNode.ts:420 at db91886c, undefined).
 func TestPeerAddressOfNodeThatFailedToLoadWithoutStoredAddress(t *testing.T) {
 	t.Parallel()
 	sr := newScriptedRegistry(t, func(st *client.MemoryStore) {

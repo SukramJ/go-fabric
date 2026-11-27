@@ -207,7 +207,7 @@ func (w *PeerWakefulness) observe(o wakeObserver) func() {
 // reading and converted at the current wall-clock offset, as matter.js's
 // IcdClient.nextExpectedCheckin exposes it: "The wakefulness runs on the
 // monotonic clock; expose the deadline on the wall clock"
-// (packages/node/src/behavior/system/icd/IcdClient.ts:83-87 at b25ed960).
+// (packages/node/src/behavior/system/icd/IcdClient.ts:83-87 at db91886c).
 func (w *PeerWakefulness) NextCheckInDue() (time.Time, bool) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -275,7 +275,7 @@ func (w *PeerWakefulness) SetRequiresAwait(v bool) {
 // changes, so an observer of the mode change already reads the activity
 // (Awake reports true for a peer flipped into LIT with active true).
 //
-// Mirrors matter.js, at b25ed960, requiresAwait then noteActive in one synchronous step:
+// Mirrors matter.js, at db91886c, requiresAwait then noteActive in one synchronous step:
 // packages/node/src/behavior/system/icd/IcdClient.ts:166-178 (#onOperatingModeChanged, LIT and online)
 // packages/node/src/behavior/system/icd/IcdClient.ts:747-806 (#feedFabricIcd, on seed)
 func (w *PeerWakefulness) SetOperatingMode(requiresAwait, active bool) {

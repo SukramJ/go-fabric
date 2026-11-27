@@ -171,7 +171,7 @@ func TestBasicInfo_UnchangedWriteCommitsNothing(t *testing.T) {
 // what a controller's write is refused, with its status — a Location that
 // is not two characters — and keep the served value. A NodeLabel over its
 // 32 bytes is cut to them instead, as matter.js's datasource cuts a stored
-// string over its numeric maximum (Datasource.ts:149-165 at b25ed960,
+// string over its numeric maximum (Datasource.ts:149-165 at db91886c,
 // #4995; TestBasicInfo_RestoreNodeLabelTooLong).
 func TestBasicInfo_RestoresUseTheDefinition(t *testing.T) {
 	t.Parallel()

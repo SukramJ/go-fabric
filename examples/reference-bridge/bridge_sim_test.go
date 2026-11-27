@@ -28,7 +28,7 @@ var bridgeSimCommands = []string{
 
 // TestBridgeSimFlag: with --bridge-sim the node bridges matter.js's bridge
 // test instance's devices after every other device
-// (BridgeTestInstance.ts:148-172 at b25ed960). They mount free of
+// (BridgeTestInstance.ts:148-172 at db91886c). They mount free of
 // device-type violations — the composed sensors tell each other apart by
 // their CommonNumberTag (:306-317); the composed
 // device lists Bridged Node and then Power Source (:330-335), its sensors are its own

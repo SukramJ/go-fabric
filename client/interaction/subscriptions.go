@@ -96,6 +96,19 @@ func NewSubscriptions(cfg SubscriptionsConfig) *Subscriptions {
 // it too.
 func (r *Subscriptions) MaxReportBytesPerSession() int { return r.maxReport }
 
+// blockLocked blocks new report processing and ends the reads in flight;
+// r.mu is held.
+func (r *Subscriptions) blockLocked() {
+	if r.blocked {
+		return
+	}
+	r.blocked = true
+	r.readingCancel()
+	if r.timer != nil {
+		r.timer.Stop()
+	}
+}
+
 // IsBlocked reports whether new report processing is blocked (:58-63).
 func (r *Subscriptions) IsBlocked() bool {
 	r.mu.Lock()
@@ -108,13 +121,7 @@ func (r *Subscriptions) IsBlocked() bool {
 // second call waits as well. It returns ctx's error when ctx ends first.
 func (r *Subscriptions) BlockNewActivity(ctx context.Context) error {
 	r.mu.Lock()
-	if !r.blocked {
-		r.blocked = true
-		r.readingCancel()
-		if r.timer != nil {
-			r.timer.Stop()
-		}
-	}
+	r.blockLocked()
 	var wait chan struct{}
 	if r.inFlight > 0 {
 		if r.drained == nil {
@@ -400,9 +407,9 @@ func (s *Subscription) timedOut() {
 
 // nextReportNumber counts a report the peer started sending on the
 // subscription and returns the number to pass to
-// [Subscription.reportStatusUnacknowledged] for it. Mirrors matter.js
-// PeerSubscription.nextReportNumber (PeerSubscription.ts:59-66 at
-// b25ed960).
+// [Subscription.reportInterrupted] for it. Mirrors matter.js
+// PeerSubscription.nextReportNumber (PeerSubscription.ts:60-66 at
+// db91886c).
 func (s *Subscription) nextReportNumber() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -410,30 +417,36 @@ func (s *Subscription) nextReportNumber() int {
 	return s.reportsStarted
 }
 
-// reportStatusUnacknowledged decides whether the subscription is lost
-// because the peer did not acknowledge our status response to report
-// number n ([Subscription.nextReportNumber]), and closes it if so — so
-// its owner replaces it before its timeout, as a sustained subscription
-// does. A status to a chunk with more to follow closes it; one to a final
-// report only when its priming is compact; a subscription that is closed,
-// or on which a newer report started, is kept as it is. Mirrors matter.js
-// PeerSubscription.reportStatusUnacknowledged
-// (PeerSubscription.ts:68-120 at b25ed960, the table :77-81).
-func (s *Subscription) reportStatusUnacknowledged(n int, status unacknowledgedReportStatus) {
+// reportInterrupted decides whether the subscription is lost because
+// report number n ([Subscription.nextReportNumber]) did not complete, and
+// closes it if so — so its owner replaces it before its timeout, as a
+// sustained subscription does, and the peer's late chunks are refused. An
+// unacknowledged status to a chunk with more to follow closes it, as does
+// a continuation chunk the peer never sent, whatever the priming; an
+// unacknowledged status to a final report closes it only when its priming
+// is compact; a subscription that is closed, or on which a newer report
+// started, is kept as it is. The loss of a missing chunk logs its own line
+// (subscription_lost_report_chunk_missing). Mirrors matter.js
+// PeerSubscription.reportInterrupted (PeerSubscription.ts:68-126 at
+// db91886c, the table :80-87, the log :115-123).
+func (s *Subscription) reportInterrupted(n int, interruption reportInterruption) {
 	s.mu.Lock()
 	ignore := s.isClosed || n != s.reportsStarted
-	keep := status == reportStatusFinal && !s.compactPriming
+	keep := interruption == reportFinalUnacknowledged && !s.compactPriming
 	id := s.id
 	s.mu.Unlock()
 	attrs := []any{
 		slog.Uint64("subscription_id", uint64(id)), slog.Int("fabric_index", int(s.peer.FabricIndex)),
-		slog.Uint64("node_id", s.peer.NodeID), slog.String("status", string(status)),
+		slog.Uint64("node_id", s.peer.NodeID), slog.String("interruption", string(interruption)),
 	}
 	switch {
 	case ignore:
-		s.log.Debug("matter.controller.interaction.report_status_unacknowledged_ignored", attrs...)
+		s.log.Debug("matter.controller.interaction.report_interrupted_ignored", attrs...)
 	case keep:
-		s.log.Debug("matter.controller.interaction.report_status_unacknowledged_kept", attrs...)
+		s.log.Debug("matter.controller.interaction.report_interrupted_kept", attrs...)
+	case interruption == reportChunkMissing:
+		s.log.Info("matter.controller.interaction.subscription_lost_report_chunk_missing", attrs...)
+		s.Close()
 	default:
 		s.log.Info("matter.controller.interaction.subscription_lost_report_status_unacknowledged", attrs...)
 		s.Close()

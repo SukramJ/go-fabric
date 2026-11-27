@@ -27,7 +27,7 @@
 // creation, which processes what the initiator sends and is seen by peer
 // loss and close, and its completion when the Success went out (full
 // handshake) or arrived (resumption) — matter.js NodeSession.isEstablishing
-// and completeEstablishment (NodeSession.ts:209-251 at b25ed960). The
+// and completeEstablishment (NodeSession.ts:209-251 at db91886c). The
 // establishing state is the handshake's affair, not a consumer's, so it is
 // not a field of exchange.SecureSessionConfig.
 package exchangeseam
@@ -62,7 +62,7 @@ var ActivateSecureSession func(sess any)
 // onTransmitted once, when the first transmission of the message went
 // out, before the wait for its acknowledgement — matter.js
 // ExchangeSendOptions.onTransmitted (MessageExchange.ts:132-137 at
-// b25ed960); the CASE responder's Success completes its session's
+// db91886c); the CASE responder's Success completes its session's
 // establishment with it. Set by client/exchange's init.
 var SendNotifyingTransmission func(ctx context.Context, x any, opcode uint8, payload []byte, opts any, onTransmitted func()) error
 

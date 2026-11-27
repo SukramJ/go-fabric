@@ -34,7 +34,7 @@ func (c *countingTime) Now() time.Time {
 // notBefore in the future is a warning whose throw is commented out, and
 // notAfter is compared with nothing
 // (packages/protocol/src/certificate/kinds/OperationalBase.ts:99-106 at
-// b25ed960). TestVerifyAndExtractPubKey_Expired, …_ICAC_Expired and
+// db91886c). TestVerifyAndExtractPubKey_Expired, …_ICAC_Expired and
 // TestCheckValidity_NotYetValid hold three of the four cases one by one;
 // this test holds all four against one clock and adds the half no other
 // test has — that the clock the verifier was built with is never asked.
@@ -110,7 +110,7 @@ func TestCertValidityNotEnforced(t *testing.T) {
 			}
 			pub, err := v.VerifyAndExtractPubKey(nocRaw, icacRaw)
 			if err != nil {
-				t.Fatalf("VerifyAndExtractPubKey = %v; the chain verifies whatever its validity period says (OperationalBase.ts:99-106 at b25ed960)", err)
+				t.Fatalf("VerifyAndExtractPubKey = %v; the chain verifies whatever its validity period says (OperationalBase.ts:99-106 at db91886c)", err)
 			}
 			if !pub.Equal(&nocPriv.PublicKey) {
 				t.Fatal("the extracted key is not the NOC's")

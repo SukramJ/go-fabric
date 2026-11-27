@@ -124,14 +124,14 @@ func wholePath(enc *tlv.Encoder) {
 // endpoint 0, a masked status 0x100 is Success. The path, DataVersion and
 // CommandRef widths are matter.js's (packages/types/src/protocol/types/
 // TlvAttributePath.ts:22-26, TlvAttributeReportData.ts:15,
-// TlvCommandStatus.ts:18 at b25ed960, whose TlvNumber refuses a value out
+// TlvCommandStatus.ts:18 at db91886c, whose TlvNumber refuses a value out
 // of bounds, as [uintField] cites). A StatusIB's Status and ClusterStatus
 // are refused above 8 bits as chip refuses them
 // (src/app/MessageDef/StatusIB.cpp:55-60 with
 // src/lib/core/TLVReader.cpp:204-214 at 6170af84,
 // CHIP_ERROR_INVALID_INTEGER_VALUE); matter.js reads both as a 32-bit enum
 // (packages/types/src/protocol/types/TlvStatus.ts:15-16,
-// packages/types/src/tlv/TlvNumber.ts:303 at b25ed960), which this module's
+// packages/types/src/tlv/TlvNumber.ts:303 at db91886c), which this module's
 // 8-bit StatusCode cannot hold.
 func TestClientDecodersRefuseOutOfRangeIntegers(t *testing.T) {
 	t.Parallel()

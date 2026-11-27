@@ -94,7 +94,7 @@ type PaseVerifierInstaller interface {
 //
 // Mirrors matter.js
 // packages/node/src/behaviors/administrator-commissioning/AdministratorCommissioningServer.ts:143-147
-// at b25ed960 (revokeCommissioning: `SessionManager.getPaseSession()` →
+// at db91886c (revokeCommissioning: `SessionManager.getPaseSession()` →
 // `paseSession.initiateClose()`).
 type PaseSessionCloser interface {
 	ClosePaseSessions(ctx context.Context) error
@@ -148,7 +148,7 @@ type CommissioningWindow struct {
 	// every open — an administrator's window, the node's own, a restart of
 	// the node's own — as matter.js makes a new CommissioningWindow object
 	// there (packages/protocol/src/protocol/DeviceCommissioner.ts:274-299 at
-	// b25ed960). The bridge counts a failed commissioning attempt against
+	// db91886c). The bridge counts a failed commissioning attempt against
 	// the window a fail-safe was armed in by it ([Bridge.recordFailedAttempt]).
 	generation uint64
 
@@ -869,7 +869,7 @@ func (w *CommissioningWindow) RevokeWindow(ctx context.Context) error {
 	// Matter §11.19.7.3 step 1: close any open PASE session before
 	// touching window state. Mirrors matter.js
 	// packages/node/src/behaviors/administrator-commissioning/AdministratorCommissioningServer.ts:143-147
-	// at b25ed960 (revokeCommissioning, step 1: getPaseSession() →
+	// at db91886c (revokeCommissioning, step 1: getPaseSession() →
 	// paseSession.initiateClose()).
 	//
 	// The bridge the window is attached to closes each PASE session of
@@ -1136,7 +1136,7 @@ func RandomDiscriminator() (uint16, error) {
 // from the §5.1.1.1.1 valid-passcode set: a candidate that fails
 // [setup.IsValidPasscode] — 0, the all-same-digit values 11111111..99999999,
 // 12345678 and 87654321, matter.js packages/types/src/schema/
-// PairingCodeSchema.ts:160-162 INVALID_PASSCODES at b25ed960 — is
+// PairingCodeSchema.ts:160-162 INVALID_PASSCODES at db91886c — is
 // re-rolled, as matter.js PaseClient.generateRandomPasscode does
 // (packages/protocol/src/session/pase/PaseClient.ts:55-67). The rule is
 // that one function; this one only draws.

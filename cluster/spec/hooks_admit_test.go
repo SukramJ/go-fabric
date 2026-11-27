@@ -31,7 +31,7 @@ func hooksAdmitDefinition() *spec.Cluster {
 // answers the command's Refusal there, so neither the host's handler nor
 // the server's own logic runs; Hooks.Invoke itself is a local call and
 // does not validate (matter.js validates only the commands its interaction
-// layer invokes, ProtocolService.ts:347-350 at b25ed960). Before decision
+// layer invokes, ProtocolService.ts:347-350 at db91886c). Before decision
 // 339 the gate sat in Hooks.Invoke (review II, DR5b-c2-06, R2-P6-api-1307).
 func TestHooksInvokeAdmitsTheRequestFirst(t *testing.T) {
 	t.Parallel()

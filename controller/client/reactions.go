@@ -13,7 +13,7 @@ import (
 )
 
 // The registry's reactions to a peer's BasicInformation events —
-// node/client/Peers.ts:772-948 at b25ed960. They hang on each node's
+// node/client/Peers.ts:772-948 at db91886c. They hang on each node's
 // Event hook (D6 of brief AL): matter.js registers them once per node when
 // the BasicInformation client is installed (:772-774); the Go hook exists
 // from the node's creation, so that guard has nothing to guard. Each runs
@@ -184,7 +184,7 @@ func (r *Registry) onLeave(n *Node, fabricIndex uint8, live bool) {
 	}
 }
 
-// onShutdown is Peers.#onShutdown (Peers.ts:894-915 at b25ed960): a node
+// onShutdown is Peers.#onShutdown (Peers.ts:894-915 at db91886c): a node
 // that is closing or not started is left alone, a shutdown without an
 // active subscription ignored; the device reboots, so every session with
 // it is given up — SessionManager.handlePeerShutdown without a session to

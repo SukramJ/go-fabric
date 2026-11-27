@@ -145,7 +145,7 @@ func servedOptional(features uint32) []uint32 {
 // GoToLiftPercentage on a Lift axis without position awareness ("LF &
 // PA_LF, [LF]") and GoToTiltPercentage likewise, which matter.js's
 // WindowCoveringServer implements for every axis, so its ValidatedElements
-// lists them as supported (WindowCoveringServer.ts:576-618 at b25ed960;
+// lists them as supported (WindowCoveringServer.ts:576-618 at db91886c;
 // W3-club1-04).
 func servedOptionalCommands(features uint32) []uint32 {
 	var out []uint32
@@ -319,7 +319,7 @@ const (
 // globalStatus is the OperationalStatus bitmap for the given lift and
 // tilt movement: global tracks lift while it moves, otherwise tilt
 // (matter.js #handleOperationalStatusChanging,
-// WindowCoveringServer.ts:203-214 at b25ed960).
+// WindowCoveringServer.ts:203-214 at db91886c).
 func globalStatus(lift, tilt uint8) uint8 {
 	global := tilt
 	if lift != movementStopped {
@@ -359,7 +359,7 @@ func (s *WindowCoveringServer) OnAttributeChange(cb func(change contract.Change)
 // (PositionAwareTilt) but not Lift (Tilt) is refused with [ErrFeatureMap]:
 // advertising it would list attributes or commands the server does not
 // serve, or break the features' conformance (PA_LF "LF", PA_TL "TL",
-// window-covering-cluster.element.ts at b25ed960). A Mover together with
+// window-covering-cluster.element.ts at db91886c). A Mover together with
 // a non-zero MoveStep is refused with [ErrMoverWithMoveStep], a Type or
 // EndProductType the FeatureMap disallows with [ErrEnumValue], and an
 // initial position of a position-aware axis above 10000 with
@@ -428,7 +428,7 @@ func New(cfg Config) (*WindowCoveringServer, error) {
 			aware:   features&paLift != 0,
 			current: cfg.InitialPositionPercent100ths, target: cfg.InitialPositionPercent100ths,
 			// initialize copies the position into the target, null
-			// included (WindowCoveringServer.ts:138-143 at b25ed960).
+			// included (WindowCoveringServer.ts:138-143 at db91886c).
 			currentNull: cfg.InitialPositionUnknown, targetNull: cfg.InitialPositionUnknown,
 			attrCurrent: wcdef.AttrCurrentPositionLiftPercent100ths, attrPercentage: wcdef.AttrCurrentPositionLiftPercentage,
 			attrTarget: wcdef.AttrTargetPositionLiftPercent100ths, shift: liftShift,
@@ -932,7 +932,7 @@ func (s *WindowCoveringServer) setPositions(lift, tilt *uint16, clampMsg string,
 
 // SetOperationalStatus records the OperationalStatus bitmap the device
 // reports (global in bits 0-1, lift in bits 2-3, tilt in bits 4-5 —
-// window-covering-cluster.element.ts:128-131 at matter.js b25ed960),
+// window-covering-cluster.element.ts:128-131 at matter.js db91886c),
 // stored without the [Mover] and reported through the change notifier.
 // Bits above the attribute's "max 63" (:55-56) are dropped and logged.
 func (s *WindowCoveringServer) SetOperationalStatus(status uint8) {
@@ -974,14 +974,14 @@ func (s *WindowCoveringServer) moveToLocked(a *axis, target uint16) {
 	if s.moveStep == 0 || (!a.currentNull && cur == target) {
 		// matter.js's default handleMovement sets the position to the
 		// target, a null one included (WindowCoveringServer.ts:347-363 at
-		// b25ed960).
+		// db91886c).
 		a.current, a.currentNull = target, false
 		s.setAxisStatusLocked(a, movementStopped)
 		return
 	}
 	if a.currentNull {
 		// The CHIP test node does not travel from an unknown position
-		// (TestWindowCoveringServer.ts:55-62 at b25ed960); the axis is
+		// (TestWindowCoveringServer.ts:55-62 at db91886c); the axis is
 		// Stopped, #computeOperationalState's answer for a null position
 		// (WindowCoveringServer.ts:273-275).
 		s.setAxisStatusLocked(a, movementStopped)

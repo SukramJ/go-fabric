@@ -30,7 +30,7 @@ import (
 
 // unitTestingPath is the UnitTesting attribute attr on the Aggregator,
 // endpoint 1 — matter.js's UNIT_TESTING_ENDPOINT
-// (unit-testing-cluster.ts:64 at b25ed960).
+// (unit-testing-cluster.ts:64 at db91886c).
 func unitTestingPath(attr uint32) im.ConcreteAttributePath {
 	return im.ConcreteAttributePath{
 		Endpoint: 1, Cluster: unitTestingClusterID, Attribute: attr,
@@ -104,7 +104,7 @@ func write(t *testing.T, s *bridgetest.Session, path im.ConcreteAttributePath, v
 // replaced whole.
 //
 // Mirrors matter.js support/chip-testing/src/cert/unit-testing-cluster.ts:91-106
-// and test/cert/TC-IDM-3.1.test.ts:80-85 (the written values) at b25ed960.
+// and test/cert/TC-IDM-3.1.test.ts:80-85 (the written values) at db91886c.
 func TestUnitTestingServesWhatTheGoTHWrites(t *testing.T) {
 	t.Parallel()
 	s := startUnitTestingNode(t)
@@ -166,7 +166,7 @@ func TestUnitTestingServesWhatTheGoTHWrites(t *testing.T) {
 // TestUnitTestingServesEveryAttributeFromTheStart: a wildcard read of the
 // cluster on endpoint 1 returns all four attributes before any write, each
 // at matter.js's initial value (unit-testing-cluster.ts:91-106 at
-// b25ed960), and a subscription to floatSingle is established — chip's
+// db91886c), and a subscription to floatSingle is established — chip's
 // TC-IDM-10.1 reads every attribute AttributeList names, and TC-IDM-4.1
 // step 7 subscribes to floatSingle (PR #562's chiptool.yml: both absent,
 // the subscribe refused InvalidAction).
@@ -209,7 +209,7 @@ func TestUnitTestingServesEveryAttributeFromTheStart(t *testing.T) {
 // with the definition's entry type, as matter.js decodes it with the
 // list's elementSchema
 // (packages/protocol/src/action/server/AttributeWriteResponse.ts:446-460 at
-// b25ed960); before, the daemon answered every ADD CONSTRAINT_ERROR.
+// db91886c); before, the daemon answered every ADD CONSTRAINT_ERROR.
 func TestUnitTestingListAppend(t *testing.T) {
 	t.Parallel()
 	site := fabrictest.NewSite(t, fabrictest.Options{})

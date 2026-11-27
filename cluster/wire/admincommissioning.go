@@ -681,7 +681,7 @@ func (admCommPakeErr) MatterClusterStatus() uint8      { return 0x03 } // PAKEPa
 // [ErrAdmCommWindowNotOpen]. Matter §11.19.8.3 Step 2 mandates returning
 // a cluster-specific failure when RevokeCommissioning is called while no
 // window is open. Both matter.js
-// AdministratorCommissioningServer.ts:157-160 at b25ed960 (throws
+// AdministratorCommissioningServer.ts:157-160 at db91886c (throws
 // WindowNotOpenError)
 // and chip AdministratorCommissioningLogic.cpp:115-119
 // (ClusterStatusCode::kWindowNotOpen = 0x04) require ClusterStatus=0x04.

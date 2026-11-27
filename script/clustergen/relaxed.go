@@ -10,9 +10,9 @@ import "fmt"
 // entry with the reference line that justifies it. matter.js relaxes a
 // field by extending its server's schema (constraint "none",
 // packages/node/src/behaviors/icd-management/IcdManagementServer.ts:58-75
-// at b25ed960) or by a Supervision config of a command or a field
+// at db91886c) or by a Supervision config of a command or a field
 // (packages/node/src/behaviors/door-lock/DoorLockServer.ts:1494-1526 at
-// b25ed960); connectedhomeip's behaviour stands in for
+// db91886c); connectedhomeip's behaviour stands in for
 // an Ahead server under an owner decision. The generator writes each entry
 // into the cluster's definition (spec.Field.Relaxed, spec.Attribute.Relaxed,
 // spec.Command.Check) and drops the relaxed constraint from the generated
@@ -62,8 +62,8 @@ var serverRelaxations = []struct {
 		// rejected with ConstraintError before the handler runs": an
 		// Administrator's key is ignored, a Manage caller's mismatch is
 		// FAILURE (review 2026-11 W3-clusec-06).
-		{kind: relaxRequestField, key: "IcdManagement.RegisterClient.VerificationKey", ref: "matter.js packages/node/src/behaviors/icd-management/IcdManagementServer.ts:58-69 at b25ed960"},
-		{kind: relaxRequestField, key: "IcdManagement.UnregisterClient.VerificationKey", ref: "matter.js packages/node/src/behaviors/icd-management/IcdManagementServer.ts:58-74 at b25ed960"},
+		{kind: relaxRequestField, key: "IcdManagement.RegisterClient.VerificationKey", ref: "matter.js packages/node/src/behaviors/icd-management/IcdManagementServer.ts:58-69 at db91886c"},
+		{kind: relaxRequestField, key: "IcdManagement.UnregisterClient.VerificationKey", ref: "matter.js packages/node/src/behaviors/icd-management/IcdManagementServer.ts:58-74 at db91886c"},
 	}},
 	{"cluster/core OperationalCredentials", []relaxation{
 		// "relax constraints on AttestationNonce and CsrNonce … so the
@@ -73,14 +73,14 @@ var serverRelaxations = []struct {
 		// "The cluster requires INVALID_COMMAND for a CertificateType that
 		// CertificateChainTypeEnum does not define": the command's
 		// onValidationError answers every validation error with it.
-		{kind: relaxRefusal, key: "OperationalCredentials.CertificateChainRequest", refusal: statusInvalidCommand, ref: "matter.js packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts:635-638 at b25ed960"},
+		{kind: relaxRefusal, key: "OperationalCredentials.CertificateChainRequest", refusal: statusInvalidCommand, ref: "matter.js packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts:635-638 at db91886c"},
 	}},
 	{"cluster/core GeneralCommissioning", []relaxation{
 		// "The cluster answers an unknown regulatory location with
 		// ValueOutsideRange in the response, which the handler sets": the
 		// field's validation is off (validate = false); the TLV check of
 		// its presence stays.
-		{kind: relaxRequestField, key: "GeneralCommissioning.SetRegulatoryConfig.NewRegulatoryConfig", ref: "matter.js packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts:288-289 at b25ed960"},
+		{kind: relaxRequestField, key: "GeneralCommissioning.SetRegulatoryConfig.NewRegulatoryConfig", ref: "matter.js packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts:288-289 at db91886c"},
 	}},
 	{"cluster/core Identify", []relaxation{
 		// The fields' validation is off (validate = false) until CHIP
@@ -123,7 +123,7 @@ var serverRelaxations = []struct {
 		// Fifteen commands answer every validation error of their request
 		// with INVALID_COMMAND (onValidationError, "Invalid field value");
 		// the cluster's other commands are held to the request schema and
-		// the model as every command is (ProtocolService.ts:671-705 at b25ed960).
+		// the model as every command is (ProtocolService.ts:671-705 at db91886c).
 		{kind: relaxRefusal, key: "DoorLock.SetUser", refusal: statusInvalidCommand, ref: doorLockRefusal},
 		{kind: relaxRefusal, key: "DoorLock.GetUser", refusal: statusInvalidCommand, ref: doorLockRefusal},
 		{kind: relaxRefusal, key: "DoorLock.ClearUser", refusal: statusInvalidCommand, ref: doorLockRefusal},
@@ -188,7 +188,7 @@ var serverRelaxations = []struct {
 		// the server's $AtomicChanging reactor judges it
 		// (#validatePresetWriteRequest, ThermostatServer.ts:1367-1375:
 		// RESOURCE_EXHAUSTED over NumberOfPresets), so the list's count is
-		// the server's — as Schedules' is (BD-chip-Thermostat-Schedules).
+		// the server's — as Schedules' is (schedules_write.go).
 		{kind: relaxAttribute, key: "Thermostat.Presets", ref: thermostatAtomic},
 		{kind: relaxAttribute, key: "Thermostat.Schedules", ref: thermostatAtomic},
 	}},
@@ -206,9 +206,9 @@ const (
 	groupsRelaxed    = "matter.js packages/node/src/behaviors/groups/GroupsServer.ts:20-50 at db021da0"
 	scenesRelaxed    = "matter.js packages/node/src/behaviors/scenes-management/ScenesManagementServer.ts:128-159 at db021da0"
 	thermostatAtomic = "matter.js packages/node/src/behaviors/thermostat/AtomicWriteHandler.ts:239-266 at db021da0"
-	doorLockRefusal  = "matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1494-1516 at b25ed960"
-	doorLockIndex    = "matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1518-1526 at b25ed960"
-	identifyRelaxed  = "matter.js packages/node/src/behaviors/identify/IdentifyServer.ts:162-166 at b25ed960"
+	doorLockRefusal  = "matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1494-1516 at db91886c"
+	doorLockIndex    = "matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1518-1526 at db91886c"
+	identifyRelaxed  = "matter.js packages/node/src/behaviors/identify/IdentifyServer.ts:162-166 at db91886c"
 	pavstEmptyLists  = "connectedhomeip src/app/clusters/push-av-stream-transport-server/PushAVStreamTransportLogic.cpp:672-678 at 6170af84 (owner decision 69, BD-chip-PushAvStreamTransport-RulesInServer)"
 )
 

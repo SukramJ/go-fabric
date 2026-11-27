@@ -96,7 +96,7 @@ func (e *Encoder) PutNull(tag Tag) {
 // matter.js has no fixed-width integer encoding: every TlvUInt*/TlvInt*
 // schema picks its length from the value (TlvCodec.getUIntTlvLength /
 // getIntTlvLength, packages/types/src/tlv/TlvNumber.ts:247-300 at
-// b25ed960), and chip's TLVReader accepts any width of the right sign
+// db91886c), and chip's TLVReader accepts any width of the right sign
 // (src/lib/core/TLVReader.cpp:240-255). A fixed width is a deliberate,
 // documented divergence for a controller that rejected a narrower one
 // (notes/parity/by_design.md L5-Apple-Width,
@@ -159,7 +159,7 @@ func (e *Encoder) PutUint(tag Tag, v uint64) {
 //
 // matter.js never encodes at a fixed width: its TlvUInt8/16/32/64 all
 // take the smallest length that fits the value
-// (packages/types/src/tlv/TlvNumber.ts:271-300 at b25ed960, through
+// (packages/types/src/tlv/TlvNumber.ts:271-300 at db91886c, through
 // TlvCodec.getUIntTlvLength). This helper exists for the documented
 // fixed-width divergences only (see [Encoder.PutUint16]); a spec field
 // has no width of its own on the wire. Wire example:
@@ -192,7 +192,7 @@ func (e *Encoder) PutUintWidth(tag Tag, v uint64, widthBytes int) {
 
 // PutInt16 writes an explicit 2-byte signed-int element regardless of
 // v's magnitude. matter.js encodes TlvInt16 at the smallest fitting
-// width (packages/types/src/tlv/TlvNumber.ts:253-257 at b25ed960); this
+// width (packages/types/src/tlv/TlvNumber.ts:253-257 at db91886c); this
 // fixed form is for the documented divergences only (see
 // [Encoder.PutUint16]) — [Encoder.PutInt] is the matter.js encoding.
 func (e *Encoder) PutInt16(tag Tag, v int16) {
@@ -202,7 +202,7 @@ func (e *Encoder) PutInt16(tag Tag, v int16) {
 
 // PutInt32 writes an explicit 4-byte signed-int element regardless of
 // v's magnitude. matter.js encodes TlvInt32 at the smallest fitting
-// width (TlvNumber.ts:259-263 at b25ed960); see [Encoder.PutInt16].
+// width (TlvNumber.ts:259-263 at db91886c); see [Encoder.PutInt16].
 func (e *Encoder) PutInt32(tag Tag, v int32) {
 	e.writeControlAndTag(TypeSignedInt4, tag)
 	e.buf = binary.LittleEndian.AppendUint32(e.buf, uint32(v)) //nolint:gosec // G115: bit-pattern preserved, two's-complement is the wire form; see #20
@@ -210,7 +210,7 @@ func (e *Encoder) PutInt32(tag Tag, v int32) {
 
 // PutInt64 writes an explicit 8-byte signed-int element regardless of
 // v's magnitude. matter.js encodes TlvInt64 at the smallest fitting
-// width (TlvNumber.ts:265-269 at b25ed960); see [Encoder.PutInt16].
+// width (TlvNumber.ts:265-269 at db91886c); see [Encoder.PutInt16].
 func (e *Encoder) PutInt64(tag Tag, v int64) {
 	e.writeControlAndTag(TypeSignedInt8, tag)
 	e.buf = binary.LittleEndian.AppendUint64(e.buf, uint64(v)) //nolint:gosec // G115: bit-pattern preserved, two's-complement is the wire form; see #20
@@ -389,7 +389,7 @@ func (e *Encoder) PutUTF8Bounded(tag Tag, s string, maxBytes int) {
 // PutInt8Bounded writes a signed-int element at the smallest fitting
 // width, as matter.js's nullable schema does (TlvNullable.ts wraps
 // the TlvNumber schema, whose length provider picks the width from the
-// value, TlvNumber.ts:247-300 at b25ed960). Returns
+// value, TlvNumber.ts:247-300 at db91886c). Returns
 // [ErrInt8NullableSentinel] when v equals the Matter §6.6.4.5 Table 26
 // nullable-int8 sentinel (−128 / 0x80). Callers on a nullable int8
 // attribute must encode null via [Encoder.PutNull] when the intended
@@ -409,7 +409,7 @@ func (e *Encoder) PutInt8Bounded(tag Tag, v int8) error {
 // PutInt16Bounded writes a signed-int element at the smallest fitting
 // width, as matter.js's nullable schema does (TlvNullable.ts wraps
 // the TlvNumber schema, whose length provider picks the width from the
-// value, TlvNumber.ts:247-300 at b25ed960). Returns
+// value, TlvNumber.ts:247-300 at db91886c). Returns
 // [ErrInt16NullableSentinel] when v equals the Matter §6.6.4.5 Table 26
 // nullable-int16 sentinel (−32768 / 0x8000). See [Encoder.PutInt8Bounded]
 // for the encoding rationale.
@@ -427,7 +427,7 @@ func (e *Encoder) PutInt16Bounded(tag Tag, v int16) error {
 // PutInt32Bounded writes a signed-int element at the smallest fitting
 // width, as matter.js's nullable schema does (TlvNullable.ts wraps
 // the TlvNumber schema, whose length provider picks the width from the
-// value, TlvNumber.ts:247-300 at b25ed960). Returns
+// value, TlvNumber.ts:247-300 at db91886c). Returns
 // [ErrInt32NullableSentinel] when v equals the Matter §6.6.4.5 Table 26
 // nullable-int32 sentinel (−2147483648 / 0x80000000). See
 // [Encoder.PutInt8Bounded] for the encoding rationale.
@@ -445,7 +445,7 @@ func (e *Encoder) PutInt32Bounded(tag Tag, v int32) error {
 // PutUint8Bounded writes a unsigned-int element at the smallest fitting
 // width, as matter.js's nullable schema does (TlvNullable.ts wraps
 // the TlvNumber schema, whose length provider picks the width from the
-// value, TlvNumber.ts:247-300 at b25ed960). Returns
+// value, TlvNumber.ts:247-300 at db91886c). Returns
 // [ErrUint8NullableSentinel] when v equals 0xFF, the Matter §6.6.4.5
 // Table 26 nullable-uint8 sentinel. Callers on a nullable uint8
 // attribute (e.g. NullableEnum8, occupancy percentage) must encode
@@ -454,7 +454,7 @@ func (e *Encoder) PutInt32Bounded(tag Tag, v int32) error {
 // interpret the field as null on read.
 //
 // Mirrors matter.js packages/types/src/tlv/TlvNullable.ts:37-44 at
-// b25ed960 — NullableSchema shrinks max from baseTypeMax to
+// db91886c — NullableSchema shrinks max from baseTypeMax to
 // baseTypeMax-1 for nullable unsigned types.
 func (e *Encoder) PutUint8Bounded(tag Tag, v uint8) error {
 	if v == 0xFF {
@@ -467,13 +467,13 @@ func (e *Encoder) PutUint8Bounded(tag Tag, v uint8) error {
 // PutUint16Bounded writes a unsigned-int element at the smallest fitting
 // width, as matter.js's nullable schema does (TlvNullable.ts wraps
 // the TlvNumber schema, whose length provider picks the width from the
-// value, TlvNumber.ts:247-300 at b25ed960). Returns
+// value, TlvNumber.ts:247-300 at db91886c). Returns
 // [ErrUint16NullableSentinel] when v equals 0xFFFF, the Matter
 // §6.6.4.5 Table 26 nullable-uint16 sentinel. See
 // [Encoder.PutUint8Bounded] for the encoding rationale.
 //
 // Mirrors matter.js packages/types/src/tlv/TlvNullable.ts:37-44 at
-// b25ed960 (the nullable uint16's max is 0xFFFE).
+// db91886c (the nullable uint16's max is 0xFFFE).
 func (e *Encoder) PutUint16Bounded(tag Tag, v uint16) error {
 	if v == 0xFFFF {
 		return fmt.Errorf("%w: uint16 sentinel 0xFFFF must be encoded as null", ErrUint16NullableSentinel)
@@ -485,13 +485,13 @@ func (e *Encoder) PutUint16Bounded(tag Tag, v uint16) error {
 // PutUint32Bounded writes a unsigned-int element at the smallest fitting
 // width, as matter.js's nullable schema does (TlvNullable.ts wraps
 // the TlvNumber schema, whose length provider picks the width from the
-// value, TlvNumber.ts:247-300 at b25ed960). Returns
+// value, TlvNumber.ts:247-300 at db91886c). Returns
 // [ErrUint32NullableSentinel] when v equals 0xFFFFFFFF, the Matter
 // §6.6.4.5 Table 26 nullable-uint32 sentinel. See
 // [Encoder.PutUint8Bounded] for the encoding rationale.
 //
 // Mirrors matter.js packages/types/src/tlv/TlvNullable.ts:37-44 at
-// b25ed960 (the nullable uint32's max is 0xFFFFFFFE).
+// db91886c (the nullable uint32's max is 0xFFFFFFFE).
 func (e *Encoder) PutUint32Bounded(tag Tag, v uint32) error {
 	if v == 0xFFFFFFFF {
 		return fmt.Errorf("%w: uint32 sentinel 0xFFFFFFFF must be encoded as null", ErrUint32NullableSentinel)
@@ -503,13 +503,13 @@ func (e *Encoder) PutUint32Bounded(tag Tag, v uint32) error {
 // PutUint64Bounded writes a unsigned-int element at the smallest fitting
 // width, as matter.js's nullable schema does (TlvNullable.ts wraps
 // the TlvNumber schema, whose length provider picks the width from the
-// value, TlvNumber.ts:247-300 at b25ed960). Returns
+// value, TlvNumber.ts:247-300 at db91886c). Returns
 // [ErrUint64NullableSentinel] when v equals 0xFFFFFFFFFFFFFFFF, the
 // Matter §6.6.4.5 Table 26 nullable-uint64 sentinel. See
 // [Encoder.PutUint8Bounded] for the encoding rationale.
 //
 // Mirrors matter.js packages/types/src/tlv/TlvNullable.ts:37-44 at
-// b25ed960 (the nullable uint64's max is 0xFFFFFFFFFFFFFFFE).
+// db91886c (the nullable uint64's max is 0xFFFFFFFFFFFFFFFE).
 func (e *Encoder) PutUint64Bounded(tag Tag, v uint64) error {
 	if v == 0xFFFFFFFFFFFFFFFF {
 		return fmt.Errorf("%w: uint64 sentinel 0xFFFFFFFFFFFFFFFF must be encoded as null", ErrUint64NullableSentinel)

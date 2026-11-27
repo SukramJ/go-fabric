@@ -65,7 +65,7 @@ func queuedWithHeldQuery(t *testing.T, onFailed func(r *otaRig, p softwareupdate
 // item 5; C-17): the update manager's NodeDeleted, run on its hand-off
 // goroutine for a node the registry deleted with an update queued, ends
 // the update without an event (#forgetPeer, SoftwareUpdateManager.ts:312-341
-// at b25ed960), so the hand-off reaches no host OnUpdateFailed — one that
+// at db91886c), so the hand-off reaches no host OnUpdateFailed — one that
 // would block or close the controller is never called — and Close returns.
 // Before C-17 NodeDeleted reported the update failed from the hand-off,
 // and these were two cases: a blocking callback and one that closes the
@@ -95,7 +95,7 @@ func TestCloseAfterADeletedNodeWithAQueuedUpdate(t *testing.T) {
 // returns, and so does the Close it called and the RemoveConsent that
 // reported the failure: a change's events run on its own caller, after its
 // queue run, never on an announcement goroutine Close waits for
-// (#mutate, SoftwareUpdateManager.ts:539-561 at b25ed960).
+// (#mutate, SoftwareUpdateManager.ts:539-561 at db91886c).
 func TestOnUpdateFailedMayCloseTheController(t *testing.T) {
 	t.Parallel()
 	closed := make(chan error, 1)

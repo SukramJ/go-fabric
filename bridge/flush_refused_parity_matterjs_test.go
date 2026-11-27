@@ -4,7 +4,7 @@
 package bridge
 
 // Ports by meaning of matter.js
-// packages/node/test/node/ServerSubscriptionTest.ts at b25ed960:
+// packages/node/test/node/ServerSubscriptionTest.ts at db91886c:
 // "terminates when the peer refuses a report sent during a shutdown close"
 // (:279-305). matter.js marks the subscription terminated when the peer
 // answers a report with an error status, "even during a shutdown close"

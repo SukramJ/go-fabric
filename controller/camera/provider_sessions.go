@@ -534,8 +534,10 @@ func (p *providerSessions) endWithinBudget(ctx context.Context, cleanup func(con
 // run: the camera sends it on the same CASE session right after the
 // response, and the served requestor answers NOT_FOUND to an Answer for a
 // session it does not hold (cluster/camera Requestor.findSessionStrict;
-// matter.js packages/node/src/behaviors/web-rtc-transport-requestor/WebRtcTransportRequestorServer.ts:170-182
-// at db021da0). matterjs-server registers the session after the invoke
+// matter.js packages/node/src/behaviors/web-rtc-transport-requestor/WebRtcTransportRequestorServer.ts:306-337
+// at db91886c). The registration at the arrival is why the controller
+// takes no Requestor.HoldUnknownSignals hold (notes/parity/by_design.md,
+// BD-Matter-Camera-RequestorRegistersAtArrival). matterjs-server registers the session after the invoke
 // resolves, and the local requestor accepts the camera's signalling from
 // then on (packages/ws-controller/src/camera/sessionRegistry.ts:284-296 at
 // 0bd06f2); on Node the response's continuation runs to its end before the

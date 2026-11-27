@@ -15,7 +15,7 @@ import (
 // the schedule refreshes: "Leaves a late Sigma2 time to arrive and
 // tolerates a single lost transmission before the next refresh." Mirrors
 // matter.js packages/protocol/src/peer/InitialContactSchedule.ts:14-18 at
-// b25ed960 (TRANSMISSIONS_PER_REFRESH = 3).
+// db91886c (TRANSMISSIONS_PER_REFRESH = 3).
 const transmissionsPerRefresh = 3
 
 // contactOutcome is how the schedule continues after [contactAttempt.fail]
@@ -51,7 +51,7 @@ const (
 // attempt makes the next one refresh; every other end of an attempt — the
 // peer answered, a kick restart, another error, an abort — returns the
 // schedule to the identical phase. Mirrors matter.js
-// InitialContactSchedule (InitialContactSchedule.ts:20-177 at b25ed960).
+// InitialContactSchedule (InitialContactSchedule.ts:20-177 at db91886c).
 // Why, in the words of matter.js #4794's commit message (cf651e6a), not
 // of the source: "a fresh Sigma1 is cheap and CHIP never sends one more
 // than MRP_MAX_TRANSMISSIONS times".

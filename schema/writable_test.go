@@ -61,9 +61,9 @@ func loadWritableSnapshot(t *testing.T) *snapshotSchema {
 }
 
 // effectiveWritable mirrors matter.js limits.writable
-// (packages/protocol/src/action/server/AccessControl.ts:523 at b25ed960,
+// (packages/protocol/src/action/server/AccessControl.ts:523 at db91886c,
 // `access.writable && !fixed`) on an attribute's effective layer:
-// Access.writable (packages/model/src/aspects/Access.ts:44-46 at b25ed960,
+// Access.writable (packages/model/src/aspects/Access.ts:44-46 at db91886c,
 // `!!this.rw && this.rw !== Access.Rw.Read`) — "R" or none is read-only,
 // "RW" and the optional-write "R[W]" are writable — and not the fixed
 // quality.
@@ -204,7 +204,7 @@ func TestReadOnlyDriftSeesAnInheritedAttribute(t *testing.T) {
 		t.Errorf("a table without the cluster: %q, want its two read-only attributes missing", d)
 	}
 	// A writable attribute with the fixed quality is read-only
-	// (AccessControl.ts:523 at b25ed960, `access.writable && !fixed`).
+	// (AccessControl.ts:523 at db91886c, `access.writable && !fixed`).
 	withFixed := []snapshotCluster{{ID: 0x1234, Name: "Derived", Attributes: append(slices.Clone(clusters[0].Attributes), fixed)}}
 	d = readOnlyDrift(withFixed, set(0x0000, 0x0001))
 	if len(d) != 1 || !strings.Contains(d[0], "attr 0x0004 is read-only in matter.js but missing") {

@@ -26,13 +26,13 @@ import (
 )
 
 // The image store: the storage half of matter.js's DclOtaUpdateService
-// (packages/protocol/src/dcl/DclOtaUpdateService.ts at b25ed960) over the
+// (packages/protocol/src/dcl/DclOtaUpdateService.ts at db91886c) over the
 // ledger lookups of controller/dcl (dcl.OTAVersions) — stored images by
 // vendor, product, mode and version, the update check over stored images
 // and the ledgers, and the download of a ledger's image into the store.
 
 // Mode is the storage mode of an image — OtaStorageMode
-// (DclOtaUpdateService.ts:41 at b25ed960): "prod" and "test" images came
+// (DclOtaUpdateService.ts:41 at db91886c): "prod" and "test" images came
 // from the production and test-net ledgers, "local" ones from the host.
 type Mode string
 
@@ -44,7 +44,7 @@ const (
 )
 
 // Sources of an update — OtaUpdateSource (DclOtaUpdateService.ts:39 at
-// b25ed960).
+// db91886c).
 const (
 	SourceLocal = "local"
 	SourceProd  = dcl.SourceProduction
@@ -52,14 +52,14 @@ const (
 )
 
 // ErrOTA is an update check, store or download that failed — matter.js
-// OtaUpdateError (DclOtaUpdateService.ts:33-37 at b25ed960).
+// OtaUpdateError (DclOtaUpdateService.ts:33-37 at db91886c).
 var ErrOTA = errors.New("softwareupdate: OTA update failed")
 
 // StoredImage is a stored image's entry — DclOtaUpdateService.OtaUpdateListEntry
-// (DclOtaUpdateService.ts:1319-1331 at b25ed960).
+// (DclOtaUpdateService.ts:1319-1331 at db91886c).
 type StoredImage struct {
 	// Filename is "<vendor hex>.<product hex>.<mode>.<version>"
-	// (DclOtaUpdateService.ts:555-557 at b25ed960).
+	// (DclOtaUpdateService.ts:555-557 at db91886c).
 	Filename              string
 	VendorID              uint16
 	ProductID             uint16
@@ -76,22 +76,22 @@ type StoredImage struct {
 }
 
 // FindOptions filter [Images.Find] — DclOtaUpdateService.FindOptions
-// (DclOtaUpdateService.ts:1333-1339 at b25ed960). A nil field matches
+// (DclOtaUpdateService.ts:1333-1339 at db91886c). A nil field matches
 // anything.
 type FindOptions struct {
 	VendorID, ProductID *uint16
 	// IsProduction, without Mode, keeps prod images (true) or the others
-	// (false) (DclOtaUpdateService.ts:1113-1116 at b25ed960).
+	// (false) (DclOtaUpdateService.ts:1113-1116 at db91886c).
 	IsProduction *bool
 	Mode         Mode
 	// CurrentVersion keeps the images whose applicable range holds it
-	// (#checkEntry, DclOtaUpdateService.ts:1138-1174 at b25ed960).
+	// (#checkEntry, DclOtaUpdateService.ts:1138-1174 at db91886c).
 	CurrentVersion *uint32
 }
 
 // UpdateInfo is an applicable update — matter.js
 // DeviceSoftwareVersionModelDclSchemaWithSource (DclOtaUpdateService.ts:43-45
-// at b25ed960): a ledger record or a stored image, with the source it came
+// at db91886c): a ledger record or a stored image, with the source it came
 // from.
 type UpdateInfo struct {
 	VendorID, ProductID          uint16
@@ -214,12 +214,12 @@ func (m *MemoryBlobs) List(context.Context) ([]string, error) {
 	return out, nil
 }
 
-// filenamePattern is OTA_FILENAME_REGEX (DclOtaUpdateService.ts:61 at b25ed960),
+// filenamePattern is OTA_FILENAME_REGEX (DclOtaUpdateService.ts:61 at db91886c),
 // case-insensitive as its `i` flag makes it (W4-ctlint-08).
 var filenamePattern = regexp.MustCompile(`(?i)^[0-9a-f]+[./][0-9a-f]+[./](?:prod|test|local)[./]\d+$`)
 
 // metaSuffix names an image's recorded specification version (the
-// "meta" context of DclOtaUpdateService.ts:63-67 at b25ed960).
+// "meta" context of DclOtaUpdateService.ts:63-67 at db91886c).
 const metaSuffix = ".meta"
 
 // originSuffix names a stored image's provenance record, written when the
@@ -323,7 +323,7 @@ type ImagesConfig struct {
 	Blobs Blobs
 	// Ledger asks the production and test-net ledgers; nil asks none, as
 	// the service's offline option (DclOtaUpdateService.ts:1305-1316 at
-	// b25ed960): only stored images are found, and nothing is downloaded. Its MaxImageSize bounds every
+	// db91886c): only stored images are found, and nothing is downloaded. Its MaxImageSize bounds every
 	// download of the store ([Images.DownloadUpdate],
 	// [Images.UpdateInfoFromURL]) at [dcl.DefaultMaxImageSize] when it
 	// sets none. DownloadUpdate holds the image in memory until it is
@@ -503,13 +503,13 @@ func (i *Images) servable(ctx context.Context, name string) bool {
 	return i.allowUnverified || i.vouched(ctx, name)
 }
 
-// fileName is #fileName (DclOtaUpdateService.ts:555-557 at b25ed960).
+// fileName is #fileName (DclOtaUpdateService.ts:555-557 at db91886c).
 func fileName(vid, pid uint16, mode Mode, version uint32) string {
 	return strconv.FormatUint(uint64(vid), 16) + "." + strconv.FormatUint(uint64(pid), 16) + "." + string(mode) + "." + strconv.FormatUint(uint64(version), 10)
 }
 
 // Store stores an image — DclOtaUpdateService.store
-// (DclOtaUpdateService.ts:562-616 at b25ed960): it is written under its vendor, product, mode and version, read back and
+// (DclOtaUpdateService.ts:562-616 at db91886c): it is written under its vendor, product, mode and version, read back and
 // checked against its header (and against info's vendor, product and
 // version when given), the specification version recorded; a failed check
 // removes it. Store and [Images.DownloadUpdate] of one file name run one
@@ -568,14 +568,14 @@ func (i *Images) store(ctx context.Context, name string, image []byte, info *Upd
 // storeValidation is how Store verifies the whole file before it is kept:
 // the ledger's checksum and file size when the record carries them, as
 // matter.js #verifyUpdate passes them to OtaImageReader.file
-// (#verifyUpdate, DclOtaUpdateService.ts:409-429 at b25ed960, called
-// from store at DclOtaUpdateService.ts:594-595 at b25ed960;
-// OtaImageReader.file, OtaImageReader.ts:65-110 at b25ed960); otherwise
-// the payload size (OtaImageReader.ts:246-260 at b25ed960) and, ahead of
+// (#verifyUpdate, DclOtaUpdateService.ts:409-429 at db91886c, called
+// from store at DclOtaUpdateService.ts:594-595 at db91886c;
+// OtaImageReader.file, OtaImageReader.ts:65-110 at db91886c); otherwise
+// the payload size (OtaImageReader.ts:246-260 at db91886c) and, ahead of
 // matter.js, the header's payload digest, which matter.js's store check
-// leaves to the extraction (OtaImageReader.ts:246-249 at b25ed960;
-// extractPayload, OtaImageReader.ts:116-127 at b25ed960, checks it in
-// #extractAndValidatePayload, OtaImageReader.ts:282-332 at b25ed960),
+// leaves to the extraction (OtaImageReader.ts:246-249 at db91886c;
+// extractPayload, OtaImageReader.ts:116-127 at db91886c, checks it in
+// #extractAndValidatePayload, OtaImageReader.ts:282-332 at db91886c),
 // so a truncated or corrupted local image is refused before it is offered
 // over BDX (W4-ctlint-03, BD-Matter-OtaImageDigestAtStore).
 func storeValidation(info *UpdateInfo) otaimage.FileOptions {
@@ -599,9 +599,9 @@ func storeValidation(info *UpdateInfo) otaimage.FileOptions {
 // recordMeta records the specification version of the stored image name;
 // 0 removes the record. The record is optional, so a failure is logged and
 // fails nothing. Mirrors matter.js #recordMetadata
-// (DclOtaUpdateService.ts:489-512 at b25ed960); an unset value is 0 here,
+// (DclOtaUpdateService.ts:489-512 at db91886c); an unset value is 0 here,
 // the one invalid value a uint32 can carry
-// (isSpecificationVersion, DclOtaUpdateService.ts:73-75 at b25ed960).
+// (isSpecificationVersion, DclOtaUpdateService.ts:73-75 at db91886c).
 func (i *Images) recordMeta(ctx context.Context, name string, spec uint32) {
 	var err error
 	if spec == 0 {
@@ -617,7 +617,7 @@ func (i *Images) recordMeta(ctx context.Context, name string, spec uint32) {
 // readMeta is the recorded specification version of the stored image
 // name, 0 when none is recorded. A record that cannot be read or holds no
 // valid version is removed, so it is reported once. Mirrors matter.js
-// #readMetadata (DclOtaUpdateService.ts:514-545 at b25ed960).
+// #readMetadata (DclOtaUpdateService.ts:514-545 at db91886c).
 func (i *Images) readMeta(ctx context.Context, name string) uint32 {
 	m, err := i.blobs.Get(ctx, name+metaSuffix)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -639,7 +639,7 @@ func (i *Images) readMeta(ctx context.Context, name string) uint32 {
 }
 
 // verifyHeader is #verifyUpdate's header check (DclOtaUpdateService.ts:409-445
-// at b25ed960).
+// at db91886c).
 func verifyHeader(h otaimage.Header, info UpdateInfo) error {
 	switch {
 	case h.VendorID != info.VendorID:
@@ -653,7 +653,7 @@ func verifyHeader(h otaimage.Header, info UpdateInfo) error {
 }
 
 // entry reads a stored image's entry from its header
-// (#checkEntry, DclOtaUpdateService.ts:1138-1174 at b25ed960).
+// (#checkEntry, DclOtaUpdateService.ts:1138-1174 at db91886c).
 func (i *Images) entry(ctx context.Context, name string) (StoredImage, bool) {
 	parts := strings.Split(name, ".")
 	if len(parts) != 4 {
@@ -673,7 +673,7 @@ func (i *Images) entry(ctx context.Context, name string) (StoredImage, bool) {
 		Filename: name, VendorID: h.VendorID, ProductID: h.ProductID, SoftwareVersion: h.SoftwareVersion,
 		SoftwareVersionString: h.SoftwareVersionString, MinApplicable: h.MinApplicableSoftwareVersion,
 		// A host-chosen "FFF1.8000.PROD.3" is the prod image: the pattern
-		// admits any case (DclOtaUpdateService.ts:61 at b25ed960), the Mode
+		// admits any case (DclOtaUpdateService.ts:61 at db91886c), the Mode
 		// constants are lower case.
 		MaxApplicable: h.MaxApplicableSoftwareVersion, Mode: Mode(strings.ToLower(parts[2])), Size: int(b.Size()), //nolint:gosec // a stored file's size
 
@@ -684,7 +684,7 @@ func (i *Images) entry(ctx context.Context, name string) (StoredImage, bool) {
 
 // Find lists the stored images opts selects, by mode (prod, test, local),
 // vendor, product and version — DclOtaUpdateService.find
-// (DclOtaUpdateService.ts:1017-1174 at b25ed960).
+// (DclOtaUpdateService.ts:1017-1174 at db91886c).
 func (i *Images) Find(ctx context.Context, opts FindOptions) []StoredImage {
 	names, err := i.blobs.List(ctx)
 	if err != nil {
@@ -723,7 +723,7 @@ func (i *Images) Find(ctx context.Context, opts FindOptions) []StoredImage {
 }
 
 // DeleteOptions select the stored images [Images.Delete] removes —
-// delete's options (DclOtaUpdateService.ts:1208-1215 at b25ed960).
+// delete's options (DclOtaUpdateService.ts:1208-1215 at db91886c).
 type DeleteOptions struct {
 	// Filename names one stored image ("fff1.8000.prod.3"); the other
 	// fields are then not read.
@@ -736,17 +736,17 @@ type DeleteOptions struct {
 	Mode Mode
 	// IsProduction, without Mode, is ModeProd (true) or ModeTest (false),
 	// matter.js's deprecated isProduction (DclOtaUpdateService.ts:1224-1227
-	// at b25ed960).
+	// at db91886c).
 	IsProduction *bool
 }
 
 // Delete removes the stored images opts selects, each with its recorded
 // specification version, and returns how many it removed — matter.js
 // DclOtaUpdateService.delete (DclOtaUpdateService.ts:1208-1295 at
-// b25ed960). A filename that is not an OTA filename is refused; one that
+// db91886c). A filename that is not an OTA filename is refused; one that
 // names no stored image removes nothing and is no error
-// (DclOtaUpdateService.ts:1229-1242 at b25ed960). Without a filename the
-// vendor is required (DclOtaUpdateService.ts:1266-1268 at b25ed960). A ProductID narrows the selection with or without
+// (DclOtaUpdateService.ts:1229-1242 at db91886c). Without a filename the
+// vendor is required (DclOtaUpdateService.ts:1266-1268 at db91886c). A ProductID narrows the selection with or without
 // a mode, where matter.js narrows by product only together with a mode
 // (BD-Matter-OtaImages-DeleteProductWithoutMode).
 func (i *Images) Delete(ctx context.Context, opts DeleteOptions) (int, error) {
@@ -812,7 +812,7 @@ func deleteSelects(name string, vid, pid *uint16, mode Mode) bool {
 }
 
 // Open opens the stored image named filename for a BDX transfer
-// (fileDesignatorForUpdate, DclOtaUpdateService.ts:1177-1192 at b25ed960).
+// (fileDesignatorForUpdate, DclOtaUpdateService.ts:1177-1192 at db91886c).
 // A name that is not an OTA filename is refused as matter.js refuses it and, as no stored image has
 // it, wraps fs.ErrNotExist; a missing image wraps the Blobs error.
 func (i *Images) Open(ctx context.Context, filename string) (bdx.Blob, error) {
@@ -854,10 +854,10 @@ type CheckOptions struct {
 // versions a stored image before a ledger one, or the target version
 // alone.
 //
-// Mirrors matter.js packages/protocol/src/dcl/DclOtaUpdateService.ts:299-383 at b25ed960
+// Mirrors matter.js packages/protocol/src/dcl/DclOtaUpdateService.ts:299-383 at db91886c
 // (checkForUpdate); the stored images are selected as
 // [Images.applicable] selects them, called as at
-// DclOtaUpdateService.ts:318-324 at b25ed960.
+// DclOtaUpdateService.ts:318-324 at db91886c.
 func (i *Images) CheckForUpdate(ctx context.Context, vid, pid uint16, current uint32, opts CheckOptions) (UpdateInfo, bool) {
 	var found []UpdateInfo
 	if opts.IncludeStored {
@@ -918,9 +918,9 @@ func (i *Images) CheckForUpdate(ctx context.Context, vid, pid uint16, current ui
 // the image (ImagesConfig.AllowUnverifiedLedgerImages) is Go's own
 // condition.
 //
-// Mirrors matter.js packages/protocol/src/dcl/DclOtaUpdateService.ts:394-407 at b25ed960
+// Mirrors matter.js packages/protocol/src/dcl/DclOtaUpdateService.ts:394-407 at db91886c
 // (findApplicable; STORED_MODE_PRECEDENCE at
-// DclOtaUpdateService.ts:59 at b25ed960).
+// DclOtaUpdateService.ts:59 at db91886c).
 func (i *Images) applicable(ctx context.Context, vid, pid uint16, current uint32, includeNonProduction bool) []StoredImage {
 	var out []StoredImage
 	for _, st := range i.Find(ctx, FindOptions{VendorID: &vid, ProductID: &pid, CurrentVersion: &current}) {
@@ -941,7 +941,7 @@ func (i *Images) applicable(ctx context.Context, vid, pid uint16, current uint32
 }
 
 // storedModePrecedence is STORED_MODE_PRECEDENCE: local 0, test 1, prod 2
-// (DclOtaUpdateService.ts:59 at b25ed960).
+// (DclOtaUpdateService.ts:59 at db91886c).
 func storedModePrecedence(mode Mode) int {
 	switch mode {
 	case ModeLocal:
@@ -975,7 +975,7 @@ func modeOf(source string) Mode {
 }
 
 // storedCheck is what the check of a stored image found —
-// #checkStoredImage's verdict (DclOtaUpdateService.ts:450-472 at b25ed960).
+// #checkStoredImage's verdict (DclOtaUpdateService.ts:450-472 at db91886c).
 type storedCheck int
 
 const (
@@ -989,7 +989,7 @@ const (
 
 // checkStored validates the stored image b (opened with getErr) against info
 // as Store validates a new one — #checkStoredImage over #verifyUpdate
-// (DclOtaUpdateService.ts:409-472 at b25ed960): the ledger's whole-file checksum and size when info carries
+// (DclOtaUpdateService.ts:409-472 at db91886c): the ledger's whole-file checksum and size when info carries
 // them, the header's ids and version.
 func (i *Images) checkStored(name string, b bdx.Blob, getErr error, info UpdateInfo) storedCheck {
 	if getErr != nil {
@@ -1009,7 +1009,7 @@ func (i *Images) checkStored(name string, b bdx.Blob, getErr error, info UpdateI
 
 // DownloadUpdate makes info's image available in the store and returns
 // its filename — downloadUpdate (DclOtaUpdateService.ts:636-731 at
-// b25ed960). A stored image that validates is used, unless force asks for
+// db91886c). A stored image that validates is used, unless force asks for
 // a new download, and the specification version info carries is recorded
 // for it; a stored image that fails validation is removed. Online a
 // stored image that cannot be read, or one force replaces, is removed
@@ -1086,7 +1086,7 @@ func (i *Images) downloadUpdate(ctx context.Context, info UpdateInfo, force bool
 		return name, nil
 	}
 	// Offline nothing can replace the image, so only one shown to be
-	// invalid is removed (DclOtaUpdateService.ts:667-672 at b25ed960).
+	// invalid is removed (DclOtaUpdateService.ts:667-672 at db91886c).
 	keep := exists && i.offline && check != storedInvalid
 	if exists && !keep {
 		_ = i.blobs.Delete(ctx, name)
@@ -1245,7 +1245,7 @@ func (h *headerWriter) Write(p []byte) (int, error) {
 
 // LocalImageOptions are the fields of a local image's [UpdateInfo] its
 // header may not carry — updateInfoFromStream's options
-// (DclOtaUpdateService.ts:862-884 at b25ed960).
+// (DclOtaUpdateService.ts:862-884 at db91886c).
 type LocalImageOptions struct {
 	// MinApplicable is used when the header states none; nil is 0.
 	MinApplicable *uint32
@@ -1259,7 +1259,7 @@ type LocalImageOptions struct {
 
 // UpdateInfoFromImage reads the header of the OTA image r and returns its
 // update, of [SourceLocal], for [Images.Store] with [ModeLocal] — matter.js
-// updateInfoFromStream (DclOtaUpdateService.ts:862-922 at b25ed960): the
+// updateInfoFromStream (DclOtaUpdateService.ts:862-922 at db91886c): the
 // header's ids, version and applicable range, opts where the header states
 // none.
 func UpdateInfoFromImage(r io.Reader, opts LocalImageOptions) (UpdateInfo, error) {
@@ -1293,7 +1293,7 @@ func UpdateInfoFromImage(r io.Reader, opts LocalImageOptions) (UpdateInfo, error
 // UpdateInfoFromURL reads the header of the OTA image at the HTTP(S) URL
 // fileURL and returns its update, of [SourceLocal]; [Images.DownloadUpdate]
 // then downloads it from that URL into [ModeLocal] — matter.js
-// createUpdateInfoFromFile (DclOtaUpdateService.ts:945-1002 at b25ed960).
+// createUpdateInfoFromFile (DclOtaUpdateService.ts:945-1002 at db91886c).
 // The download ends once the header's bytes are in (at most
 // [otaimage.MaxHeaderSize] and the 16-byte prefix); the rest of the image
 // is not fetched.

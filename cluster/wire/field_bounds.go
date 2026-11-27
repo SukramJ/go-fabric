@@ -30,7 +30,7 @@ func (e *fieldError) MatterStatusCode() im.StatusCode { return e.status }
 // fieldTypeError refuses a field whose TLV type is not the one the
 // command states: INVALID_ACTION, matter.js's
 // ValidationDatatypeMismatchError
-// (packages/types/src/common/ValidationError.ts:35-38 at b25ed960).
+// (packages/types/src/common/ValidationError.ts:35-38 at db91886c).
 func fieldTypeError(el tlv.Element, sentinel error, want string) error {
 	return &fieldError{sentinel: sentinel, status: im.StatusInvalidAction, reason: fmt.Sprintf("field %d has TLV type 0x%02X, want %s", el.Tag.Number, uint8(el.Type), want)}
 }
@@ -38,7 +38,7 @@ func fieldTypeError(el tlv.Element, sentinel error, want string) error {
 // fieldUint is an unsigned integer field of at most maxValue. A value
 // above it is refused with CONSTRAINT_ERROR rather than masked into a
 // different, valid value — matter.js packages/types/src/tlv/TlvNumber.ts:145-156
-// at b25ed960 (validate: a non-number is ValidationDatatypeMismatchError,
+// at db91886c (validate: a non-number is ValidationDatatypeMismatchError,
 // one out of bounds ValidationOutOfBoundsError, a ValidationError =
 // CONSTRAINT_ERROR); the same rule the Interaction Model applies to its
 // path fields (W3-clucore-08).

@@ -17,7 +17,6 @@ import (
 	mattercore "thingfabric.dev/go-fabric/cluster/core"
 	closurecontroldef "thingfabric.dev/go-fabric/cluster/spec/closurecontrol"
 	thermostatdef "thingfabric.dev/go-fabric/cluster/spec/thermostat"
-	"thingfabric.dev/go-fabric/cluster/thermo"
 	"thingfabric.dev/go-fabric/device"
 	"thingfabric.dev/go-fabric/endpoint"
 	"thingfabric.dev/go-fabric/node"
@@ -133,12 +132,9 @@ func bridged(t *testing.T, n *node.Node, key string) *endpoint.Endpoint {
 	return nil
 }
 
-// msch is the Thermostat MatterScheduleConfiguration feature, its register
-// row the extension that enables it (thermo.Ahead).
-var (
-	msch    = thermostatdef.FeatureMatterScheduleConfiguration
-	mschRow = thermo.Ahead.Row(surface.KindFeature, uint32(thermostatdef.FeatureMatterScheduleConfiguration))
-)
+// msch is the Thermostat MatterScheduleConfiguration feature: the lever
+// of the surface-change tests, declared on a thermostat between two runs.
+var msch = thermostatdef.FeatureMatterScheduleConfiguration
 
 // thermostat builds a heating thermostat with key, and MSCH with its
 // schedule attributes when withSchedules is set.
@@ -189,8 +185,30 @@ func TestSurfaceStableAcrossRestarts(t *testing.T) {
 	}
 }
 
-// TestSurfaceChangeAcrossARestart: enabling the MSCH extension on the
-// thermostat between two runs raises its ConfigurationVersion and the
+// TestRetiredExtensionOnTheNodeOnly: a host that still names the retired
+// BD-chip-Thermostat-Schedules on the node (Config.Surface) but not on a
+// device, or the other way round, composes — the digest leaves a retired
+// ID out — and the node's report does not list it; a restart after the
+// host drops the ID announces no change (owner decisions 731, 740).
+func TestRetiredExtensionOnTheNodeOnly(t *testing.T) {
+	db := openDB(t, filepath.Join(t.TempDir(), "retired.db"))
+	named := surface.Policies{Extensions: surface.NewExtensions("BD-chip-Thermostat-Schedules")}
+	first := startRun(t, db, named, nil, thermostat(t, "thermo", true, nil))
+	if rep := first.n.Surface(); rep.Extensions != nil {
+		t.Errorf("report extensions %v, want none", rep.Extensions)
+	}
+	first.stop(t)
+	again := startRun(t, db, surface.Policies{}, nil, thermostat(t, "thermo", true, &named))
+	if got := again.store.take(); len(got) != 0 {
+		t.Errorf("dropping the retired ID wrote %v", got)
+	}
+	if rootVersion(t, again.n) != 1 || len(again.n.Surface().Changed) != 0 {
+		t.Error("dropping the retired ID announced a change")
+	}
+}
+
+// TestSurfaceChangeAcrossARestart: declaring MSCH on the thermostat
+// between two runs raises its ConfigurationVersion and the
 // root's by one, not the light's; the report names the change — the
 // FeatureMap and the lists — and the versions persist, so a third run
 // without a change writes nothing and serves them.
@@ -198,7 +216,7 @@ func TestSurfaceChangeAcrossARestart(t *testing.T) {
 	db := openDB(t, filepath.Join(t.TempDir(), "change.db"))
 	startRun(t, db, surface.Policies{}, nil, light(t, "light", nil), thermostat(t, "thermo", false, nil)).stop(t)
 
-	p := surface.Policies{Extensions: surface.NewExtensions(mschRow)}
+	var p surface.Policies // MSCH composes under the zero value (matter.js released it, #5044)
 	run := startRun(t, db, p, nil, light(t, "light", &p), thermostat(t, "thermo", true, &p))
 	if got := rootVersion(t, run.n); got != 2 {
 		t.Errorf("root ConfigurationVersion %d, want 2", got)
@@ -255,7 +273,7 @@ func TestSurfaceChangeAcrossARestart(t *testing.T) {
 // of the changed cluster, not of a cluster that did not change.
 func TestSurfaceChangeInProcess(t *testing.T) {
 	db := openDB(t, filepath.Join(t.TempDir(), "replace.db"))
-	p := surface.Policies{Extensions: surface.NewExtensions(mschRow)}
+	var p surface.Policies // MSCH composes under the zero value (matter.js released it, #5044)
 	run := startRun(t, db, p, nil, thermostat(t, "thermo", false, &p))
 	ep := bridged(t, run.n, "thermo")
 	const identify uint32 = 0x0003
@@ -294,7 +312,7 @@ func TestSurfaceChangeInProcess(t *testing.T) {
 func TestSurfaceTwoChangesRaiseTheRootOnce(t *testing.T) {
 	db := openDB(t, filepath.Join(t.TempDir(), "two.db"))
 	startRun(t, db, surface.Policies{}, nil, thermostat(t, "a", false, nil), thermostat(t, "b", false, nil)).stop(t)
-	p := surface.Policies{Extensions: surface.NewExtensions(mschRow)}
+	var p surface.Policies // MSCH composes under the zero value (matter.js released it, #5044)
 	run := startRun(t, db, p, nil, thermostat(t, "a", true, &p), thermostat(t, "b", true, &p))
 	if got := rootVersion(t, run.n); got != 2 {
 		t.Errorf("root ConfigurationVersion %d, want 2 (one raise for both)", got)

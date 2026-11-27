@@ -1,6 +1,6 @@
 {
   "source": "matter.js support/chip-testing/test/cert/TC-*.test.ts, listed by `git ls-tree` at commit; regenerate: MATTERJS_DIR=\u003cmatter.js checkout\u003e go test ./internal/chiptool/ -run TestCertifiabilityDocument -args -update-matterjs-cert-cases",
-  "commit": "b25ed9604f2825857b8de28a3c29cae8124a7e49",
+  "commit": "db91886cbe742f28d2d6ae513dfc33988436bf02",
   "cases": [
     "TC-ACT-3.2.test.ts",
     "TC-ALOGIN-12.2.test.ts",

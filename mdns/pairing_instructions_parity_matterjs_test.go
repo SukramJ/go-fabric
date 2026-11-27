@@ -15,9 +15,9 @@ import (
 // [mdns.CommissionableServiceConfig.Validate] against matter.js
 // #validatePairingInstructions
 // (packages/protocol/src/advertisement/mdns/CommissionableMdnsAdvertisement.ts
-// :106-135 at b25ed960), one case per throw and the accepted shapes
+// :106-135 at db91886c), one case per throw and the accepted shapes
 // between them. The bits are PairingHintBitmap's
-// (packages/protocol/src/advertisement/PairingHintBitmap.ts at b25ed960):
+// (packages/protocol/src/advertisement/PairingHintBitmap.ts at db91886c):
 // powerCycle 0, customInstruction 4, deviceManual 5, pressResetButton 6,
 // pressResetButtonForNumberOfSeconds 8, pressSetupButtonForNumberOfSeconds
 // 15. The throw for a hint object with every flag false (:110-112) has no

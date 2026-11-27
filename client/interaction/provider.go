@@ -26,7 +26,7 @@ const (
 // ErrNoSession is a provider without a session to run the exchange on —
 // matter.js's SessionClosedError "No existing session to <address>"
 // (packages/protocol/src/peer/PeerExchangeProvider.ts:116-118 at
-// b25ed960), kept under this name — and a closed dedicated session.
+// db91886c), kept under this name — and a closed dedicated session.
 var ErrNoSession = errors.New("interaction: no session")
 
 // ExchangeOptions configures [Provider.InitiateExchange] — the part of

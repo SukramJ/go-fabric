@@ -270,7 +270,7 @@ type signer struct {
 }
 
 // CA is a fabric's certificate authority — matter.js CertificateAuthority
-// (CertificateAuthority.ts:50-437) at b25ed960. It is safe for concurrent
+// (CertificateAuthority.ts:50-437) at db91886c. It is safe for concurrent
 // use.
 type CA struct {
 	cfg Config
@@ -389,7 +389,7 @@ func New(cfg Config) (*CA, error) {
 
 // initVerifier builds the verifier over the root certificate, so a NOC's
 // authorityKeyIdentifier is checked against the root's
-// subjectKeyIdentifier (matter.js Noc.ts:174-188 at b25ed960).
+// subjectKeyIdentifier (matter.js Noc.ts:174-188 at db91886c).
 func (c *CA) initVerifier() error {
 	v, err := mattercert.NewVerifierFromRCAC(c.rootCert, c.cfg.Clock)
 	if err != nil {

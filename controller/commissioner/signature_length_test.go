@@ -37,7 +37,7 @@ func (v signedValue) EncodeTLV(e *tlv.Encoder, tag tlv.Tag) {
 // bytes is decoded and fails as the NOCSR check AttestationSignatureInvalid,
 // a commissioning error — not as a decode error of the response (review
 // II, R2-P6-doc-1857 (b), owner decision 216; NocsrValidator.ts:100-109 at
-// b25ed960).
+// db91886c).
 func TestCSRSignatureOfAnyLength(t *testing.T) {
 	t.Parallel()
 	dev := func(req imRequest) (uint8, []byte, bool) {

@@ -2,7 +2,7 @@
 // Copyright (C) 2026 SukramJ.
 
 // A port of the cases of matter.js packages/node/test/node/ClientNodeTest.ts
-// at b25ed960 that came with be36b7d1d (#4901): a client write the local
+// at db91886c that came with be36b7d1d (#4901): a client write the local
 // model would refuse, or could not judge, still goes to the device, and
 // the device's answer decides. The Go node has one write surface,
 // client.Node.Write, with no model validation on the way out and no
@@ -31,7 +31,7 @@ import (
 
 // TestClientNodeTemperatureUnitWithoutSupportedListParity ports the
 // describe "writes TemperatureUnit to a peer without
-// SupportedTemperatureUnits" (ClientNodeTest.ts:1281-1305 at b25ed960).
+// SupportedTemperatureUnits" (ClientNodeTest.ts:1281-1305 at db91886c).
 // matter.js's device is a root with UnitLocalizationServer's defaults
 // (Celsius of [Celsius, Fahrenheit]), the Go device root's own
 // UnitLocalization (node/root.go buildRootOptional). matter.js seeds the
@@ -55,7 +55,7 @@ func TestClientNodeTemperatureUnitWithoutSupportedListParity(t *testing.T) {
 
 // TestClientNodeSendsConstraintBreakingWriteParity ports the cases of the
 // describe "sends a write that breaks a model constraint to the device"
-// (ClientNodeTest.ts:1465-1558 at b25ed960) whose subject is the device's
+// (ClientNodeTest.ts:1465-1558 at db91886c) whose subject is the device's
 // answer. matter.js's device carries a ContactSensor whose
 // BooleanStateConfiguration has SensitivityLevel with three levels, at
 // level 0 (:1466-1480), the Go device the same ContactSensor, bridged as

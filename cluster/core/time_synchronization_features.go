@@ -25,7 +25,7 @@ import (
 // The TimeSynchronization features TZ, NTPC, NTPS and TSC, served after
 // connectedhomeip: matter.js's TimeSynchronizationServer is the generated
 // behaviour with no command handlers (TimeSynchronizationServer.ts:14 at
-// b25ed960), so chip's src/app/clusters/time-synchronization-server at
+// db91886c), so chip's src/app/clusters/time-synchronization-server at
 // 6170af84 is the authority — the attribute gating
 // (TimeSynchronizationCluster.cpp:186-248), the reads (:250-331), the
 // stored state (:333-353, TimeSyncDataProvider.h:58-75), the four command

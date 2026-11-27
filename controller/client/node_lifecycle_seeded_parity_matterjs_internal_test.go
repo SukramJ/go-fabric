@@ -4,7 +4,7 @@
 // A port of matter.js packages/node/test/node/NodeLifecycleSeededTest.ts at
 // 862ad75f: when the client node considers its structure seeded, and the
 // warning for a node of its root only (Peers.ts #evaluateSeeded); at
-// b25ed960 the placement cases of a7ac64f19 and 097e5a8da — an
+// db91886c the placement cases of a7ac64f19 and 097e5a8da — an
 // aggregator's devices reported before the root's PartsList, and describe
 // "ClientNode with a root that reports no device type". matter.js
 // applies Descriptor reports to an unread peer through
@@ -322,7 +322,7 @@ const rootWithoutDeviceTypeMsg = "matter.controller.client.root_without_device_t
 
 // TestNodeLifecycleSeededRootWithoutDeviceTypeParity is describe("ClientNode
 // with a root that reports no device type") (NodeLifecycleSeededTest.ts
-// :456-610 at b25ed960, a7ac64f19 and 097e5a8da).
+// :456-610 at db91886c, a7ac64f19 and 097e5a8da).
 func TestNodeLifecycleSeededRootWithoutDeviceTypeParity(t *testing.T) {
 	t.Parallel()
 	both := func(rs ...*report) *report {

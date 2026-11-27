@@ -12,7 +12,7 @@ import (
 )
 
 // EventRecord is one persisted event entry.
-// Mirrors matter.js packages/protocol/src/events/Occurrence.ts at b25ed960
+// Mirrors matter.js packages/protocol/src/events/Occurrence.ts at db91886c
 // (Occurrence, NumberedOccurrence; review II, R2-P6-doc-0703).
 //
 // EpochMS is milliseconds since the Unix epoch (Matter §10.6.6.1
@@ -126,7 +126,7 @@ func (c bufferConfig) normalized() bufferConfig {
 // numbering continues after a reboot instead of restarting.
 //
 // Mirrors matter.js packages/protocol/src/events/OccurrenceManager.ts at
-// b25ed960 (OccurrenceManager, over BaseEventStore.ts for the numbering;
+// db91886c (OccurrenceManager, over BaseEventStore.ts for the numbering;
 // review II, R2-P6-doc-0703).
 type EventLog struct {
 	// ceilingMu serialises the persistence of a new counter ceiling
@@ -292,7 +292,7 @@ func (l *EventLog) raiseCeiling() bool {
 // says (BasicInformation's Leave carries the index of the fabric it left).
 // Mirrors matter.js
 // packages/node/src/behavior/cluster/FabricScopedDataHandler.ts:114-170 at
-// b25ed960 (limitNodeDataToAllowedFabrics: the occurrences of events whose
+// db91886c (limitNodeDataToAllowedFabrics: the occurrences of events whose
 // access is fabric-scoped or fabric-sensitive, bound to a fabric that is
 // not allowed, are removed), run when a fabric is deleted
 // (ServerEnvironment.ts:186-195). They stayed in the log.

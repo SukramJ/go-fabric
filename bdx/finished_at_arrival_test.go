@@ -211,7 +211,7 @@ func TestBlockAckEOFFinishesAtArrival(t *testing.T) {
 // flow waits for the final acknowledgement — still in the BlockEof's send,
 // or reading the BlockAckEof — ends the transfer cancelled, never
 // finished: matter.js's processTransfer reports a closed flow with
-// progressCancelled (flow/Flow.ts:137-138 at b25ed960).
+// progressCancelled (flow/Flow.ts:137-138 at db91886c).
 func TestScopeDisabledDuringTheEOFWaitIsCancelled(t *testing.T) {
 	t.Parallel()
 	t.Run("in the send", func(t *testing.T) {
@@ -276,7 +276,7 @@ func TestScopeDisabledDuringTheEOFWaitIsCancelled(t *testing.T) {
 // TestWrongBlockAckEOFCounterIsRefused: a BlockAckEof for another counter
 // does not finish the transfer at its arrival; the read refuses it with
 // BadBlockCounter as it always has (flow/OutboundFlow.ts:115-118,
-// Flow.ts:103-111 at b25ed960), and the transfer is cancelled.
+// Flow.ts:103-111 at db91886c), and the transfer is cancelled.
 func TestWrongBlockAckEOFCounterIsRefused(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
@@ -309,7 +309,7 @@ func TestWrongBlockAckEOFCounterIsRefused(t *testing.T) {
 // provider's ApplyUpdateRequest for a transfer it knows as completed —
 // succeeds. matter.js closes the session in processTransfer's finally and
 // removes it from the active sessions before anything else is dispatched
-// (BdxSession.ts:197-198, BdxProtocol.ts:187-189 at b25ed960). The session
+// (BdxSession.ts:197-198, BdxProtocol.ts:187-189 at db91886c). The session
 // is ended before the finished observers run, so one served meanwhile —
 // an ApplyUpdateRequest on another goroutine — finds it ended too.
 func TestTransferFinishedAtArrivalIsNoLongerActive(t *testing.T) {

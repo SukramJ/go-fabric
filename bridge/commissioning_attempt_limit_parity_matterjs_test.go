@@ -5,13 +5,13 @@ package bridge
 
 // The commissioning window's limit of failed commissioning attempts, ported
 // by meaning from matter.js
-// packages/node/test/node/CommissioningAttemptLimitTest.ts at b25ed960
+// packages/node/test/node/CommissioningAttemptLimitTest.ts at db91886c
 // (describe "Commissioning attempt limit", :52) and the case
 // AdministratorCommissioningServerTest.ts:523-536 of the same pin. A failed
 // attempt is a PASE pairing that failed before its session was established
 // or a fail-safe that ends without commissioning while the window it was
 // armed in is still open (matter.js
-// packages/protocol/src/protocol/DeviceCommissioner.ts:156-199 at b25ed960).
+// packages/protocol/src/protocol/DeviceCommissioner.ts:156-199 at db91886c).
 //
 // The matter.js cases commission over a MockSite; here the root's
 // GeneralCommissioning, the commissioning window and the bridge are wired as
@@ -116,7 +116,7 @@ func (r *attemptRig) openEnhanced(t *testing.T) {
 }
 
 // TestCommissioningAttemptLimitParity ports CommissioningAttemptLimitTest.ts
-// at b25ed960. The node's own window reads WindowNotOpen on the
+// at db91886c. The node's own window reads WindowNotOpen on the
 // AdministratorCommissioning cluster here (matter.js keeps the cluster's
 // status for administrator windows); matter.js's BasicWindowOpen of
 // DeviceCommissioner.windowStatus is the window's IsOpen.
@@ -380,7 +380,7 @@ func TestCommissioningAttemptLimitPASEFailureParity(t *testing.T) {
 }
 
 // TestAdministratorCommissioningAttemptLimitParity ports
-// AdministratorCommissioningServerTest.ts:523-536 at b25ed960
+// AdministratorCommissioningServerTest.ts:523-536 at db91886c
 // (AdministratorCommissioningServer.ts:137-158: the window's state is read
 // before the revoke closes the PASE session and the fail-safe).
 func TestAdministratorCommissioningAttemptLimitParity(t *testing.T) {

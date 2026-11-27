@@ -4,7 +4,7 @@
 package endpoint
 
 // Ports of matter.js packages/node/test/node/AttributeReadResponseTest.ts at
-// b25ed960, run through the module's read path (im.HandleReadRequest over a
+// db91886c, run through the module's read path (im.HandleReadRequest over a
 // TopologyDispatcher): a status answers only a fully concrete request path.
 // A path with a wildcard selects what exists and nothing else — matter.js
 // packages/protocol/src/action/server/AttributeReadResponse.ts at db021da0

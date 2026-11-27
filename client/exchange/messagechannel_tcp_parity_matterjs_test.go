@@ -133,7 +133,7 @@ func TestMessageChannelTCPLimitParity(t *testing.T) {
 
 // TestSessionParametersMaxTCPMessageSizeParity ports the two cases
 // matter.js #4793 added to
-// packages/protocol/test/session/SessionParametersTest.ts at b25ed960
+// packages/protocol/test/session/SessionParametersTest.ts at db91886c
 // (:89-95): the SessionParameters factory (here PeerParameters) keeps a
 // TCP peer's limit below the default and takes the default for 0
 // (SessionParameters.ts:66-73).

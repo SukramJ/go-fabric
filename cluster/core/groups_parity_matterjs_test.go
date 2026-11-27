@@ -132,7 +132,7 @@ func TestGroupsParityMatterJS(t *testing.T) {
 		if got := f.addGroup(t, f.ep3, 1, strings.Repeat("n", 17)); got != im.StatusConstraintError {
 			t.Errorf("17-character name: %v, want ConstraintError", got)
 		}
-		// The bound counts UTF-8 bytes (GroupsServer.ts:101 at b25ed960,
+		// The bound counts UTF-8 bytes (GroupsServer.ts:101 at db91886c,
 		// #4995): 16 × "ü" is 32 bytes, 8 × "ü" the 16 allowed.
 		if got := f.addGroup(t, f.ep3, 1, strings.Repeat("ü", 16)); got != im.StatusConstraintError {
 			t.Errorf("16 characters in 32 bytes: %v, want ConstraintError", got)

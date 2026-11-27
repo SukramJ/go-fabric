@@ -292,7 +292,7 @@ func TestNegativeWriteParity(t *testing.T) {
 	cases := []negativeWriteCase{
 		{
 			// Mirrors matter.js packages/model/src/aspects/Constraint.ts:969-1096
-			// (evaluate) at b25ed960: "max supportedSensitivityLevels - 1"
+			// (evaluate) at db91886c: "max supportedSensitivityLevels - 1"
 			// is computed against the served SupportedSensitivityLevels (3)
 			// by the generated checks (W3-clugen-01), as chip's
 			// BooleanStateConfiguration .cpp:324 refuses it.

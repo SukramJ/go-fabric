@@ -39,7 +39,7 @@ import (
 //
 // It is the composition of [Site.AddController] for the role's own
 // composition root — matter.js's MockSite builds its controller as a
-// ServerNode in the same environment (mock-site.ts:112 at b25ed960).
+// ServerNode in the same environment (mock-site.ts:112 at db91886c).
 func (s *Site) ControllerConfig(opts ControllerOptions) controller.Config {
 	s.tb.Helper()
 	index := s.index()
