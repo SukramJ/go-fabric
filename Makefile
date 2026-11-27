@@ -17,7 +17,7 @@ MATTERJS_SERVER_DIR ?= ../matterjs-server
 # drifted behind its own CI; do not copy that here. Bump deliberately: raise
 # both, run the linter locally, fix what it finds, in one commit.
 GOFUMPT_VERSION       ?= v0.12.0
-GOLANGCI_LINT_VERSION ?= v2.14.0
+GOLANGCI_LINT_VERSION ?= v2.15.0
 # The workflow linters (`make workflow-lint`): actionlint is a Go tool
 # `make setup` installs; zizmor is a Python package (pip install
 # zizmor==$(ZIZMOR_VERSION)), which ci.yml installs into a venv.
