@@ -268,7 +268,8 @@ const citecheckDriftRatchet = 416
 // pin); 734 stay at b25ed960 because a bound file changed upstream or a
 // bare part binds no file. binding/manager.go's ClientGroupInteraction.ts
 // range is re-cut to :33-81 (#5069 shortened the class by one line).
-const citecheckOffPinRatchet = 3372
+// Phase 9 unit P1-C: two client/peer Busy citations at b25ed960 re-cited at db91886c (3370).
+const citecheckOffPinRatchet = 3370
 
 // offPinRowRE reads the off-pin row of summary.md.
 var offPinRowRE = regexp.MustCompile(`(?m)^\| ` + regexp.QuoteMeta(offPinRow) + ` \| (\d+) \|$`)

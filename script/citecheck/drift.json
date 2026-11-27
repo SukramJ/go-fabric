@@ -1132,7 +1132,7 @@
   },
   {
     "file": "client/peer/connection.go",
-    "line": 1726,
+    "line": 1778,
     "citation": "PeerConnection.ts:674-696",
     "resolved": "packages/protocol/src/peer/PeerConnection.ts",
     "identifier": "handleConnectionError",
@@ -1141,7 +1141,7 @@
   },
   {
     "file": "client/peer/connection.go",
-    "line": 1753,
+    "line": 1822,
     "citation": "SessionManager.ts:468-480",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "deleteResumptionRecord",
