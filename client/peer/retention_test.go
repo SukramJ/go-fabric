@@ -501,14 +501,14 @@ func TestBusyAtAnUnprovenAddressHoldsOnlyItsAttempt(t *testing.T) {
 	}
 }
 
-// TestIssue507_BusyHoldsTheHandlersDelay: the error handler's
+// TestIssue507_BusyIgnoresTheHandlersDelay: the error handler's
 // replacement of the Busy delay neither sets nor shortens the deadline:
 // the peer's deadline is the minimum wait the node asked for, and the
 // attempt that received the Busy, after sleeping the handler's 2 s, waits
 // out the rest of it before its next Sigma1 (matter.js
 // PeerConnection.ts:683 before :686, the hook doc :845-846 at db91886c;
 // decision 734).
-func TestIssue507_BusyHoldsTheHandlersDelay(t *testing.T) {
+func TestIssue507_BusyIgnoresTheHandlersDelay(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
 		r := newRig507(t, func(c *Context) {

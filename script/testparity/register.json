@@ -9621,7 +9621,7 @@
       "go": [
         "client/peer:TestPeerConnectionBusyParity",
         "client/peer:TestIssue507_BusyDeadline",
-        "client/peer:TestIssue507_BusyHoldsTheHandlersDelay",
+        "client/peer:TestIssue507_BusyIgnoresTheHandlersDelay",
         "client/peer:TestBusyAtAnUnprovenAddressHoldsOnlyItsAttempt",
         "client/peer:TestBusyAtAnotherAddressOfTheProvenHostHoldsOnlyItsAttempt"
       ],
