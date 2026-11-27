@@ -26,7 +26,7 @@ Line citations whose sentence names a matter.js commit other than the pin are ch
 | Commit | Line citations | Bare parts bound to a file |
 |---|---|---|
 | `0ceb202d` | 114 | 7 |
-| `862ad75f` | 3 | 121 |
+| `862ad75f` | 3 | 120 |
 | `9892fa39` | 2 | 0 |
 | `b25ed960` | 726 | 12 |
 | `d87d1de4` | 2 | 0 |
@@ -37,10 +37,10 @@ Line citations whose sentence names a matter.js commit other than the pin are ch
 
 | Reference | Count |
 |---|---|
-| A .ts file named without a line part | 2763 |
-| … whose sentence names another matter.js commit | 621 |
+| A .ts file named without a line part | 2764 |
+| … whose sentence names another matter.js commit | 620 |
 | A bare line part bound to the .ts file named before it (checked; not a citation, drift or hard error of the run) | 590 |
-| … checked at another matter.js commit | 320 |
+| … checked at another matter.js commit | 319 |
 | … with a hard error at the commit it was checked at | 3 |
 | A bare line part after a .ts citation or after no file (not checked) | 3056 |
 | A chip citation (a chip source in a sentence naming chip or connectedhomeip) | 1825 |

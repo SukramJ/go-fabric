@@ -3,7 +3,7 @@
 
 // MatterScheduleConfiguration, the cases of connectedhomeip
 // src/app/clusters/thermostat-server/tests/TestThermostatClusterSchedules.cpp
-// at 645b267a that matter.js's three Schedules suites at b25ed960 have no
+// at 645b267a that matter.js's three Schedules suites at db91886c have no
 // counterpart for (schedules_*_parity_matterjs_test.go hold the rules
 // since matter.js implements the feature, released since #5044): the attributes and
 // commands served, the counts and ScheduleTypes read, the SchedulePort's

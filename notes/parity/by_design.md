@@ -5720,27 +5720,26 @@ matter.js emits all eight events, each from a `$Changed` reaction after the
 change commits (`packages/node/src/behaviors/thermostat/ThermostatServer.ts:2074-2251`
 at `db91886c`, `#setupEvents` `:2078`), behind its forward feature
 `thermostat-events` (`:264-268` at `db91886c`, class doc `:177-191`), which
-is why the row stays in the Ahead register. The other `ThermostatServer.ts`
-and `ThermostatBehaviorTest.ts` lines below are at `b25ed960` and were not
-re-read at `db91886c`. `cluster/thermo` mirrors it: SystemModeChange, RunningModeChange,
+is why the row stays in the Ahead register. All lines are at `db91886c`.
+`cluster/thermo` mirrors it: SystemModeChange, RunningModeChange,
 RunningStateChange and OccupancyChange with previous and current value, none
 for an unchanged value; SetpointChange for the four setpoints (none for a user
-limit), the Occupancy field only with OCC (`:2167`); ActivePresetChange and
+limit), the Occupancy field only with OCC (`:2159`); ActivePresetChange and
 ActiveScheduleChange on every change of the handle from any source — command,
 host setter, direct setpoint write ending a preset, the start clearing a stale
 handle, the start's reconcile moving a setpoint in effect
-(`ThermostatBehaviorTest.ts:134-149`; its event inferred from `:2126-2134`, no
+(`ThermostatBehaviorTest.ts:152-167`; its event inferred from `:2118-2126`, no
 matter.js test) — and none for an unchanged one; LocalTemperatureChange for a
-change of at least `localTemperatureChangeThreshold` (default 50, `:3159`;
-settable, refused ≤ 0 when the event exists, `:2191-2196`) or a null↔value
+change of at least `localTemperatureChangeThreshold` (default 50, `:3151`;
+settable, refused ≤ 0 when the event exists, `:2183-2200`) or a null↔value
 switch, at most one per 60 s, a held-back one re-decided when the window ends
-(`:2190-2259`). ThermostatRunningMode is served with TEVT and AUTO. Two Go
+(`:2182-2251`). ThermostatRunningMode is served with TEVT and AUTO. Two Go
 choices: the events of the start (stale handle cleared, setpoints the initial
-reconcile moved — their SetpointChange inferred from `:2176-2187`, no
+reconcile moved — their SetpointChange inferred from `:2168-2179`, no
 matter.js test) are emitted at the first SetEndpoint; a LocalTemperature set
 before it is the configured value. One divergence (owner decision W2, 434):
 matter.js creates an event only when the application enabled it
-(`:180-184`); here TEVT selects every event its conformance admits — re-read
+(`:177-181`); here TEVT selects every event its conformance admits — re-read
 when matter.js releases TEVT. Pinned by `TestParityMatterJS_ThermostatEventsTest`
 (44 cases) and the rules in `events_rules_test.go`. Pin lift b25ed960, unit
 P4-A; until pin lift db91886c (unit P1-F) this was the events paragraph of
@@ -5748,7 +5747,7 @@ P4-A; until pin lift db91886c (unit P1-F) this was the events paragraph of
 
 ### BD-chip-Thermostat-SchedulePort — the device stores its own week programs, after connectedhomeip's Delegate
 
-`cluster/thermo` (`schedules.go`, `schedules_write.go`, the Schedules branch of `atomic.go`) mirrors matter.js's MatterScheduleConfiguration — the write rules, the normalisation, the commit checks in the three passes of `packages/node/src/behaviors/thermostat/AtomicWriteHandler.ts:298-320` at `b25ed960`, the ScheduleTypes start checks — and serves it when the host declares the feature; the three suites are ported (`schedules_*_parity_matterjs_test.go`). Without a matter.js counterpart: the `SchedulePort` (after chip's Delegate), which switches the device before a SetActiveScheduleRequest stores the handle and stores a committed list before the server does. Where two rules hit one entry the Go order differs (NOT_FOUND before a repeated handle; a transition's preset checks before the setpoint combination) and answers the same status (coordinator decision C-7, 385). The host's own writes are `BD-Thermostat-HostSchedules`. Until pin lift db91886c this was the entry `BD-chip-Thermostat-Schedules` of the Ahead register, closed caught up there (unit P1-F, owner decisions 731, 740); its text before pin lift b25ed960, unit P3-A, which followed connectedhomeip's `ThermostatSchedules` at `645b267a` with five choices of its own, is in Git history.
+`cluster/thermo` (`schedules.go`, `schedules_write.go`, the Schedules branch of `atomic.go`) mirrors matter.js's MatterScheduleConfiguration — the write rules, the normalisation, the commit checks in the two passes of `packages/node/src/behaviors/thermostat/AtomicWriteHandler.ts:298-320` at `db91886c` (`$AtomicChanging` with staging, then `$AtomicChanged`) before the one commit or rollback (`:322-334`), the ScheduleTypes start checks — and serves it when the host declares the feature; the three suites are ported (`schedules_*_parity_matterjs_test.go`). Without a matter.js counterpart: the `SchedulePort` (after chip's Delegate), which switches the device before a SetActiveScheduleRequest stores the handle and stores a committed list before the server does. Where two rules hit one entry the Go order differs (NOT_FOUND before a repeated handle; a transition's preset checks before the setpoint combination) and answers the same status (coordinator decision C-7, 385). The host's own writes are `BD-Thermostat-HostSchedules`. Until pin lift db91886c this was the entry `BD-chip-Thermostat-Schedules` of the Ahead register, closed caught up there (unit P1-F, owner decisions 731, 740); its text before pin lift b25ed960, unit P3-A, which followed connectedhomeip's `ThermostatSchedules` at `645b267a` with five choices of its own, is in Git history.
 
 Review II, phase 4 (2026-11-14): connectedhomeip at `645b267a`
 (`ThermostatClusterSchedules.cpp` and `.h`) is outside the exports the
