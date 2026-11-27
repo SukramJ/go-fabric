@@ -92,6 +92,7 @@ wherever it is logged. Each row below names a value's type and meaning:
 | `device` | slog.String | the host's device key — the reference daemon's, in examples/ only; the module itself has no device key |
 | `reason` | slog.String | why the event happened: a refusal's cause, a close's trigger |
 | `status` | slog.String (a status name), slog.Int (a code); slog.Bool for whether a report entry is a status | a Matter status (Interaction Model, secure channel) |
+| `interruption` | slog.String | how a subscription report the controller read was interrupted: chunk-unacknowledged, final-unacknowledged, chunk-missing |
 
 The keys one area uses for what only it logs, accepted as they stand:
 

@@ -132,7 +132,7 @@ type RequestEncoding struct {
 	// omits (packages/protocol/src/interaction/InteractionMessenger.ts:1587-1611
 	// at db91886c, the copy :1603-1610). MoreChunkedMessages and InteractionModelRevision are
 	// untouched. Whether to omit is the sender's decision
-	// (client/interaction's request flag rule), not the encoder's.
+	// ([RequestFlagsForSending]), not the encoder's.
 	OmitFalseFlags bool
 }
 
@@ -146,19 +146,30 @@ const FalseRequestFlagsOmittedFromRevision = 14
 
 // RequestFlagsForSending is the sender's rule for the flags of an Invoke
 // or Write request: a false flag is left out when omitFalseFlags is set
-// (the caller forces it), or when this node's revision own and the peer's
-// revision peer are both at least [FalseRequestFlagsOmittedFromRevision]
-// and the request is not a group request (a group's members' revisions are
-// unknown, so a group request keeps both flags unless forced). Otherwise
-// the flags go as given. Every client sender of an Invoke or Write takes
-// its [RequestEncoding] from here — client/interaction for unicast, groups
-// for group requests — the Write before it is chunked, so chunk sizes and
-// sent bytes agree. Mirrors matter.js
-// InteractionClientMessenger.requestFlagsForSending
+// (the caller forces it), or when this module's revision
+// [MatterInteractionModelRevision] and the peer's revision peerRevision
+// are both at least [FalseRequestFlagsOmittedFromRevision] and the request
+// is not a group request (a group's members' revisions are unknown, so a
+// group request keeps both flags unless forced). Otherwise the flags go as
+// given. Every client sender of an Invoke or Write takes its
+// [RequestEncoding] from here — client/interaction for unicast, groups for
+// group requests — the Write before it is chunked, so chunk sizes and sent
+// bytes agree. One sender does not yet: the OTA requestor's QueryImage in
+// bridge/ota_provider_link.go writes the zero encoding, equal on the wire
+// while this module's revision is below 14, and must take the rule when
+// the revision is raised (TestRequestFlagsForSendingParityMatterJS fails
+// then). Mirrors matter.js InteractionClientMessenger.requestFlagsForSending
 // (packages/protocol/src/interaction/InteractionMessenger.ts:1587-1611 at
-// db91886c, the rule :1594-1598). With this module's own revision
-// [MatterInteractionModelRevision] (12) only omitFalseFlags omits.
-func RequestFlagsForSending(omitFalseFlags, group bool, peer, own uint16) RequestEncoding {
+// db91886c, the rule :1594-1598), whose own revision is a defaulted
+// parameter only tests set (:1592). With this module's revision (12) only
+// omitFalseFlags omits.
+func RequestFlagsForSending(omitFalseFlags, group bool, peerRevision uint16) RequestEncoding {
+	return requestFlagsForSending(omitFalseFlags, group, peerRevision, uint16(MatterInteractionModelRevision))
+}
+
+// requestFlagsForSending is [RequestFlagsForSending] at the revision own,
+// the seam of the parity rows.
+func requestFlagsForSending(omitFalseFlags, group bool, peer, own uint16) RequestEncoding {
 	return RequestEncoding{OmitFalseFlags: omitFalseFlags ||
 		(own >= FalseRequestFlagsOmittedFromRevision && !group && peer >= FalseRequestFlagsOmittedFromRevision)}
 }
@@ -166,7 +177,7 @@ func RequestFlagsForSending(omitFalseFlags, group bool, peer, own uint16) Reques
 // MarshalTLVWith encodes w as a client sends it, its flags as how says.
 // Mirrors matter.js
 // packages/types/src/protocol/messages/TlvWriteRequest.ts:16-35 at
-// db91886c with the request action/request/Write.ts:49-191 builds:
+// db91886c with the request action/request/Write.ts:51-198 at db91886c builds:
 // SuppressResponse (0) only when set, TimedRequest (1) unless how omits
 // it as false, WriteRequests (2)
 // of AttributeDataIB — DataVersion (0) when set, Path (1), Data (2)

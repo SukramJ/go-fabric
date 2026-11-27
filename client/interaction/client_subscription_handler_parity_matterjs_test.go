@@ -28,6 +28,7 @@ import (
 	"testing/synctest"
 	"time"
 
+	"thingfabric.dev/go-fabric/client/exchange"
 	"thingfabric.dev/go-fabric/client/interaction"
 	"thingfabric.dev/go-fabric/im"
 )
@@ -70,9 +71,20 @@ func (b *handlerLog) has(key string) bool {
 // is what the peer owes.
 func chunkRig(t *testing.T, log *handlerLog, xid uint16) (*scripted, *interaction.Subscriptions, *interaction.Subscription, time.Duration, msg) {
 	t.Helper()
+	return chunkRigClock(t, log, xid, nil)
+}
+
+// chunkRigClock is chunkRig with the registry on clock, when set, in place
+// of the rig's fake clock.
+func chunkRigClock(t *testing.T, log *handlerLog, xid uint16, clock func(*scripted) exchange.Clock) (*scripted, *interaction.Subscriptions, *interaction.Subscription, time.Duration, msg) {
+	t.Helper()
 	s := newScripted(t)
+	var regClock exchange.Clock = s.clock
+	if clock != nil {
+		regClock = clock(s)
+	}
 	reg := interaction.NewSubscriptions(interaction.SubscriptionsConfig{
-		Clock:  s.clock,
+		Clock:  regClock,
 		Logger: slog.New(slog.NewTextHandler(log, &slog.HandlerOptions{Level: slog.LevelDebug})),
 	})
 	reg.Register(s.mgr)
@@ -227,20 +239,35 @@ func TestClientSubscriptionHandlerParity(t *testing.T) {
 		})
 	})
 	// :186-197: the next chunk goes missing while the registry shuts down —
-	// the subscription is kept.
+	// the interruption is recorded but not handed over, the subscription is
+	// kept. matter.js blocks the handler while it waits and then lets the
+	// wait fail with PeerMessageMissingError; a Go shutdown would end the
+	// wait itself, so the wait expires first and the registry is blocked
+	// at the end of the report, before the handler asks IsBlocked
+	// (interaction.BlockAtReportEnd).
 	t.Run("keeps a subscription whose next chunk goes missing during shutdown", func(t *testing.T) {
 		t.Parallel()
 		synctest.Test(t, func(t *testing.T) {
 			var log handlerLog
-			s, reg, sub, timeout, _ := chunkRig(t, &log, 0x7313)
-			blocked := make(chan error, 1)
-			go func() { blocked <- reg.BlockNewActivity(context.Background()) }()
+			var arm func(*interaction.Subscriptions)
+			s, reg, sub, timeout, _ := chunkRigClock(t, &log, 0x7313, func(s *scripted) exchange.Clock {
+				var c exchange.Clock
+				c, arm = interaction.BlockAtReportEnd(s.clock)
+				return c
+			})
+			arm(reg)
 			unanswered(t, s, timeout)
-			if err := await(t, blocked); err != nil {
+			if !reg.IsBlocked() {
+				t.Fatal("the registry was not blocked at the end of the report")
+			}
+			if err := reg.BlockNewActivity(context.Background()); err != nil {
 				t.Fatal(err)
 			}
 			if isClosed(sub) {
 				t.Fatal("the subscription closed")
+			}
+			if !log.has("report_interrupted_during_shutdown") || !log.has("interruption=chunk-missing") {
+				t.Fatalf("no chunk-missing interruption during shutdown logged:\n%s", log.buf.String())
 			}
 			sub.Close()
 		})

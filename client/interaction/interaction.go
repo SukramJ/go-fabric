@@ -373,9 +373,9 @@ func isAckMissing(err error) bool {
 }
 
 // isMessageMissing reports a wait for the peer's next message that ended
-// without one — matter.js PeerMessageMissingError
-// (packages/protocol/src/protocol/MessageExchange.ts:915 at db91886c),
-// which the Go exchange raises as the exact
+// without one — matter.js PeerMessageMissingError, thrown at
+// packages/protocol/src/protocol/MessageExchange.ts:915 at db91886c, the
+// class packages/protocol/src/peer/PeerCommunicationError.ts:55, which the Go exchange raises as the exact
 // [*exchange.PeerMessageMissingError]. errors.As takes the type: a
 // [*exchange.PeerUnresponsiveError] is no match, although
 // PeerMessageMissingError.Is matches that target.
@@ -408,7 +408,7 @@ func (m *messenger) sendReportStatus(ctx context.Context, rd *im.ReportData) err
 // (packages/protocol/src/interaction/InteractionMessenger.ts:1266, :1330 at
 // db91886c).
 func (m *messenger) requestEncoding(omitFalseFlags bool) im.RequestEncoding {
-	return im.RequestFlagsForSending(omitFalseFlags, false, m.x.Session().Parameters().InteractionModelRevision, uint16(im.MatterInteractionModelRevision))
+	return im.RequestFlagsForSending(omitFalseFlags, false, m.x.Session().Parameters().InteractionModelRevision)
 }
 
 // close closes the exchange and ends its in-flight entry.

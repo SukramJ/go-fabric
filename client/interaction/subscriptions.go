@@ -96,6 +96,19 @@ func NewSubscriptions(cfg SubscriptionsConfig) *Subscriptions {
 // it too.
 func (r *Subscriptions) MaxReportBytesPerSession() int { return r.maxReport }
 
+// blockLocked blocks new report processing and ends the reads in flight;
+// r.mu is held.
+func (r *Subscriptions) blockLocked() {
+	if r.blocked {
+		return
+	}
+	r.blocked = true
+	r.readingCancel()
+	if r.timer != nil {
+		r.timer.Stop()
+	}
+}
+
 // IsBlocked reports whether new report processing is blocked (:58-63).
 func (r *Subscriptions) IsBlocked() bool {
 	r.mu.Lock()
@@ -108,13 +121,7 @@ func (r *Subscriptions) IsBlocked() bool {
 // second call waits as well. It returns ctx's error when ctx ends first.
 func (r *Subscriptions) BlockNewActivity(ctx context.Context) error {
 	r.mu.Lock()
-	if !r.blocked {
-		r.blocked = true
-		r.readingCancel()
-		if r.timer != nil {
-			r.timer.Stop()
-		}
-	}
+	r.blockLocked()
 	var wait chan struct{}
 	if r.inFlight > 0 {
 		if r.drained == nil {
