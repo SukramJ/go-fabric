@@ -44,6 +44,17 @@ type InvokeOptions struct {
 	// SuppressResponse asks the peer for no InvokeResponse: the send
 	// expects an acknowledgement only and Invoke returns the zero Result.
 	SuppressResponse bool
+	// OmitFalseFlags leaves a false SuppressResponse and TimedRequest out of
+	// the InvokeRequest, whatever the revisions; without it they are left
+	// out only when this node and the peer are both at Interaction Model
+	// revision 14 or later ([im.RequestFlagsForSending]; this module is at
+	// [im.MatterInteractionModelRevision]). A command with the option goes
+	// on its own, never in a batch. Mirrors matter.js
+	// RequestFlagsOptions.omitFalseFlags
+	// (packages/protocol/src/action/client/RequestFlagsOptions.ts:10-22 at
+	// db91886c) on ClientInvoke (Invoke.ts:65) and its batch key
+	// (ClientInteraction.ts:223).
+	OmitFalseFlags bool
 	// BatchDuration is how long a single command waits for others to
 	// share its InvokeRequest — matter.js Invoke.batchDuration
 	// (packages/protocol/src/action/request/Invoke.ts:50 at db021da0);
@@ -271,7 +282,9 @@ func (c *Interaction) exchangeInvoke(ctx context.Context, invokes []im.CommandIn
 		ept = DefaultMinimumResponseTimeoutWithFailsafe
 	}
 	enc := tlv.NewEncoder()
-	im.MarshalInvokeRequestTLV(enc, im.InvokeRequest{
+	// The flags go as the sender's rule says, decided before the send
+	// (requestFlagsForSending, InteractionMessenger.ts:1266 at db91886c).
+	im.MarshalInvokeRequestTLVWith(enc, im.InvokeRequest{
 		SuppressResponse: opts.SuppressResponse, TimedRequest: timed, Invokes: invokes,
 		DelayReportData: opts.DelayReportData, InteractionModelRevision: opts.InteractionModelRevision,
 	},
@@ -283,7 +296,7 @@ func (c *Interaction) exchangeInvoke(ctx context.Context, invokes []im.CommandIn
 				return
 			}
 			fields.EncodeTLV(e, tag)
-		})
+		}, m.requestEncoding(opts.OmitFalseFlags))
 	req, err := enc.Bytes()
 	if err != nil {
 		return nil, err

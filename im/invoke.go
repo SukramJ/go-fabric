@@ -66,6 +66,12 @@ var (
 
 // InvokeRequest is the in-memory form of an InvokeRequestMessage.
 type InvokeRequest struct {
+	// SuppressResponse and TimedRequest are optional on the wire: the
+	// decoder reads an absent flag as false, as matter.js does
+	// (TlvInvokeRequest.ts:23, :30 at db91886c; its server answers an
+	// absent SuppressResponse, InteractionServer.ts:1109, and defaults
+	// TimedRequest to false, :976). [MarshalInvokeRequestTLV] writes both;
+	// [MarshalInvokeRequestTLVWith] may leave a false one out.
 	SuppressResponse bool
 	TimedRequest     bool
 	Invokes          []CommandInvocation
@@ -75,7 +81,7 @@ type InvokeRequest struct {
 	// (BD-Matter-DelayReportData).
 	DelayReportData *DelayReportData
 	// InteractionModelRevision is the request's InteractionModelRevision
-	// (tag 0xFF, TlvInvokeRequest.ts:30 at b25ed960):
+	// (tag 0xFF, TlvInvokeRequest.ts:38 at db91886c):
 	// [MarshalInvokeRequestTLV] writes it, 0 writing
 	// [MatterInteractionModelRevision]; [UnmarshalInvokeRequestTLV] fills
 	// it, 0 when the field is absent. The server acts on neither.
@@ -227,7 +233,7 @@ func UnmarshalInvokeRequestTLV(dec *tlv.Decoder, fieldsReader CommandFieldsReade
 		return InvokeRequest{}, fmt.Errorf("%w: expected struct, got 0x%02X", ErrInvalidInvokeRequest, open.Type)
 	}
 	var req InvokeRequest
-	var hasSuppress, hasTimed, hasInvokes bool
+	var hasInvokes bool
 	var later laterErrors
 	for {
 		el, err := dec.Next()
@@ -238,16 +244,12 @@ func UnmarshalInvokeRequestTLV(dec *tlv.Decoder, fieldsReader CommandFieldsReade
 			if later.first != nil {
 				return InvokeRequest{}, later.first
 			}
-			// SuppressResponse, TimedRequest and InvokeRequests are
-			// mandatory: matter.js
-			// packages/types/src/protocol/messages/TlvInvokeRequest.ts:19,
-			// :22, :25 at db021da0 (TlvField).
-			switch {
-			case !hasSuppress:
-				return InvokeRequest{}, fmt.Errorf("%w: %w", ErrInvalidInvokeRequest, missingField(tagInvokeReqSuppressResponse, "SuppressResponse"))
-			case !hasTimed:
-				return InvokeRequest{}, fmt.Errorf("%w: %w", ErrInvalidInvokeRequest, missingField(tagInvokeReqTimedRequest, "TimedRequest"))
-			case !hasInvokes:
+			// InvokeRequests is mandatory (TlvField); SuppressResponse and
+			// TimedRequest are optional and read as false when absent:
+			// matter.js
+			// packages/types/src/protocol/messages/TlvInvokeRequest.ts:23,
+			// :30 (TlvOptionalField), :33 (TlvField) at db91886c.
+			if !hasInvokes {
 				return InvokeRequest{}, fmt.Errorf("%w: %w", ErrInvalidInvokeRequest, missingField(tagInvokeReqInvokeRequests, "InvokeRequests"))
 			}
 			return req, nil
@@ -257,21 +259,20 @@ func UnmarshalInvokeRequestTLV(dec *tlv.Decoder, fieldsReader CommandFieldsReade
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case tagInvokeReqSuppressResponse:
-			// TlvField(0, TlvBoolean): a SuppressResponse of another type
-			// fails the decode, and the request is answered
-			// (packages/types/src/protocol/messages/TlvInvokeRequest.ts:19;
-			// SuppressResponseTest.ts:337-343).
+			// TlvOptionalField(0, TlvBoolean): a SuppressResponse of another
+			// type fails the decode, and the request is answered
+			// (packages/types/src/protocol/messages/TlvInvokeRequest.ts:23
+			// at db91886c; SuppressResponseTest.ts:337-343 at db021da0).
 			if req.SuppressResponse, err = requestBoolField(el, "SuppressResponse"); err != nil {
 				return InvokeRequest{}, fmt.Errorf("%w: %w", ErrInvalidInvokeRequest, err)
 			}
-			hasSuppress = true
 		case tagInvokeReqTimedRequest:
-			// TlvField(1, TlvBoolean), TlvInvokeRequest.ts:22: a TimedRequest
-			// of another type fails the decode (FAILURE), never reads as false.
+			// TlvOptionalField(1, TlvBoolean), TlvInvokeRequest.ts:30 at
+			// db91886c: a TimedRequest of another type fails the decode
+			// (FAILURE), never reads as false.
 			if req.TimedRequest, err = requestBoolField(el, "TimedRequest"); err != nil {
 				return InvokeRequest{}, fmt.Errorf("%w: %w", ErrInvalidInvokeRequest, err)
 			}
-			hasTimed = true
 		case tagInvokeReqInvokeRequests:
 			if !el.IsContainer || el.Type != tlv.TypeArray {
 				return InvokeRequest{}, fmt.Errorf("%w: InvokeRequests not array", ErrInvalidInvokeRequest)

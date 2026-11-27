@@ -111,14 +111,15 @@ func (r *Subscriptions) sendStatus(ctx context.Context, m *messenger, status im.
 	}
 }
 
-// handleReport is ClientSubscriptionHandler.#handleExchange (:63-160 at
-// b25ed960).
+// handleReport is ClientSubscriptionHandler.#handleExchange (:62-160 at
+// db91886c).
 //
-// A report whose status the peer never acknowledged is handed to the
-// subscription once the report ends, unless the registry is blocked
-// (shutdown); a missing acknowledgement of a chunk's status, which ends
-// the report, is no failure of it. Mirrors matter.js
-// ClientSubscriptionHandler.ts:107 and :142-158 at b25ed960.
+// An interrupted report — our status the peer never acknowledged, or a
+// continuation chunk it never sent — is handed to the subscription once
+// the report ends, unless the registry is blocked (shutdown); an
+// interruption after a chunk (chunk-unacknowledged, chunk-missing), which
+// ends the report, is no failure of it, whatever the error. Mirrors
+// matter.js ClientSubscriptionHandler.ts:106 and :141-158 at db91886c.
 func (r *Subscriptions) handleReport(ctx context.Context, m *messenger, first *exchange.Message) (err error) {
 	initial, err := decodeReport(first.Payload)
 	if err != nil {
@@ -142,7 +143,7 @@ func (r *Subscriptions) handleReport(ctx context.Context, m *messenger, first *e
 	sub.isReading = true
 	sub.mu.Unlock()
 	defer func() {
-		if err != nil && m.unacknowledgedReportStatus == reportStatusChunk && isAckMissing(err) {
+		if err != nil && (m.reportInterruption == reportChunkUnacknowledged || m.reportInterruption == reportChunkMissing) {
 			err = nil
 		}
 		sub.mu.Lock()
@@ -150,12 +151,12 @@ func (r *Subscriptions) handleReport(ctx context.Context, m *messenger, first *e
 		sub.timeoutAt = time.Time{}
 		sub.mu.Unlock()
 		r.ResetTimer()
-		if unacknowledged := m.unacknowledgedReportStatus; unacknowledged != "" {
+		if interruption := m.reportInterruption; interruption != "" {
 			if r.IsBlocked() {
-				r.log.Debug("matter.controller.interaction.report_status_unacknowledged_during_shutdown",
-					slog.Uint64("subscription_id", uint64(initial.SubscriptionID)))
+				r.log.Debug("matter.controller.interaction.report_interrupted_during_shutdown",
+					slog.Uint64("subscription_id", uint64(initial.SubscriptionID)), slog.String("interruption", string(interruption)))
 			} else {
-				sub.reportStatusUnacknowledged(reportNumber, unacknowledged)
+				sub.reportInterrupted(reportNumber, interruption)
 			}
 		}
 	}()

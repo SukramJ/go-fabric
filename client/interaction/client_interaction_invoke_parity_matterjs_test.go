@@ -17,6 +17,7 @@ package interaction_test
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 	"time"
 
@@ -271,6 +272,51 @@ func TestClientInteractionInvokeDelayReportData(t *testing.T) {
 			t.Fatalf("DelayReportData %+v", req.DelayReportData)
 		}
 		await(t, done)
+	})
+}
+
+// TestClientInteractionRequestFlags ports the "ClientInteraction request
+// flags" group of ClientInteractionInvokeTest.ts:847-917 at db91886c
+// (#5069): with OmitFalseFlags an Invoke goes without its false
+// SuppressResponse and TimedRequest and a Write without its false
+// TimedRequest (the Go write never carries a false SuppressResponse);
+// without the option both Invoke flags go as false — this module's own
+// Interaction Model revision is below the one that leaves them out
+// (im.RequestFlagsForSending).
+func TestClientInteractionRequestFlags(t *testing.T) {
+	t.Parallel()
+	invokeTags := func(t *testing.T, opts interaction.InvokeOptions) []uint32 {
+		t.Helper()
+		s := newScripted(t)
+		c := interaction.New(s.mgr, s.session, nil)
+		done := ciInvoke(context.Background(), c, ciPath(1, ciOff), opts)
+		m := s.next(t)
+		tags := icmTopTags(t, m.payload)
+		req := ciRefLess(t, s, m)
+		if req.SuppressResponse || req.TimedRequest {
+			t.Fatalf("request %+v: want both flags false", req)
+		}
+		await(t, done)
+		return tags
+	}
+	t.Run("leaves false flags out when forced", func(t *testing.T) {
+		t.Parallel()
+		if tags := invokeTags(t, interaction.InvokeOptions{OmitFalseFlags: true}); !slices.Equal(tags, []uint32{2, 0xFF}) {
+			t.Fatalf("InvokeRequest fields %v, want InvokeRequests and the revision only", tags)
+		}
+	})
+	t.Run("sends false flags without the option", func(t *testing.T) {
+		t.Parallel()
+		if tags := invokeTags(t, interaction.InvokeOptions{}); !slices.Equal(tags, []uint32{0, 1, 2, 0xFF}) {
+			t.Fatalf("InvokeRequest fields %v, want SuppressResponse and TimedRequest as false", tags)
+		}
+	})
+	t.Run("leaves false flags out of a write when forced", func(t *testing.T) {
+		t.Parallel()
+		_, payload, _ := writeCaptured(t, []interaction.WriteRequest{{Path: attrPath(1, 6, 0x4003), Value: writeUint8(1)}}, interaction.WriteOptions{OmitFalseFlags: true})
+		if tags := icmTopTags(t, payload); !slices.Equal(tags, []uint32{2, 3, 0xFF}) {
+			t.Fatalf("WriteRequest fields %v, want WriteRequests, MoreChunkedMessages and the revision", tags)
+		}
 	})
 }
 

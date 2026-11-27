@@ -751,7 +751,7 @@
   },
   {
     "file": "client/interaction/client_interaction_invoke_parity_matterjs_test.go",
-    "line": 287,
+    "line": 333,
     "citation": "ClientInteractionInvokeTest.ts:812-818",
     "resolved": "packages/protocol/test/action/client/ClientInteractionInvokeTest.ts",
     "identifier": "InteractionModelRevision",
@@ -796,7 +796,7 @@
   },
   {
     "file": "client/interaction/interaction.go",
-    "line": 448,
+    "line": 473,
     "citation": "InteractionMessenger.ts:148-161",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "StatusResponse",
@@ -805,7 +805,7 @@
   },
   {
     "file": "client/interaction/invoke.go",
-    "line": 55,
+    "line": 66,
     "citation": "ClientInteraction.ts:195",
     "resolved": "packages/protocol/src/action/client/ClientInteraction.ts",
     "identifier": "batchDuration",
@@ -814,7 +814,7 @@
   },
   {
     "file": "client/interaction/invoke.go",
-    "line": 132,
+    "line": 143,
     "citation": "InteractionMessenger.ts:1227-1250",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "StatusResponse",
@@ -823,7 +823,7 @@
   },
   {
     "file": "client/interaction/invoke.go",
-    "line": 365,
+    "line": 378,
     "citation": "InteractionMessenger.ts:1440-1452",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "sendTimedRequest",
@@ -832,7 +832,7 @@
   },
   {
     "file": "client/interaction/invoke_batcher_parity_matterjs_test.go",
-    "line": 387,
+    "line": 394,
     "citation": "ClientInteraction.ts:186",
     "resolved": "packages/protocol/src/action/client/ClientInteraction.ts",
     "identifier": "isBatchable",
@@ -1060,7 +1060,7 @@
   },
   {
     "file": "client/interaction/write.go",
-    "line": 130,
+    "line": 139,
     "citation": "InteractionMessenger.ts:1454-1478",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "StatusResponse",
@@ -1069,7 +1069,7 @@
   },
   {
     "file": "client/interaction/write.go",
-    "line": 147,
+    "line": 156,
     "citation": "InteractionMessenger.ts:1333",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "maxPayloadSize",
@@ -1078,7 +1078,7 @@
   },
   {
     "file": "client/interaction/write_chunk_parity_matterjs_test.go",
-    "line": 303,
+    "line": 329,
     "citation": "InteractionClientMessengerTest.ts:621-629",
     "resolved": "packages/protocol/test/interaction/InteractionClientMessengerTest.ts",
     "identifier": "worstResponseSize",
@@ -1087,7 +1087,7 @@
   },
   {
     "file": "client/interaction/write_request_parity_matterjs_test.go",
-    "line": 127,
+    "line": 137,
     "citation": "WriteTest.ts:99",
     "resolved": "packages/protocol/test/action/request/WriteTest.ts",
     "identifier": "timedRequest",
@@ -3045,7 +3045,7 @@
   },
   {
     "file": "im/write.go",
-    "line": 573,
+    "line": 585,
     "citation": "AttributeWriteResponse.ts:355-358",
     "resolved": "packages/protocol/src/action/server/AttributeWriteResponse.ts",
     "identifier": "isHeldByOtherWrite",

@@ -465,3 +465,61 @@ func TestSenderInvokeAndWrite(t *testing.T) {
 		}
 	}
 }
+
+// TestSenderOmitFalseFlags: a group request keeps both flags — its
+// SuppressResponse true, its TimedRequest false — unless OmitFalseFlags
+// forces the false TimedRequest out; SuppressResponse stays (im.RequestFlagsForSending
+// with group set, matter.js InteractionMessenger.ts:1594-1598 at db91886c).
+// An own test, not a port: matter.js's group case (ClientGroupTest.ts:49)
+// checks that the caller's request object is not mutated, which has no Go
+// counterpart.
+func TestSenderOmitFalseFlags(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	m, st, tr := senderSetup(t)
+	rx, _ := NewManager(st, nil)
+	s, err := m.Sender(ctx, 1, 257)
+	if err != nil {
+		t.Fatal(err)
+	}
+	topTags := func(payload []byte) map[uint32]bool {
+		t.Helper()
+		dec := tlv.NewDecoder(payload)
+		if _, err := dec.Next(); err != nil {
+			t.Fatal(err)
+		}
+		tags := map[uint32]bool{}
+		for {
+			el, err := dec.Next()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if el.IsEndContainer {
+				return tags
+			}
+			tags[el.Tag.Number] = true
+			if el.IsContainer {
+				if _, err := spec.ReadContainer(dec, el); err != nil {
+					t.Fatal(err)
+				}
+			}
+		}
+	}
+	path := im.ConcreteAttributePath{Cluster: 0x0006, Attribute: 0x4003, HasCluster: true, HasAttribute: true}
+	for _, omit := range []bool{false, true} {
+		if err := s.Invoke(ctx, im.ConcreteCommandPath{Cluster: 0x0006, Command: 0x02}, nil, RequestOptions{OmitFalseFlags: omit}); err != nil {
+			t.Fatal(err)
+		}
+		payload, _ := decodeSent(t, rx, tr)
+		if tags := topTags(payload); !tags[0] || tags[1] == omit {
+			t.Errorf("invoke, omit %v: fields %v, want SuppressResponse and TimedRequest %v", omit, tags, !omit)
+		}
+		if err := s.Write(ctx, path, boolValue(true), RequestOptions{OmitFalseFlags: omit}); err != nil {
+			t.Fatal(err)
+		}
+		payload, _ = decodeSent(t, rx, tr)
+		if tags := topTags(payload); !tags[0] || tags[1] == omit {
+			t.Errorf("write, omit %v: fields %v, want SuppressResponse and TimedRequest %v", omit, tags, !omit)
+		}
+	}
+}

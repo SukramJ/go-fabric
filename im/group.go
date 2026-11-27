@@ -182,9 +182,14 @@ func HandleGroupInvoke(ctx context.Context, d Dispatcher, req InvokeRequest, tim
 //
 // Mirrors matter.js InteractionServer.handleWriteRequest for a group
 // session and AttributeWriteResponse.process / #processWildcard /
-// #writeAttributeForWildcard: chunking together with SuppressResponse is
-// InvalidAction, a TimedRequest flag mismatches, a group write without
-// SuppressResponse is InvalidAction; the writes then run in order, each
+// #writeAttributeForWildcard: a SuppressResponse the request leaves out
+// counts as true, before any other check (a group write is never
+// answered; InteractionServer.ts:410-413 at db91886c, so req's
+// HasSuppressResponse decides — a hand-built WriteRequest{} is absent and
+// runs); chunking together with SuppressResponse is then InvalidAction
+// (:415-420, also for an absent one), a TimedRequest flag mismatches, a
+// group write with an explicit SuppressResponse false is InvalidAction
+// (:454-459); the writes then run in order, each
 // on every member endpoint that hosts the attribute, where the attribute
 // is writable, the Group subject holds its write privilege and the
 // attribute has no timed quality (a group session is never timed); a path
@@ -237,6 +242,14 @@ func HandleGroupWrite(ctx context.Context, d Dispatcher, req WriteRequest) Group
 // handleGroupWrite runs the group write, handing every dispatcher result
 // to record.
 func handleGroupWrite(ctx context.Context, d Dispatcher, req WriteRequest, record func([]WriteResult)) StatusCode { //nolint:gocyclo // the group write's per-path gates in matter.js order
+	// A group write is never answered, so an absent SuppressResponse
+	// counts as true — first, before the MoreChunkedMessages check.
+	// Mirrors matter.js
+	// packages/node/src/node/server/InteractionServer.ts:410-413 at
+	// db91886c (session type Group and suppressResponse undefined → true).
+	if !req.HasSuppressResponse {
+		req.SuppressResponse, req.HasSuppressResponse = true, true
+	}
 	if req.MoreChunkedMessages && req.SuppressResponse {
 		return StatusInvalidAction
 	}

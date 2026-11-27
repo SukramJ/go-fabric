@@ -4985,8 +4985,10 @@
         "im:TestChunkedWriteHoldParityMatterJS",
         "im:TestGroupInvokeParityMatterJS",
         "im:TestGroupWriteParityMatterJS",
+        "im:TestGroupWriteSuppressResponsePresenceFromTheDecoder",
         "node:TestInteractionProtocolParityMatterJS",
-        "node:TestWildcardPathFlagsParityMatterJS"
+        "node:TestWildcardPathFlagsParityMatterJS",
+        "bridge:TestRequestWithoutFlagsParityMatterJS"
       ],
       "missing": [
         "does not answer the subscriber's error status for the initial report with a status",
@@ -5013,8 +5015,8 @@
           "reason": "matter.js log-line text of a unicast invoke"
         }
       ],
-      "reason": "The version filters, path ceilings, wildcard writes, the timed-interaction gates and the invoke-batch checks are covered on the Go IM paths; chunked-write holds, group dispatch, response chunking and the remaining read/subscribe cases are not ported case by case. Pin lift b25ed960: under SuppressResponse no InvokeResponse is sent also when a CommandDataIB was produced (#5011, P1-C; findings F-b25ed960-6 closed); the two held-response cases it replaces are gone upstream and from the Go subtests, and the suppressed cases (command throws, only a status, a CommandDataIB) are ported.",
-      "snapshotSha": "35735557f10029f24896788242447a6db8cb9879"
+      "reason": "The version filters, path ceilings, wildcard writes, the timed-interaction gates and the invoke-batch checks are covered on the Go IM paths; chunked-write holds, group dispatch, response chunking and the remaining read/subscribe cases are not ported case by case. Pin lift b25ed960: under SuppressResponse no InvokeResponse is sent also when a CommandDataIB was produced (#5011, P1-C; findings F-b25ed960-6 closed); the two held-response cases it replaces are gone upstream and from the Go subtests, and the suppressed cases (command throws, only a status, a CommandDataIB) are ported. Pin lift db91886c (#5047, P1-A): a Write without TimedRequest and an Invoke without SuppressResponse and TimedRequest are processed and answered (bridge, over the secure receive path), and a group write without SuppressResponse counts it as true — written and unanswered, refused when chunked — while an explicit false is refused (im, on HandleGroupWrite and from the decoder).",
+      "snapshotSha": "1222a615f3e682803d4882932b3c79456416611b"
     },
     {
       "path": "packages/node/test/endpoint/server/ProtocolServiceTest.ts",
@@ -5794,8 +5796,8 @@
       "path": "packages/node/test/node/ClientGroupTest.ts",
       "status": "excluded",
       "class": "js-runtime-only",
-      "reason": "The TypeScript ClientGroup refusing endpoint state accessors and state writes.",
-      "snapshotSha": "11a2406561a62d7f73d1dc938a7c676e6e2fd55f"
+      "reason": "The TypeScript ClientGroup refusing endpoint state accessors and state writes; and (pin lift db91886c, #5069) a group invoke leaving the caller's request object unchanged — the Go group sender (groups.Sender.Invoke) takes path, fields and options by value and builds a fresh request, so there is no caller-owned request to mutate (its OmitFalseFlags is groups:TestSenderOmitFalseFlags, an own test).",
+      "snapshotSha": "67717df0390a896433f66b8900970a21cacf9fbf"
     },
     {
       "path": "packages/node/test/node/ClientInvokeTest.ts",
@@ -5817,8 +5819,8 @@
           "reason": "beforeDispatch is `Server only` in matter.js's own words (Invoke.ts:52-55 at 862ad75f): it reaches ClientInvoke through the shared Invoke type and the client reads it nowhere but isBatchable; a Go client option nothing dispatches would copy the type-sharing artefact, not a behaviour."
         }
       ],
-      "reason": "The batcher of single commands (client/interaction Interaction.Invoke, ClientInteraction.#invokeWithBatching at 862ad75f) on the scripted rig — one InvokeRequest per batch window and network lane, numbered by CommandRef, its bypasses (MaxPathsPerInvoke 1, endpoint 0, timed, suppressed, expected processing time, extended fail-safe timeout, MRP delay, Large Message, NoBatch, a non-default InvokeOptions.InteractionModelRevision, a DelayReportData, a ClientRequest.AddressOverride whose exchange carries it — isBatchable, ClientInteraction.ts:185-213), duplicate paths in separate batches, a split by MaxPathsPerInvoke, the interaction's default network (interaction.Config.Network, `request.network ?? this.#network` :765, :1250) sharing a lane with a command naming it, close and abort, a close while the batcher's connect is held (interaction.HoldConnect, export_test.go) — and the commands through it on fabrictest (controller/client:TestClientInvokeParity). The network of the direct, batched and split exchange (TestInvokeNetworkParity) is observed on a provider that records each exchange's network (interaction.RecordNetworks, export_test.go), matter.js's spy on NetworkProfiles.select; the request names \"unlimited\", which matter.js's ClientNodeInteraction.invoke supplies (ClientNodeInteraction.ts:213-216). Left: the maxPathsPerInvoke cache (none in Go) and beforeDispatch (a server-only field of the shared Invoke type). The requireExistingSession bypass (ClientRequest.RequireExistingSession, ClientInteraction.ts:229 at b25ed960) is TestInvokeBatcherParity's row requireExistingSession (pin-lift unit P3-D).",
-      "snapshotSha": "981d5fb9dafc6ec7505f1b5c2940d1ea62ccd96d"
+      "reason": "The batcher of single commands (client/interaction Interaction.Invoke, ClientInteraction.#invokeWithBatching at 862ad75f) on the scripted rig — one InvokeRequest per batch window and network lane, numbered by CommandRef, its bypasses (MaxPathsPerInvoke 1, endpoint 0, timed, suppressed, expected processing time, extended fail-safe timeout, MRP delay, Large Message, NoBatch, a non-default InvokeOptions.InteractionModelRevision, a DelayReportData, a ClientRequest.AddressOverride whose exchange carries it — isBatchable, ClientInteraction.ts:185-213), duplicate paths in separate batches, a split by MaxPathsPerInvoke, the interaction's default network (interaction.Config.Network, `request.network ?? this.#network` :765, :1250) sharing a lane with a command naming it, close and abort, a close while the batcher's connect is held (interaction.HoldConnect, export_test.go) — and the commands through it on fabrictest (controller/client:TestClientInvokeParity). The network of the direct, batched and split exchange (TestInvokeNetworkParity) is observed on a provider that records each exchange's network (interaction.RecordNetworks, export_test.go), matter.js's spy on NetworkProfiles.select; the request names \"unlimited\", which matter.js's ClientNodeInteraction.invoke supplies (ClientNodeInteraction.ts:213-216). Left: the maxPathsPerInvoke cache (none in Go) and beforeDispatch (a server-only field of the shared Invoke type). The requireExistingSession bypass (ClientRequest.RequireExistingSession, ClientInteraction.ts:229 at b25ed960) is TestInvokeBatcherParity's row requireExistingSession (pin-lift unit P3-D). Pin lift db91886c (#5069, P1-B): InvokeOptions.OmitFalseFlags is a bypass row of TestInvokeBatcherParity (isBatchable, ClientInteraction.ts:223).",
+      "snapshotSha": "e4bb5e36921852ec597d711bec312d1cf020cf86"
     },
     {
       "path": "packages/node/test/node/ClientNestedStructStateTest.ts",
@@ -7742,7 +7744,8 @@
         "client/interaction:TestInvokeBatchRefusals",
         "client/interaction:TestInvokeBatchSplitsRefLessParity",
         "client/interaction:TestClientInteractionInvokeLargeMessageInference",
-        "client/interaction:TestInvokeBatcherCloseParity"
+        "client/interaction:TestInvokeBatcherCloseParity",
+        "client/interaction:TestClientInteractionRequestFlags"
       ],
       "missing": [
         "does not synthesize NO_COMMAND_RESPONSE for an unanswered wildcard command (no concrete path)",
@@ -7750,8 +7753,8 @@
         "sends DelayReportData in its own message",
         "refuses a request with DelayReportData before anything is sent"
       ],
-      "reason": "15 cases ported on the scripted rig for the Go single-command Invoke (no commandRef on the wire, abort during and before the exchange with no retransmission after, a read's abort, suppressResponse, concurrent single invokes, no DelayReportData, a response without InteractionModelRevision, received vs local error statuses, the largeMessage inference on a copy of the caller's options); the multi-command invoke through Interaction.InvokeBatch (client/interaction:TestInvokeBatch*: NoCommandResponse for an unanswered command, a stray CommandDataIB discarded, the ref-less split for a MaxPathsPerInvoke-1 peer, the refusal below one path; ClientInteraction.ts:510-517, :616-700 at 862ad75f); the batcher's close cases (client/interaction:TestInvokeBatcherCloseParity: an in-flight batch aborted with the close reason, the batch queued behind it rejected with it). Missing: the wildcard command (a Go invoke names a concrete path), the stray CommandStatusIB passed up (InvokeBatch returns one Result per command, so a status for no sent command has no slot) and DelayReportData sending.",
-      "snapshotSha": "501b3a3570c0c93de6ce67f0ea5dfb310b4b3e56"
+      "reason": "15 cases ported on the scripted rig for the Go single-command Invoke (no commandRef on the wire, abort during and before the exchange with no retransmission after, a read's abort, suppressResponse, concurrent single invokes, no DelayReportData, a response without InteractionModelRevision, received vs local error statuses, the largeMessage inference on a copy of the caller's options); the multi-command invoke through Interaction.InvokeBatch (client/interaction:TestInvokeBatch*: NoCommandResponse for an unanswered command, a stray CommandDataIB discarded, the ref-less split for a MaxPathsPerInvoke-1 peer, the refusal below one path; ClientInteraction.ts:510-517, :616-700 at 862ad75f); the batcher's close cases (client/interaction:TestInvokeBatcherCloseParity: an in-flight batch aborted with the close reason, the batch queued behind it rejected with it). Missing: the wildcard command (a Go invoke names a concrete path), the stray CommandStatusIB passed up (InvokeBatch returns one Result per command, so a status for no sent command has no slot) and DelayReportData sending. Pin lift db91886c (#5069, P1-B): the request flags group (an invoke and a write with OmitFalseFlags, an invoke without it sending both flags false) is client/interaction:TestClientInteractionRequestFlags.",
+      "snapshotSha": "607d821387aeef518e3e631002ade96f19141fb6"
     },
     {
       "path": "packages/protocol/test/action/client/ClientInteractionSubscribeTest.ts",
@@ -7769,8 +7772,8 @@
         "does not wait on close for a BDX exchange whose creation failed",
         "aborts the creation of a BDX exchange on close"
       ],
-      "reason": "Interaction.Close (ClientInteraction.ts:264-297 at 862ad75f), its in-flight set and the abandoned establishment (:1084-1097, InteractionMessenger.ts:1116-1137) run on the scripted peer: an aborted subscribe returns at once and Close ends the wait for its report; a report that arrives after the abort, and one being processed when the interaction closes, are answered INVALID_SUBSCRIPTION once. Missing: the reuse of an abandoned subscribe's request object (Go requests are values) and a failing exchange close (the Go exchange's Close cannot fail) have no Go shape; the three BDX cases need the client-side BDX initiation (ClientInteraction.initBdx, :1185-1215), which the Go client has not. The compact-priming group (#4943) runs through the scripted subscribe and an unacknowledged final report status (pin lift b25ed960, P2b-E).",
-      "snapshotSha": "3208cf7822dfaeb118e49e676e0a10565016f343"
+      "reason": "Interaction.Close (ClientInteraction.ts:264-297 at 862ad75f), its in-flight set and the abandoned establishment (:1084-1097, InteractionMessenger.ts:1116-1137) run on the scripted peer: an aborted subscribe returns at once and Close ends the wait for its report; a report that arrives after the abort, and one being processed when the interaction closes, are answered INVALID_SUBSCRIPTION once. Missing: the reuse of an abandoned subscribe's request object (Go requests are values) and a failing exchange close (the Go exchange's Close cannot fail) have no Go shape; the three BDX cases need the client-side BDX initiation (ClientInteraction.initBdx, :1185-1215), which the Go client has not. The compact-priming group (#4943) runs through the scripted subscribe and an unacknowledged final report status (pin lift b25ed960, P2b-E). Pin lift db91886c (#5046, P1-B): the seam is reportInterrupted with final-unacknowledged (interaction.ReportInterrupted).",
+      "snapshotSha": "b6973b7ffb35e98ac521606a93eaebc792956ebf"
     },
     {
       "path": "packages/protocol/test/action/client/InputChunkTest.ts",
@@ -7809,8 +7812,8 @@
       "go": [
         "client/interaction:TestClientSubscriptionHandlerParity"
       ],
-      "reason": "All 6 cases ported on the scripted rig (#4943, pin lift b25ed960, P2b-E): the peer never acknowledges our StatusResponse to a keepalive, so the exchange's MRP gives up as on the wire. The compact priming comes from the subscribe request (OnOff compact, wildcard not). The 'another reason' case fails the send at the socket (ErrNetwork), because a Go send has no PeerUnresponsiveError other than the ack-missing one.",
-      "snapshotSha": "15da7483d8ab539dd4de5c4f962a856e303add3e"
+      "reason": "All 9 cases ported on the scripted rig (#4943, pin lift b25ed960, P2b-E; #5046, pin lift db91886c, P1-B): the peer never acknowledges our StatusResponse to a keepalive, so the exchange's MRP gives up as on the wire; or it acknowledges our status to a report chunk and never sends the next one, so the exchange's receive wait ends in PeerMessageMissingError. The compact priming comes from the subscribe request (OnOff compact, wildcard not). The 'another reason' cases fail the status send at the socket (ErrNetwork), because a Go send has no PeerUnresponsiveError other than the ack-missing one, and answer the next chunk's wait with a StatusResponse Failure; the surfaced error is the registry's report_failed log line.",
+      "snapshotSha": "e2f5b028323b3382c0339d8b848783359cb59fe4"
     },
     {
       "path": "packages/protocol/test/action/client/subscription/ClientSubscriptionsTest.ts",
@@ -7831,10 +7834,10 @@
       "path": "packages/protocol/test/action/client/subscription/PeerSubscriptionTest.ts",
       "status": "ported",
       "go": [
-        "client/interaction:TestPeerSubscriptionReportStatusUnacknowledgedParity"
+        "client/interaction:TestPeerSubscriptionReportInterruptedParity"
       ],
-      "reason": "All 6 cases ported as an internal test on Subscription.reportStatusUnacknowledged / nextReportNumber (#4943, pin lift b25ed960, P2b-E). The loss log is captured from the subscription's slog.Logger.",
-      "snapshotSha": "c38a12eee3806a38c9dc5d01ec9657d50c16929e"
+      "reason": "All 7 cases ported as an internal test on Subscription.reportInterrupted / nextReportNumber (#4943, pin lift b25ed960, P2b-E; #5046 chunk-missing, pin lift db91886c, P1-B). The loss logs are captured from the subscription's slog.Logger; the chunk-missing loss has its own key (subscription_lost_report_chunk_missing) as matter.js's has its own text.",
+      "snapshotSha": "d0e5bcddcb58c10007d852aed00720205cea3efe"
     },
     {
       "path": "packages/protocol/test/action/client/subscription/SustainedSubscriptionTest.ts",
@@ -7957,8 +7960,8 @@
         "uses custom interaction model revision",
         "replaces a secret attribute value"
       ],
-      "reason": "The WriteRequest read off the wire of Interaction.Write (paths, encoded values, timed flag and TimedRequest timeout, data versions, moreChunkedMessages, list chunking default, the revision) and its refusals before sending (a DataVersion on a wildcard endpoint, through the one numeric surface both the reified and the raw case map to; an empty write) are ported; missing are the call without an argument (Write always takes a writes slice; the empty one is ported) and a custom revision (Go always stamps its own). Pin lift b25ed960: the redaction of a secret attribute value in the request's log output (#4931) is open, unit P4-B.",
-      "snapshotSha": "6fa95b7cd28e80cabd81e8714fd9eded1c8e1a1b"
+      "reason": "The WriteRequest read off the wire of Interaction.Write (paths, encoded values, timed flag and TimedRequest timeout, data versions, moreChunkedMessages, list chunking default, the revision) and its refusals before sending (a DataVersion on a wildcard endpoint, through the one numeric surface both the reified and the raw case map to; an empty write) are ported; missing are the call without an argument (Write always takes a writes slice; the empty one is ported) and a custom revision (Go always stamps its own). Pin lift b25ed960: the redaction of a secret attribute value in the request's log output (#4931) is open, unit P4-B. Pin lift db91886c (#5069, P1-B): omitFalseFlags carried to the request is TestWriteRequestBuildBasic's first case, read off the wire (the false TimedRequest left out).",
+      "snapshotSha": "986d306340e45e12ea40db5ab64bab03d260371d"
     },
     {
       "path": "packages/protocol/test/action/response/InvokeResultTest.ts",
@@ -9198,7 +9201,9 @@
         "im:TestMessengerParity_ReadRequestFitsPayload",
         "im:TestMessengerParity_ReadRequestWithManyDataVersionFilters",
         "im:TestMessengerParity_SubscribeRequestRoundTrip",
-        "im:TestMessengerParity_SubscribeRequestWithManyDataVersionFilters"
+        "im:TestMessengerParity_SubscribeRequestWithManyDataVersionFilters",
+        "client/interaction:TestInteractionClientMessengerReportInterruption",
+        "im:TestRequestFlagsForSendingParityMatterJS"
       ],
       "missing": [
         "throws a received error when the peer answers a read with a StatusResponse ${status}",
@@ -9215,8 +9220,8 @@
         "does not consider a report with SuppressResponse as waiting for a status",
         "does not consider a report waiting for a status once it was answered"
       ],
-      "reason": "Read, subscribe, the read refused by a StatusResponse (UnsupportedAccess and Success) and every write that fits one message or is refused are ported through Interaction against a scripted peer; missing are the 0x7777 StatusResponse variant (a Go status is a uint8, im/status.go:61), the report iterator split between iteration and close (Go has no iterator; Read returns after the final ack), the abandonSubscription group (no Go counterpart, InteractionMessenger.ts:1116-1137). The write chunking across messages runs through Interaction.Write (client/interaction:TestInteractionClientMessengerWriteChunking; fix: InteractionMessenger.ts:1269-1450). The abandonSubscription group's behaviour is ported through the abandoned subscribe (client/interaction:TestClientInteractionSubscribe*), not as messenger-level cases. The allDataVersionFiltersSent result of the two subscribe cases is held through the compact-priming estimate in client/interaction:TestInteractionClientMessengerSubscribe (pin lift b25ed960, P2b-E).",
-      "snapshotSha": "f55d0921b2a0e9d917cc846ad2266ada1e3413b1"
+      "reason": "Read, subscribe, the read refused by a StatusResponse (UnsupportedAccess and Success) and every write that fits one message or is refused are ported through Interaction against a scripted peer; missing are the 0x7777 StatusResponse variant (a Go status is a uint8, im/status.go:61), the report iterator split between iteration and close (Go has no iterator; Read returns after the final ack), the abandonSubscription group (no Go counterpart, InteractionMessenger.ts:1116-1137). The write chunking across messages runs through Interaction.Write (client/interaction:TestInteractionClientMessengerWriteChunking; fix: InteractionMessenger.ts:1269-1450). The abandonSubscription group's behaviour is ported through the abandoned subscribe (client/interaction:TestClientInteractionSubscribe*), not as messenger-level cases. The allDataVersionFiltersSent result of the two subscribe cases is held through the compact-priming estimate in client/interaction:TestInteractionClientMessengerSubscribe (pin lift b25ed960, P2b-E). Pin lift db91886c (#5069, #5046, P1-B): the forced omitFalseFlags write — one message and every chunk without the false flags, the flags decided before chunking — runs through Interaction.Write; the eight requestFlagsForSending rows run on im.RequestFlagsForSending (the characterization at this module's own revision 12 included); the reportInterruption group runs on the rule readDataReports applies to a failed chunk wait (client/interaction:TestInteractionClientMessengerReportInterruption), its effect over the scripted peer in client/interaction:TestClientSubscriptionHandlerParity.",
+      "snapshotSha": "7425830d17a78d570959d77a01bb9fb20cd590a1"
     },
     {
       "path": "packages/protocol/test/mdns/CommissionableMdnsScannerTest.ts",
@@ -11029,8 +11034,18 @@
           "reason": "a second TLV schema object without the field; the module's one InvokeRequest decoder reads tag 3 and skips other unknown context tags"
         }
       ],
-      "reason": "The decode side of DelayReportData on im.UnmarshalInvokeRequestTLV: tag 3 with its two fields (the decode half of the round trip), a request without it, a missing field as 0, a value that is not a structure refused. Missing: the module has no DelayReportData encoder (its client sends none), so the encoded bytes are not asserted.",
-      "snapshotSha": "a128398457c1e9540f4ec396692315b36f110286"
+      "reason": "The CHIP SDK's group invoke without SuppressResponse and TimedRequest decodes with both false (pin lift db91886c, #5047), and the decode side of DelayReportData on im.UnmarshalInvokeRequestTLV: tag 3 with its two fields (the decode half of the round trip), a request without it, a missing field as 0, a value that is not a structure refused. Missing: the module has no DelayReportData encoder (its client sends none), so the encoded bytes are not asserted.",
+      "snapshotSha": "1ee2a8f6ade2c5664c1d6ea3223bd473e3a5b821"
+    },
+    {
+      "path": "packages/types/test/protocol/TlvWriteRequestTest.ts",
+      "status": "ported",
+      "go": [
+        "im:TestTlvWriteRequestParityMatterJS",
+        "im:TestMandatoryWriteInvokeFieldParity"
+      ],
+      "reason": "A WriteRequest that carries only WriteRequests decodes on im.UnmarshalWriteRequestTLV with SuppressResponse absent and TimedRequest false (pin lift db91886c, #5047).",
+      "snapshotSha": "f383cf710e4e86c35af975b9853d84b8436fa745"
     },
     {
       "path": "packages/types/test/schema/Base38SchemaTest.ts",

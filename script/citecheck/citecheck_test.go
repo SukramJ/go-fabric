@@ -273,7 +273,11 @@ const citecheckDriftRatchet = 416
 // ClientStructure.ts lines to db91886c: 3358.
 // P1-F (pin lift db91886c): the Thermostat MSCH/TSUGGEST citations
 // re-anchored from b25ed960 to db91886c, the forward-gate ones gone: 3364.
-const citecheckOffPinRatchet = 3364
+// 3365 after phase 9 P1-A: the im request decoders' and encoders'
+// TlvInvokeRequest/TlvWriteRequest cites re-read and relabelled at db91886c.
+// 3352 after phase 9 P1-B: client/interaction's report-interruption and
+// readDataReports cites re-read and relabelled at db91886c.
+const citecheckOffPinRatchet = 0 // MEASURE
 
 // offPinRowRE reads the off-pin row of summary.md.
 var offPinRowRE = regexp.MustCompile(`(?m)^\| ` + regexp.QuoteMeta(offPinRow) + ` \| (\d+) \|$`)

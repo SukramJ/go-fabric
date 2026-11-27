@@ -30,7 +30,7 @@ Line citations whose sentence names a matter.js commit other than the pin are ch
 | `9892fa39` | 2 | 0 |
 | `b25ed960` | 726 | 12 |
 | `d87d1de4` | 2 | 0 |
-| `db021da0` | 2516 | 180 |
+| `db021da0` | 2512 | 180 |
 | `e812bd07` | 1 | 0 |
 
 ## Counted, not ratcheted

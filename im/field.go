@@ -79,9 +79,10 @@ func boolField(el tlv.Element) (bool, error) {
 // an error that carries no status with Status.Failure (:425-460). The
 // thrown error is a plain MatterError (packages/general/src/MatterError.ts:188).
 // The fields:
-// TlvReadRequest.ts:30, TlvSubscribeRequest.ts:21, :39,
-// TlvInvokeRequest.ts:19, :22, TlvWriteRequest.ts:18, :21, :25 (under
-// packages/types/src/protocol/messages/), TlvAttributePath.ts:21 and
+// TlvReadRequest.ts:30, TlvSubscribeRequest.ts:21, :39 (at db021da0),
+// TlvInvokeRequest.ts:23, :30 and TlvWriteRequest.ts:22, :29, :33 (at
+// db91886c; under packages/types/src/protocol/messages/),
+// TlvAttributePath.ts:21 and
 // TlvEventPath.ts:22 (under packages/types/src/protocol/types/). The
 // response decoders keep [boolField], except the event path, which
 // readEventPathFields shares with the request side: the client's

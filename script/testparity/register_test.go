@@ -251,9 +251,11 @@ const testparityPlannedRatchet = 3
 // nullable-struct default case, #5058), ClusterBehaviorFeaturesTest.ts's
 // Thermostat default case and SERVER_ONLY_DEFAULTS case missing: 180 ported,
 // 1007 missing.
+// Pin lift db91886c P1-A ports the new TlvWriteRequestTest.ts (#5047): 180
+// ported.
 const (
-	testparityPortedRatchet  = 180
-	testparityMissingRatchet = 1007
+	testparityPortedRatchet  = 0 // MEASURE
+	testparityMissingRatchet = 0 // MEASURE
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the

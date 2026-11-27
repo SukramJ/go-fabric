@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 11037,
+  "entry_points": 11045,
   "initializers": 374,
   "entry_packages": [
     ".",
@@ -298,9 +298,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 28774,
-    "reachable": 22361,
-    "whitelisted": 6391,
+    "total_exported": 28786,
+    "reachable": 22366,
+    "whitelisted": 6398,
     "unreachable": 22
   },
   "by_package": [
@@ -7428,7 +7428,7 @@
       "identifier": "TestRequestBooleanFieldOfAnotherTypeAnsweredFailure",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/request_boolean_fields_test.go",
-      "line": 95
+      "line": 99
     },
     {
       "package": "bridge",
@@ -7450,6 +7450,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_awaits_ack_test.go",
       "line": 25
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestRequestWithoutFlagsParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/request_boolean_fields_test.go",
+      "line": 163
     },
     {
       "package": "bridge",
@@ -11201,7 +11208,7 @@
       "identifier": "EstablishedCount",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/interaction/export_test.go",
-      "line": 152
+      "line": 148
     },
     {
       "package": "client/interaction",
@@ -11257,7 +11264,7 @@
       "identifier": "RegisterPeerSubscription",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/interaction/export_test.go",
-      "line": 161
+      "line": 157
     },
     {
       "package": "client/interaction",
@@ -11268,7 +11275,7 @@
     },
     {
       "package": "client/interaction",
-      "identifier": "ReportStatusUnacknowledged",
+      "identifier": "ReportInterrupted",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/interaction/export_test.go",
       "line": 142
@@ -11422,6 +11429,13 @@
     },
     {
       "package": "client/interaction",
+      "identifier": "TestInteractionClientMessengerReportInterruption",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/interaction/report_interruption_parity_matterjs_test.go",
+      "line": 26
+    },
+    {
+      "package": "client/interaction",
       "identifier": "TestInvokeChargeCountsTheFields",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/interaction/report_charge_internal_test.go",
@@ -11443,10 +11457,10 @@
     },
     {
       "package": "client/interaction",
-      "identifier": "TestPeerSubscriptionReportStatusUnacknowledgedParity",
+      "identifier": "TestPeerSubscriptionReportInterruptedParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/interaction/peer_subscription_parity_matterjs_test.go",
-      "line": 69
+      "line": 68
     },
     {
       "package": "client/interaction",
@@ -34046,6 +34060,13 @@
     },
     {
       "package": "groups",
+      "identifier": "TestSenderOmitFalseFlags",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/sender_test.go",
+      "line": 476
+    },
+    {
+      "package": "groups",
       "identifier": "TestSenderSendsTheGroupMessage",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "groups/sender_test.go",
@@ -34763,7 +34784,7 @@
       "identifier": "TestGroupInteractionsFailClosed",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/group_parity_matterjs_test.go",
-      "line": 180
+      "line": 182
     },
     {
       "package": "im",
@@ -34777,7 +34798,7 @@
       "identifier": "TestGroupInvokeParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/group_parity_matterjs_test.go",
-      "line": 114
+      "line": 116
     },
     {
       "package": "im",
@@ -34791,7 +34812,7 @@
       "identifier": "TestGroupWriteIsNeverTimed",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/group_parity_matterjs_test.go",
-      "line": 266
+      "line": 324
     },
     {
       "package": "im",
@@ -34805,7 +34826,14 @@
       "identifier": "TestGroupWriteParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/group_parity_matterjs_test.go",
-      "line": 210
+      "line": 212
+    },
+    {
+      "package": "im",
+      "identifier": "TestGroupWriteSuppressResponsePresenceFromTheDecoder",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/group_parity_matterjs_test.go",
+      "line": 271
     },
     {
       "package": "im",
@@ -35253,7 +35281,7 @@
       "identifier": "TestMandatoryWriteInvokeFieldParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/mandatory_field_parity_matterjs_test.go",
-      "line": 72
+      "line": 74
     },
     {
       "package": "im",
@@ -35691,6 +35719,20 @@
     },
     {
       "package": "im",
+      "identifier": "TestRequestEncodingOmitFalseFlags",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/request_encoding_test.go",
+      "line": 17
+    },
+    {
+      "package": "im",
+      "identifier": "TestRequestFlagsForSendingParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/request_flags_parity_matterjs_test.go",
+      "line": 16
+    },
+    {
+      "package": "im",
       "identifier": "TestRequestsWithoutInteractionModelRevision",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/imrevision_absent_parity_matterjs_test.go",
@@ -35785,7 +35827,14 @@
       "identifier": "TestTlvInvokeRequestParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/tlv_invoke_request_parity_matterjs_test.go",
-      "line": 19
+      "line": 21
+    },
+    {
+      "package": "im",
+      "identifier": "TestTlvWriteRequestParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/tlv_write_request_parity_matterjs_test.go",
+      "line": 17
     },
     {
       "package": "im",
