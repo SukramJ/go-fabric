@@ -230,7 +230,7 @@ func (i *Instance) patchStruct(ctx FeatureContext, name string, s *Struct, v ref
 
 // storedDefault is the value storage holds for f absent one, as a value
 // of the Go type t: matter.js StoredDefaultValue (SelectDefaultValue.ts:46-65
-// at b25ed960) — nothing unless f is mandatory under the features, then
+// at db91886c) — nothing unless f is mandatory under the features, then
 // the stated default, else the null of a nullable f.
 func (i *Instance) storedDefault(ctx FeatureContext, f *Field, t reflect.Type) (reflect.Value, bool) {
 	if f.Conformance.Applicability(ctx) != ApplicabilityMandatory {

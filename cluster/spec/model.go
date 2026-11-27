@@ -213,7 +213,7 @@ func held(t Type, c Constraint, relaxed string) (Type, Constraint) {
 // LocationCapability, the Thermostat user limits' Abs* limits), an octet
 // string ("bytes") or a non-empty list ("list"). matter.js's model leaves
 // a reference to be resolved by the consumer
-// (packages/model/src/logic/SelectDefaultValue.ts:104-107 at b25ed960);
+// (packages/model/src/logic/SelectDefaultValue.ts:103-106 at db91886c);
 // the runtime starts such an element without a value, as it starts one
 // with no stated default, and a hand-written server resolves it. The
 // marker tells the two apart (W3-clugen-07).

@@ -2358,17 +2358,19 @@ func sortedClusterNames(s *snapshot) []string {
 // structDefault is the default of a struct-typed element that states none
 // of its own, built from the defaults its fields state. matter.js builds an
 // object's default from every conformant child that has one
-// (packages/model/src/logic/DefaultValue.ts:153-179 at b25ed960, reached
-// through ClusterDerivation.ts:144 and SelectDefaultValue.ts:144); for
-// OperationalError, whose ErrorStateStruct.ErrorStateId has `default: 0`
+// (packages/model/src/logic/DefaultValue.ts:153-179 at db91886c, reached
+// through ClusterDerivation.ts:178 and SelectDefaultValue.ts:143, the
+// DefaultValue call :155); for OperationalError, whose
+// ErrorStateStruct.ErrorStateId has `default: 0`
 // (operational-state.element.ts:110-111), that is {errorStateId: 0}. This
 // generator narrows it: the literal is the generated struct with each
 // mandatory, non-nullable field whose stated default is a number, a bool or
 // a string set to it; empty when the type is no struct or no such field
-// states a default. matter.js's wider rule also gives partial objects to
-// four nullable attributes (CommodityTariff CurrentDayEntry/NextDayEntry,
-// DeviceEnergyManagement Forecast, CommodityPrice CurrentPrice) that this
-// generator leaves without a default.
+// states a default. A nullable struct or bitmap attribute without a stated
+// default is null in matter.js, not built from its fields
+// (SelectDefaultValue.ts:145-152); no nullable attribute of the snapshot
+// gets a struct default here either, so the narrowing differs from
+// matter.js for a non-nullable struct only.
 func structDefault(t typeInfo) string {
 	if t.kind != kindStruct || t.dt == nil {
 		return ""

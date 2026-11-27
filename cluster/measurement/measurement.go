@@ -867,7 +867,7 @@ func (s *OccupancySensingServer) MatterRead(attrID uint32) (any, bool) {
 		// occupancy-sensing.element.ts:36 at b25ed960), so an unobserved
 		// source reads 0, unoccupied — matter.js's default of a
 		// non-nullable bitmap, `{}` with no bit set (packages/model/src/
-		// logic/SelectDefaultValue.ts:155-171) — as
+		// logic/SelectDefaultValue.ts:164-180 at db91886c) — as
 		// BooleanStateServer.MatterRead answers false.
 		v, _ := s.ObservedOccupancy()
 		return v, true

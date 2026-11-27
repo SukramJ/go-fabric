@@ -325,8 +325,8 @@ type ChangeReportingWriter interface {
 // behavior an event that records and reports only for the cluster's
 // conformant events it supports, so nothing else reaches a subscriber
 // there
-// (packages/node/src/behavior/internal/ClusterDerivation.ts:174-200 at
-// b25ed960, createDerivedEvents).
+// (packages/node/src/behavior/internal/ClusterDerivation.ts:215-241 at
+// db91886c, createDerivedEvents).
 type ClusterEventLister interface {
 	// MatterEvents returns the cluster event IDs the server may
 	// surface via subscribed event reports.
@@ -1065,7 +1065,7 @@ type AttributeChangeNotifier interface {
 // emits only those events conveyed between nodes", the event itself
 // normally and its QuietObservable for a server-side quieter element
 // (packages/node/src/behavior/Events.ts:231-239, :269-300;
-// internal/ClusterDerivation.ts:171-172, :182 at db021da0) — which
+// internal/ClusterDerivation.ts:212-213, :223 at db91886c) — which
 // ServerBehaviorBacking subscribes, as the event's `quiet`, for the report
 // of a quieter property (internal/ServerBehaviorBacking.ts:253-261).
 //

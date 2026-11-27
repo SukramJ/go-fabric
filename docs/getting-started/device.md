@@ -298,7 +298,9 @@ and a declaration that serves HoldTime gets chip's hold timer — a cleared
 Occupancy holds for HoldTime. A
 TemperatureSensor therefore answers MeasuredValue null until you set a
 reading. An enum or a string has no fallback in matter.js either, and a
-struct only an empty placeholder (`SelectDefaultValue.ts:19`, `:167-171`);
+non-nullable struct only an empty placeholder (`SelectDefaultValue.ts:19`,
+`:176-180`) — a nullable struct or bitmap without a stated default is null
+(`:145-152`);
 all three stay yours to state (the test `TestEveryListedAttributeHasAValue`
 names them).
 The endpoint assembler mounts Descriptor, Identify,
