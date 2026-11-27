@@ -50,7 +50,7 @@ import (
 // [CameraControllerEndpoint] with the Camera Controller device type and a
 // WebRtcTransportRequestor the cameras of the fabric reach (matter.js
 // packages/node/src/devices/camera-controller.ts:133 mandates the requestor; the entry that lets a
-// camera reach it mirrors WebRtcTransportRequestorServer.ts:45-94). The
+// camera reach it mirrors WebRtcTransportRequestorServer.ts:118-129 and :143-181). The
 // stream management over it is the camera service (controller/camera).
 type CameraConfig struct{}
 
@@ -199,7 +199,7 @@ func rootDescriptor(root *endpoint.Endpoint) *mattercore.Descriptor {
 // servedACL is the ACL the tree is served under: on our fabric, the
 // administrator is RootNodeID — ourselves — and every node of the fabric
 // may operate the requestor over CASE, the entry matter.js's requestor
-// adds for itself (WebRtcTransportRequestorServer.ts:81-91: Operate, CASE,
+// adds for itself (WebRtcTransportRequestorServer.ts:168-177: Operate, CASE,
 // no subject, the requestor's endpoint and cluster) and node/ adds on the
 // device side (node/webrtc_requestor_acl.go). Another fabric holds nothing.
 type servedACL struct {
@@ -281,8 +281,8 @@ func (p cameraPort) End(_ context.Context, session camera.WebRTCSession, reason 
 
 // Refused is the requestor's refusal observer: a command for a session it
 // does not hold is logged and fans out as [CameraSignalRefused] — matter.js's
-// refused event (packages/node/src/behaviors/web-rtc-transport-requestor/WebRtcTransportRequestorServer.ts:177-180
-// and :212-219 at db021da0). A refused Answer is otherwise invisible on
+// refused event (packages/node/src/behaviors/web-rtc-transport-requestor/WebRtcTransportRequestorServer.ts:328-335
+// and :455 at db91886c). A refused Answer is otherwise invisible on
 // this side, and the camera only logs it (issue 464); the ws-controller
 // of the reference server leaves the event unobserved. A refused Offer or
 // Answer is a failed establishment and logs a warning; a refused

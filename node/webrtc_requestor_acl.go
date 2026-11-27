@@ -22,8 +22,8 @@ type WebRTCRequestorConfig struct {
 	// a camera among them, may then invoke the requestor's commands. nil
 	// writes it into no fabric. matter.js writes it only into the first
 	// fabric its node's own controller administers, by root certificate
-	// (WebRtcTransportRequestorServer.ts:56-94 at db021da0,
-	// fabricAuthority.fabrics[0] at :58; FabricAuthority.ts:112-114,
+	// (WebRtcTransportRequestorServer.ts:143-181 at db91886c,
+	// fabricAuthority.fabrics[0] at :145; FabricAuthority.ts:112-114,
 	// :126-128), and a [Node] has no controller of its own, so no fabric
 	// gets it unasked: the fabric's administrator grants the access, or the
 	// host returns true here for the fabrics its cameras signal on. The node
@@ -48,9 +48,9 @@ type WebRTCRequestorConfig struct {
 // fabric without GrantFabric. matter.js adds it to the first fabric its
 // own controller administers
 // (packages/node/src/behaviors/web-rtc-transport-requestor/
-// WebRtcTransportRequestorServer.ts:45-94 at db021da0: initialize,
-// #nodeOnline, fabricAuthority.fabrics[0] at :58, the duplicate check
-// :67-79, the entry :81-91; FabricAuthority.ts:112-114, :126-128: the
+// WebRtcTransportRequestorServer.ts at db91886c: initialize :118-129,
+// #nodeOnline :143-181, fabricAuthority.fabrics[0] at :145, the duplicate
+// check :154-167, the entry :168-177; FabricAuthority.ts:112-114, :126-128: the
 // fabrics whose root certificate is its CA's), which a [Node] does not
 // have. The facade calls it at Start and after each CommissioningComplete,
 // matter.js's node-online and fabric-added reactions. It never removes an
@@ -83,7 +83,7 @@ func (n *Node) ensureRequestorACL(ctx context.Context) {
 		n.logger.Warn("webrtc.requestor.acl_list_failed", slog.Any("err", err))
 		return
 	}
-	if len(fabrics) == 0 { // :59-62
+	if len(fabrics) == 0 { // :146-149
 		return
 	}
 	for i := range fabrics {
@@ -97,8 +97,8 @@ func (n *Node) ensureRequestorACL(ctx context.Context) {
 }
 
 // ensureRequestorACLOn adds the requestor's Operate/CASE entry to
-// fabricIndex's ACL unless it is there (the duplicate check :67-79, the
-// entry :81-91), under the AccessControl server's write lock
+// fabricIndex's ACL unless it is there (the duplicate check :154-167, the
+// entry :168-177), under the AccessControl server's write lock
 // (addLocalOperateEntry).
 func (n *Node) ensureRequestorACLOn(ctx context.Context, fabricIndex uint8, epID uint16) {
 	if !n.addLocalOperateEntry(ctx, fabricIndex, epID, camera.RequestorClusterID, "webrtc.requestor.acl") {

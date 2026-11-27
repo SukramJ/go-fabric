@@ -6,6 +6,8 @@ package bridge
 import (
 	"context"
 	"net"
+
+	"thingfabric.dev/go-fabric/internal/specseam"
 )
 
 // A session's messages are handled in the order they arrive. The UDP
@@ -35,6 +37,11 @@ import (
 // the bridge serialises itself, are not queued.
 
 type sessionTurnKey struct{}
+
+// A cluster server's handler that waits for something other than the
+// session's next message releases the turn through the seam (decision 744:
+// a held WebRTC signal, cluster/camera Requestor.HoldUnknownSignals).
+func init() { specseam.LeaveSessionTurn = leaveSessionOrder }
 
 // handleOrderedDatagram is the ordered listener's handler: the dispatch
 // context carries the release of the session's turn.

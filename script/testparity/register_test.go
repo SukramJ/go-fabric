@@ -251,9 +251,12 @@ const testparityPlannedRatchet = 3
 // (#5049, P1-D), all new, and ClusterBehaviorTest.ts, excluded before (#5058, P1-I);
 // ClusterBehaviorFeaturesTest.ts's SERVER_ONLY_DEFAULTS case is missing (P1-I):
 // 183 ported, 1006 missing.
+// P1-G: WebRtcTransportRequestorServerTest.ts becomes partial, its new ACL case
+// for an endpoint a reassembly adds missing (F-db91886c-8, outside #5045),
+// −1 ported +1 missing: 182 ported, 1007 missing.
 const (
-	testparityPortedRatchet  = 183
-	testparityMissingRatchet = 1006
+	testparityPortedRatchet  = 182
+	testparityMissingRatchet = 1007
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the
@@ -368,7 +371,10 @@ const (
 // CommissioningFailsafeExpiryTest.ts's expiry before the flow armed (matter.js
 // caught up, #5049, P1-D) leave; NobleBleChannelTest.ts's reopen after close
 // joins (js-runtime-only, #5052, Fable P0 verdict: nothing to reopen): 793.
-const testparityLeftRatchet = 793
+// P1-G leaves three WebRtcTransportRequestorServerTest.ts cases: the
+// ImplementationError of an endpoint without the requestor (by design) and two
+// that document matter.js's transaction lock (js-runtime-only): 796.
+const testparityLeftRatchet = 796
 
 // The matterjs-server register's four ratchets, exact in both directions as
 // the matter.js register's are (the comments above give the rules). Set by

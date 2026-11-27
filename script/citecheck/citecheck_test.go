@@ -186,7 +186,8 @@ import (
 // controller/attestation/policy_test.go, cluster/camera's requestor parity
 // test) and four out of it; the P1 units that touch those files re-read
 // them (measured by make cite-report).
-const citecheckDriftRatchet = 416
+// Phase 9 P1-G re-cuts cluster/camera's requestor citations to db91886c: 415.
+const citecheckDriftRatchet = 415
 
 // citecheckOffPinRatchet is the number of line citations checked at a
 // matter.js commit other than the pin: their sentence names that commit
@@ -273,8 +274,9 @@ const citecheckDriftRatchet = 416
 // Busy, ClusterDerivation.ts, SelectDefaultValue.ts, ClientStructure.ts, the
 // Thermostat MSCH/TSUGGEST ones, the im request codecs, client/interaction's
 // report interruption, the commissioner's cancel and expiry); the forward-gate
-// citations are gone with the gate: 3311 (measured after merging P1-A+B and P1-D).
-const citecheckOffPinRatchet = 3311
+// citations are gone with the gate; P1-G moves the WebRtcTransportRequestorServer.ts
+// citations of controller/serve.go, controller/camera and node/ from db021da0 to the pin: 3305 (measured after merging P1-G).
+const citecheckOffPinRatchet = 3305
 
 // offPinRowRE reads the off-pin row of summary.md.
 var offPinRowRE = regexp.MustCompile(`(?m)^\| ` + regexp.QuoteMeta(offPinRow) + ` \| (\d+) \|$`)
