@@ -1197,7 +1197,7 @@
   },
   {
     "file": "cluster/camera/requestor.go",
-    "line": 414,
+    "line": 420,
     "citation": "packages/node/src/behavior/state/managed/values/ListManager.ts:461-478",
     "resolved": "packages/node/src/behavior/state/managed/values/ListManager.ts",
     "identifier": "createProxy",

@@ -245,6 +245,12 @@ func removeKey(sessions []WebRTCSession, key wrdef.SessionKey) ([]WebRTCSession,
 // report) once no hold for the peer exists, or [EarlySignalHoldTime] after
 // the signal arrived. A waiting signal releases its CASE session's turn,
 // so the peer's other messages on that session are handled meanwhile.
+// Signals held for one session are delivered without an order among
+// them once it is registered: an IceCandidates may reach the port before
+// the Offer it belongs to, and a held End may remove the session before
+// a held Offer, which is then refused NOT_FOUND. matter.js does not order
+// one session's events either (WebRtcTransportRequestorServer.ts:428-429;
+// the test comment WebRtcTransportRequestorServerTest.ts:1337-1338).
 //
 // Take the hold before the request is sent; call release after the
 // registration was tried and before any cleanup that ends the session at
