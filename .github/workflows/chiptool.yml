@@ -855,7 +855,7 @@ jobs:
   # progress). The job keeps its name, which branch protection does not
   # list (script/requiredchecks).
   long-on-base:
-    name: certification families (long) on the base commit
+    name: chip-tool verdicts on the base commit
     needs: changes
     if: needs.changes.outputs.release == 'true' && (needs.changes.outputs.code != 'true' || needs.changes.outputs.release_shape == 'true')
     runs-on: ubuntu-latest
