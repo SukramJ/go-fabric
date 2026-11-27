@@ -303,7 +303,7 @@ func init() {
 
 // Report returns the head of a report composed under p: the policies'
 // digest, the effective level and its origin, the selected profiles and
-// the enabled extensions, each sorted and each once; no surface and no
+// the enabled extensions but the retired ones, each sorted and each once; no surface and no
 // decision. device.Device and the
 // node start their reports with it.
 func (p Policies) Report() Report {
@@ -311,7 +311,7 @@ func (p Policies) Report() Report {
 	if names := p.profileNames(); len(names) > 0 {
 		r.Profiles = names
 	}
-	if ids := p.Extensions.IDs(); len(ids) > 0 {
+	if ids := p.Extensions.effectiveIDs(); len(ids) > 0 {
 		r.Extensions = ids
 	}
 	return r

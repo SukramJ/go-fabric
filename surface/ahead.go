@@ -64,8 +64,37 @@ func (s AheadSet) Row(kind Kind, id uint32) string {
 
 // Extensions are the "Ahead of matter.js" register IDs a host enables
 // ([Policies].Extensions). An ID this module does not declare is allowed:
-// a host may enable a row before the module ships it.
+// a host may enable a row before the module ships it. A retired ID
+// ([RetiredExtensions]) is allowed too and selects nothing.
 type Extensions map[string]struct{}
+
+// retiredExtensions are the register IDs whose row closed because
+// matter.js caught up — the elements they selected compose without an
+// extension now — mapped to the release that retired them. A retired ID
+// stays known for the deprecation window (README §The deprecation window):
+// [Policies].Extensions may name it, node.AheadRows lists it so a host
+// that validates its configuration against that list keeps starting, and
+// it changes nothing — no element is tagged with it, and it is left out
+// of [Policies.Digest] and [Report].Extensions. Removing an ID from this
+// list is permissible in the second minor release after the one that
+// retired it.
+var retiredExtensions = map[string]string{
+	// MatterScheduleConfiguration: matter.js released the feature (#5044,
+	// pin db91886c); the Thermostat selects it by its feature bit.
+	"BD-chip-Thermostat-Schedules": "v0.29.0",
+}
+
+// RetiredExtensions returns the retired "Ahead of matter.js" register IDs,
+// sorted: IDs a host may still name in [Policies].Extensions during their
+// deprecation window, which select nothing.
+func RetiredExtensions() []string { return slices.Sorted(maps.Keys(retiredExtensions)) }
+
+// ExtensionRetired reports whether id is a retired register ID
+// ([RetiredExtensions]).
+func ExtensionRetired(id string) bool {
+	_, ok := retiredExtensions[id]
+	return ok
+}
 
 // NewExtensions returns the extensions ids.
 func NewExtensions(ids ...string) Extensions {
@@ -82,8 +111,15 @@ func (e Extensions) Has(id string) bool {
 	return ok
 }
 
-// IDs returns the enabled register IDs, sorted.
+// IDs returns the enabled register IDs, sorted — a retired one
+// ([RetiredExtensions]) included, as e names it.
 func (e Extensions) IDs() []string { return slices.Sorted(maps.Keys(e)) }
+
+// effectiveIDs returns the enabled register IDs without the retired ones,
+// sorted: what identifies and what reports the policies.
+func (e Extensions) effectiveIDs() []string {
+	return slices.DeleteFunc(e.IDs(), ExtensionRetired)
+}
 
 // ErrExtensionNotEnabled is wrapped by the [*RefusedError] [Evaluate]
 // returns when the built-in reference policy refuses an element: a

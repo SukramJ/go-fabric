@@ -268,7 +268,9 @@ const citecheckDriftRatchet = 416
 // pin); 734 stay at b25ed960 because a bound file changed upstream or a
 // bare part binds no file. binding/manager.go's ClientGroupInteraction.ts
 // range is re-cut to :33-81 (#5069 shortened the class by one line).
-const citecheckOffPinRatchet = 3372
+// P1-F (pin lift db91886c): the Thermostat MSCH/TSUGGEST citations
+// re-anchored from b25ed960 to db91886c, the forward-gate ones gone: 3364.
+const citecheckOffPinRatchet = 3364
 
 // offPinRowRE reads the off-pin row of summary.md.
 var offPinRowRE = regexp.MustCompile(`(?m)^\| ` + regexp.QuoteMeta(offPinRow) + ` \| (\d+) \|$`)

@@ -23,11 +23,12 @@ import (
 
 // thermostatAheadRows are the Thermostat rows of the "Ahead of matter.js"
 // register and the feature each declares (thermo.Ahead).
+// MatterScheduleConfiguration is no row since the lift to db91886c
+// (TestAheadThermostatSchedulesNeedNoExtension).
 var thermostatAheadRows = []struct {
 	row     string
 	feature thermostatdef.Feature
 }{
-	{"BD-chip-Thermostat-Schedules", thermostatdef.FeatureMatterScheduleConfiguration},
 	{"BD-chip-Thermostat-Events", thermostatdef.FeatureEvents},
 }
 
@@ -76,21 +77,51 @@ func TestAheadThermostatDisabled(t *testing.T) {
 		if !strings.Contains(err.Error(), r.row) {
 			t.Errorf("%s: error %q does not name the row", r.row, err)
 		}
-		// The other row enabled does not enable this one.
-		other := surface.Policies{Extensions: surface.NewExtensions(otherRow(r.row))}
+		// Every other row enabled, the retired ones included, does not
+		// enable this one.
+		others := slices.DeleteFunc(append(aheadRows(), surface.RetiredExtensions()...), func(id string) bool { return id == r.row })
+		other := surface.Policies{Extensions: surface.NewExtensions(others...)}
 		if _, err := aheadThermostat("refused", r.feature, &other); !errors.Is(err, surface.ErrExtensionNotEnabled) {
-			t.Errorf("%s: with only %s enabled, err = %v", r.row, otherRow(r.row), err)
+			t.Errorf("%s: with only %v enabled, err = %v", r.row, others, err)
 		}
 	}
 }
 
-func otherRow(row string) string {
-	for _, r := range thermostatAheadRows {
-		if r.row != row {
-			return r.row
+// TestAheadThermostatSchedulesNeedNoExtension: matter.js released
+// MatterScheduleConfiguration (#5044), so the feature composes under the
+// zero-value policies, untagged; naming the retired ID
+// BD-chip-Thermostat-Schedules changes nothing — not the surface, not the
+// digest, not the report's extensions (owner decisions 731, 740).
+func TestAheadThermostatSchedulesNeedNoExtension(t *testing.T) {
+	const retired = "BD-chip-Thermostat-Schedules"
+	if !surface.ExtensionRetired(retired) || thermo.Ahead.Row(surface.KindFeature, uint32(thermostatdef.FeatureMatterScheduleConfiguration)) != "" {
+		t.Fatalf("%s is not retired, or MSCH still names a row", retired)
+	}
+	plain, err := aheadThermostat("msch", thermostatdef.FeatureMatterScheduleConfiguration, nil)
+	if err != nil {
+		t.Fatalf("MSCH under the zero-value policies: %v", err)
+	}
+	rep := plain.Surface()
+	if c := clusterOf(rep, thermostatdef.ClusterID); c.FeatureMap&uint32(thermostatdef.FeatureMatterScheduleConfiguration) == 0 {
+		t.Errorf("FeatureMap 0x%X lacks MSCH", c.FeatureMap)
+	}
+	for _, d := range rep.Decisions {
+		if d.Reference.Ahead != "" {
+			t.Errorf("decision %+v names a row", d)
 		}
 	}
-	return ""
+	named := surface.Policies{Extensions: surface.NewExtensions(retired)}
+	withID, err := aheadThermostat("msch", thermostatdef.FeatureMatterScheduleConfiguration, &named)
+	if err != nil {
+		t.Fatalf("MSCH with the retired ID named: %v", err)
+	}
+	got := withID.Surface()
+	if diff := surface.Diff(rep.Effective, got.Effective); len(diff) != 0 {
+		t.Errorf("the retired ID changes the surface: %v", diff)
+	}
+	if got.Policies != rep.Policies || got.Extensions != nil {
+		t.Errorf("the retired ID reaches the report: digest equal %v, extensions %v", got.Policies == rep.Policies, got.Extensions)
+	}
 }
 
 // TestAheadThermostatNotSelected: a host that never selects an ahead

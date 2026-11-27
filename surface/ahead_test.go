@@ -194,3 +194,44 @@ func TestIDsDecodeBothForms(t *testing.T) {
 		}
 	}
 }
+
+// TestRetiredExtensionSelectsNothing: a retired register ID
+// (surface.RetiredExtensions) stays nameable in Policies.Extensions for its
+// deprecation window and has no effect — the digest and the report are
+// those of the policies without it, Has and IDs still show it as the host
+// named it, and an element tagged with another row is still refused
+// (owner decision 740).
+func TestRetiredExtensionSelectsNothing(t *testing.T) {
+	retired := surface.RetiredExtensions()
+	if !slices.Contains(retired, "BD-chip-Thermostat-Schedules") || !slices.IsSorted(retired) {
+		t.Fatalf("RetiredExtensions() = %v, want BD-chip-Thermostat-Schedules, sorted", retired)
+	}
+	for _, id := range retired {
+		if !surface.ExtensionRetired(id) {
+			t.Errorf("ExtensionRetired(%q) = false", id)
+		}
+	}
+	if surface.ExtensionRetired(rowA) {
+		t.Errorf("ExtensionRetired(%q) = true", rowA)
+	}
+	named := surface.Policies{Extensions: surface.NewExtensions(retired...)}
+	if named.Digest() != (surface.Policies{}).Digest() {
+		t.Error("a retired ID moves the digest")
+	}
+	if r := named.Report(); r.Extensions != nil || r.Policies != (surface.Policies{}).Digest() {
+		t.Errorf("report %+v names a retired ID", r)
+	}
+	withA := surface.Policies{Extensions: surface.NewExtensions(append([]string{rowA}, retired...)...)}
+	if withA.Digest() != (surface.Policies{Extensions: surface.NewExtensions(rowA)}).Digest() {
+		t.Error("a retired ID beside an enabled row moves the digest")
+	}
+	if r := withA.Report(); !slices.Equal(r.Extensions, []string{rowA}) {
+		t.Errorf("report extensions %v, want [%s]", r.Extensions, rowA)
+	}
+	if !named.Extensions.Has(retired[0]) || !slices.Equal(named.Extensions.IDs(), retired) {
+		t.Errorf("Has/IDs do not show the named IDs: %v", named.Extensions.IDs())
+	}
+	if _, _, err := surface.Evaluate(aheadCandidates(), named); !errors.Is(err, surface.ErrExtensionNotEnabled) {
+		t.Errorf("err = %v, want the rows still refused", err)
+	}
+}

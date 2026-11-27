@@ -21,11 +21,11 @@ import (
 
 // The write rules of Schedules (MSCH) — the atomic write of a controller,
 // the host's SetSchedules and the configured schedules alike — as
-// matter.js's ThermostatServer implements them behind its forward feature
-// thermostat-msch (packages/node/src/behaviors/thermostat/ThermostatServer.ts
-// at b25ed960: #validateScheduleWriteRequest :2693-2807,
-// #validateScheduleTransitions :2825-3002, #normalizeSchedules :3028-3049,
-// #validateScheduleCommit :3056-3086), on the atomic-write state of
+// matter.js's ThermostatServer implements them
+// (packages/node/src/behaviors/thermostat/ThermostatServer.ts at db91886c:
+// #validateScheduleWriteRequest :2685-2799,
+// #validateScheduleTransitions :2817-2994, #normalizeSchedules :3020-3041,
+// #validateScheduleCommit :3048-3078), on the atomic-write state of
 // atomic.go.
 
 // scheduleHandleLength is the length of a handle the server issues to a

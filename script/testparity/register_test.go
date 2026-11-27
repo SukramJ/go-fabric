@@ -355,7 +355,10 @@ const (
 // Pin lift b25ed960 wave P6 leaves ServerSubscriptionTest.ts's flush on a
 // given session (by design, BD-Matter-Subscription-FlushOnOwnSessionOnly,
 // P6-B): 773.
-const testparityLeftRatchet = 773
+// Pin lift db91886c, P1-F: SchedulesConfigurationTest.ts's "refuses to start"
+// (by design, the retired extension) left with the case matter.js deleted
+// (#5044): -1.
+const testparityLeftRatchet = 772
 
 // The matterjs-server register's four ratchets, exact in both directions as
 // the matter.js register's are (the comments above give the rules). Set by

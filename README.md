@@ -267,6 +267,17 @@ becomes permissible in:
 | `cluster/camera.Provider.PeerGone` | `Provider.EndLostPeer`, the same call, which also returns how many of the pair's sessions it ended | `v0.29.0` |
 | `cluster/core.AccessControl.NotifyLocalEntryInstalled` | `AccessControl.NotifyLocalEntryInstalledOn`, which names the fabric the entry was appended to and marks it, so the fabric's removal is reported as the Acl shrinking | `v0.29.0` |
 
+**Retired register IDs.** An *Ahead of matter.js* register ID
+(`surface.Policies.Extensions`) is a public value too. When matter.js
+catches up with its row, the row closes and the ID is retired, not removed:
+`surface.RetiredExtensions` lists it with the window above — accepted in
+`Policies.Extensions`, listed by `node.AheadRows`, removable from the list
+in the second minor release after the one that retired it. Rule 2 does not
+apply to it as written: the elements a retired ID enabled compose without
+it, so naming it selects nothing, and it is left out of `Policies.Digest`
+and `Report.Extensions`. Retired now: `BD-chip-Thermostat-Schedules` (in
+`v0.29.0`, removable in `v0.31.0`; matter.js released MatterScheduleConfiguration).
+
 A patch release (`v0.x.y`) never removes or renames a public identifier and
 never changes a signature. Deprecations may be *marked* in a patch release;
 they are only ever *acted on* in a minor one.

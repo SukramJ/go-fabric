@@ -61,8 +61,7 @@ func TestServerMatchesTheGeneratedDefinition(t *testing.T) {
 // matter.js refuses — and of the suggestions without Presets ("[PRES]",
 // connectedhomeip's ThermostatCluster.h:80 static_assert at 6170af84) —
 // New with ErrFeatures, NewThermostatServer with a panic.
-// MatterScheduleConfiguration (behind matter.js's forward feature
-// thermostat-msch, ThermostatServer.ts:267-271 at b25ed960), the events
+// MatterScheduleConfiguration (released in matter.js since #5044), the events
 // (which matter.js does not emit) and the suggestions (which it does not
 // implement) are served (schedules.go, events.go, suggestions.go).
 func TestFeaturesTheServerDoesNotServeAreRefused(t *testing.T) {

@@ -57,12 +57,19 @@ var aheadByCluster = map[uint32]surface.AheadSet{
 // Extensions (surface.Policies.Extensions) to select their elements on
 // the root and on a device. The one answer to "which extensions exist"
 // (ADR 0030 Consequences; ADR 0025 principle 2).
+//
+// During their deprecation window the retired register IDs
+// (surface.RetiredExtensions) are listed as well, so a host that validates
+// its configuration against this list keeps accepting one; a retired ID
+// selects nothing, and a page that offers the extensions for selection
+// leaves those surface.ExtensionRetired reports out.
 func AheadRows() []string {
 	var out []string
 	for _, s := range aheadByCluster {
 		out = append(out, s.IDs()...)
 	}
 	out = append(out, deviceseam.AheadRows()...)
+	out = append(out, surface.RetiredExtensions()...)
 	slices.Sort(out)
 	return slices.Compact(out)
 }

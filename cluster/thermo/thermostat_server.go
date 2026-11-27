@@ -12,10 +12,9 @@
 // the optional TemperatureSetpointHold (with TemperatureSetpointHoldDuration)
 // and ThermostatRunningState. MatterScheduleConfiguration (the device's
 // week programs, the active one, SetActiveScheduleRequest and the atomic
-// write of Schedules) follows matter.js, which implements it behind its
-// forward feature thermostat-msch (ThermostatServer.ts:177-178, :267-271
-// at b25ed960), behind the extension BD-chip-Thermostat-Schedules and a
-// [SchedulePort] (schedules.go); and ThermostatSuggestions (the presets a
+// write of Schedules) follows matter.js, which serves it released since
+// #5044 (no forward gate at db91886c), with a [SchedulePort]
+// (schedules.go); and ThermostatSuggestions (the presets a
 // controller suggests for a span of time, the one the thermostat follows)
 // after connectedhomeip's ThermostatSuggestions, on the node's Matter time
 // ([ThermostatServer.AttachMatterTime], suggestions.go).
