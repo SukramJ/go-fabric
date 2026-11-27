@@ -6,6 +6,7 @@ package device
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"thingfabric.dev/go-fabric/cluster/camera"
 	csdef "thingfabric.dev/go-fabric/cluster/spec/cameraavstreammanagement"
@@ -39,6 +40,8 @@ func TestKitSettingsBesideHostServerOrWithoutPortRefused(t *testing.T) {
 	for _, decl := range []wpdef.Declare{
 		{HostServer: host(t), MaxSessions: 1},
 		{HostServer: host(t), MaxSessionsPerFabric: 1},
+		{HostServer: host(t), EvictIdle: time.Minute},
+		{HostServer: host(t), EvictAcrossFabrics: true},
 	} {
 		if _, err := newWith(CameraType(), testOptions("host-settings"), streams, decl); !errors.Is(err, ErrConfiguration) {
 			t.Errorf("%+v: %v, want ErrConfiguration", decl, err)
@@ -49,7 +52,10 @@ func TestKitSettingsBesideHostServerOrWithoutPortRefused(t *testing.T) {
 			t.Errorf("%+v: %v, want ErrNegativeMaxSessions", decl, err)
 		}
 	}
-	for _, decl := range []wpdef.Declare{{MaxSessions: 1}, {MaxSessionsPerFabric: 1}} {
+	if _, err := newWith(CameraType(), testOptions("negative-evict-no-port"), streams, wpdef.Declare{EvictIdle: -time.Second}); !errors.Is(err, camera.ErrNegativeEvictIdle) {
+		t.Errorf("negative EvictIdle without a port: %v, want ErrNegativeEvictIdle", err)
+	}
+	for _, decl := range []wpdef.Declare{{MaxSessions: 1}, {MaxSessionsPerFabric: 1}, {EvictIdle: time.Minute}, {EvictAcrossFabrics: true}} {
 		if _, err := newWith(CameraType(), testOptions("bound-no-port"), streams, decl); err == nil {
 			t.Errorf("%+v without a ProviderPort: accepted, want refused", decl)
 		}

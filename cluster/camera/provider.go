@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	"thingfabric.dev/go-fabric/internal/deepcopy"
 
@@ -51,6 +52,10 @@ var ErrNoProviderPort = errors.New("camera: WebRtcTransportProvider needs a Prov
 // [ProviderConfig.MaxSessionsPerFabric].
 var ErrNegativeMaxSessions = errors.New("camera: WebRtcTransportProvider session bound is negative")
 
+// ErrNegativeEvictIdle reports a WebRtcTransportProvider built with a
+// negative [ProviderConfig.EvictIdle].
+var ErrNegativeEvictIdle = errors.New("camera: WebRtcTransportProvider EvictIdle is negative")
+
 // ProviderConfig carries the construction parameters of a [Provider].
 type ProviderConfig struct {
 	// Port is the camera's WebRTC stack; required.
@@ -84,6 +89,58 @@ type ProviderConfig struct {
 	// fabric cannot take every session of the camera. 0 is no bound;
 	// negative is [ErrNegativeMaxSessions].
 	MaxSessionsPerFabric int
+	// EvictIdle, when positive, lets a new session at a bound take the
+	// place of the accessing fabric's entry whose signalling is oldest,
+	// once that is at least EvictIdle old (issue #634, owner decisions
+	// 702-707): the entry leaves CurrentSessions, the port's EndSession
+	// and the requestor's End both carry OutOfResources, and the offer
+	// goes on to the port; the eviction stands whatever the port then
+	// answers, and the slot is then free. Signalling is a session's accepted signalling in either
+	// direction: its commit as a new session, an accepted re-offer,
+	// ProvideAnswer or ProvideICECandidates, and the camera's
+	// [Provider.Offer], [Provider.Answer] and [Provider.IceCandidates];
+	// a row the host set counts from the UpsertSession that entered it —
+	// a later UpsertSession of the row does not count. Idle is
+	// signalling-idle, not abandonment: a live view signals nothing once
+	// it is up, so with EvictIdle set a fabric at its bound loses its
+	// oldest established view to its own next offer once that view is
+	// older than EvictIdle — replacement within the fabric, not the
+	// detection of a dead session. Only a new session evicts (a re-offer
+	// never does), one entry per offer, and only when that one makes
+	// room: a table over the bound through the host's rows is refused as
+	// without EvictIdle. Without a [PeerConnector], or with the End queue
+	// full, the entry goes without an End. Another fabric's entry is
+	// never taken unless [ProviderConfig.EvictAcrossFabrics] is set. 0,
+	// the default, evicts nothing; negative is [ErrNegativeEvictIdle];
+	// without a bound it is inert. connectedhomeip's camera app cleans
+	// up on time only a session whose peer connection reported no state
+	// within 30 s (kConnectionTimeoutSeconds, webrtc-provider-manager.cpp:40,
+	// the timer :305-306, :526-527, cancelled at :1163, the cleanup
+	// :1408-1420 at 6170af84): a value below that lets a session still
+	// being set up be taken. A camera run against the certification cases keeps 0, or a
+	// value longer than the run, as those cases expect the refusal.
+	EvictIdle time.Duration
+	// EvictAcrossFabrics extends [ProviderConfig.EvictIdle] to a fair
+	// share across fabrics (owner decisions 708-711): at the provider's
+	// bound, a fabric holding fewer entries than its share takes the
+	// place of the longest-idle entry, idle for EvictIdle, of a fabric
+	// holding more than its share; without such an entry, the fabric's
+	// own rule applies. The share is MaxSessions divided by the number
+	// of fabrics holding an entry, the accessing one included, at least
+	// 1 and at most MaxSessionsPerFabric when that is set. An entry
+	// within its fabric's share is never ended by another fabric; the
+	// entries beyond it are borrowed, and one of them may be another
+	// administrator's view that is being watched — idle is
+	// signalling-idle. The share moves with the number of fabrics holding
+	// an entry (the fabrics with sessions, not the commissioned ones), so
+	// a fabric's protected count shrinks when another fabric first
+	// offers. A fabric over its share has the own-fabric rule only, so it
+	// cannot take a slot back. A fabric whose offer fails after it took
+	// another fabric's entry takes only its own for EvictIdle, or until a
+	// session of it is stored (decision 713): a camera that keeps refusing
+	// the fabric ends at most one view of another fabric per EvictIdle.
+	// Inert without EvictIdle > 0 and MaxSessions > 0.
+	EvictAcrossFabrics bool
 	// DataVersion is an optional host-owned tracker.
 	//
 	// Deprecated: a host-owned tracker adds nothing — the wire carries the
@@ -93,8 +150,15 @@ type ProviderConfig struct {
 	DataVersion *cluster.DataVersionTracker
 	// Logger receives the Debug lines of the camera's signals to the
 	// requestor (provider_peer.go: reaching the requestor and invoking
-	// the command, with their duration and error); slog.Default when nil.
+	// the command, with their duration and error) and the lines of an
+	// eviction at a bound (provider_cap.go): camera.provider.evicted and
+	// camera.provider.evict.no_end at Debug, camera.provider.evict.port_failed
+	// at Warn; slog.Default when nil.
 	Logger *slog.Logger
+	// Clock reads the time of the sessions' activity
+	// ([ProviderConfig.EvictIdle]) and of the signals' Debug lines; nil is
+	// the system clock (decision 712).
+	Clock clock.Clock
 }
 
 // Provider implements [contract.ClusterServer] for WebRtcTransportProvider:
@@ -116,7 +180,8 @@ type Provider struct {
 	port ProviderPort
 	cfg  ProviderConfig
 	view streamView
-	// clock times the Debug lines of the signals to the requestor (send).
+	// clock times the Debug lines of the signals to the requestor (send)
+	// and the activity of the sessions ([ProviderConfig.Clock]).
 	clock clock.Clock
 
 	// op serialises the commands and the fabric removal: each holds it
@@ -133,6 +198,16 @@ type Provider struct {
 	mu       sync.Mutex
 	sessions []ProviderSession
 	nextID   uint16
+	// activity is each entry's last accepted signalling, kept only while
+	// eviction is on ([ProviderConfig.EvictIdle], provider_cap.go).
+	activity map[uint16]time.Time
+	// spent holds, per fabric, when its offer failed after it took
+	// another fabric's entry: until EvictIdle has passed or a session of
+	// it is stored, it takes only its own (decision 713, provider_cap.go).
+	spent map[uint8]time.Time
+	// beforeEvictForTests, nil in production, runs between the admission
+	// and the eviction's removal, so a test can race the removal.
+	beforeEvictForTests func(victim ProviderSession)
 	// peers reaches a session's requestor for the camera's signals
 	// ([Provider.AttachPeerConnector]); nil until the node attaches one.
 	peers PeerConnector
@@ -168,7 +243,13 @@ func NewProvider(cfg ProviderConfig) (*Provider, error) {
 	if cfg.MaxSessions < 0 || cfg.MaxSessionsPerFabric < 0 {
 		return nil, fmt.Errorf("%w: MaxSessions %d, MaxSessionsPerFabric %d", ErrNegativeMaxSessions, cfg.MaxSessions, cfg.MaxSessionsPerFabric)
 	}
-	p := &Provider{port: cfg.Port, cfg: cfg, view: streamView{cfg.Streams}, clock: clock.System{}}
+	if cfg.EvictIdle < 0 {
+		return nil, fmt.Errorf("%w: %v", ErrNegativeEvictIdle, cfg.EvictIdle)
+	}
+	p := &Provider{port: cfg.Port, cfg: cfg, view: streamView{cfg.Streams}, clock: clock.Or(cfg.Clock)}
+	if p.evicting() {
+		p.activity, p.spent = map[uint16]time.Time{}, map[uint8]time.Time{}
+	}
 	handlers := map[uint32]spec.CommandHandler{
 		wpdef.CmdSolicitOffer:         serial(&p.op, p.solicitOffer),
 		wpdef.CmdProvideOffer:         serial(&p.op, p.provideOffer),
@@ -221,10 +302,19 @@ func (p *Provider) RemoveSession(sessionID uint16) {
 }
 
 func (p *Provider) removeSession(origin contract.Origin, sessionID uint16) error {
-	return p.change(origin, func(next []ProviderSession) ([]ProviderSession, bool) {
+	_, err := p.removeSessionReport(origin, sessionID)
+	return err
+}
+
+// removeSessionReport is removeSession reporting whether this call
+// removed the session — false when the table no longer held it.
+func (p *Provider) removeSessionReport(origin contract.Origin, sessionID uint16) (removed bool, err error) {
+	err = p.change(origin, func(next []ProviderSession) ([]ProviderSession, bool) {
 		kept := slices.DeleteFunc(next, func(s ProviderSession) bool { return s.Id == sessionID })
-		return kept, len(kept) != len(next)
+		removed = len(kept) != len(next)
+		return kept, removed
 	})
+	return removed, err
 }
 
 // change applies edit to a copy of the session table and, when edit
@@ -259,9 +349,14 @@ func (p *Provider) change(origin contract.Origin, edit func([]ProviderSession) (
 			return fmt.Errorf("camera: CurrentSessions: %w", err)
 		}
 	}
+	var now time.Time
+	if p.activity != nil {
+		now = p.clock.Now()
+	}
 	keep := func() {
 		p.mu.Lock()
 		p.sessions = next
+		p.stampLocked(now)
 		p.mu.Unlock()
 	}
 	if err := specseam.SetAttributesStored(p.srv, origin, map[uint32]any{wpdef.AttrCurrentSessions: spec.List[ProviderSession](next)}, keep); err != nil {
@@ -515,7 +610,10 @@ func (p *Provider) solicitOffer(ctx context.Context, fields any) (any, error) {
 		return nil, spec.Errorf(im.StatusDynamicConstraintError, "WebRtcTransportProvider: the camera cannot provide StreamUsage %d", r.usage)
 	}
 	node, fabric := peerOf(ctx)
-	if p.atSessionBound(fabric) {
+	refused, crossed, err := p.admitNew(ctx, fabric)
+	if err != nil {
+		return nil, err
+	} else if refused {
 		return p.refuseSolicitOffer(ctx, req, node, fabric, videos, audios)
 	}
 	id, err := p.generateSessionID() // :744-750
@@ -529,11 +627,14 @@ func (p *Provider) solicitOffer(ctx context.Context, fields any) (any, error) {
 	}
 	session, deferred, err := p.port.SolicitOffer(ctx, args) // :801-808
 	if err != nil {
+		p.settleClaim(fabric, crossed, false)
 		return nil, portError("SolicitOffer", err)
 	}
 	if err := p.upsertSession(contract.OriginCommand, session); err != nil { // :811
+		p.settleClaim(fabric, crossed, false)
 		return nil, p.abandonSession(ctx, session.Id, err)
 	}
+	p.settleClaim(fabric, crossed, true)
 	resp := wpdef.SolicitOfferResponse{WebRtcSessionId: session.Id, DeferredOffer: deferred}
 	if req.VideoStreamId != nil { // :826-830
 		resp.VideoStreamId = streamIDOf(session.VideoStreamId)
@@ -590,6 +691,7 @@ func (p *Provider) provideOffer(ctx context.Context, fields any) (any, error) {
 		return nil, spec.Errorf(im.StatusInvalidCommand, "WebRtcTransportProvider: a new session needs a StreamUsage")
 	}
 	node, fabric := peerOf(ctx)
+	newSession, crossed := req.WebRtcSessionId.Null, false
 	args := OfferArgs{
 		StreamUsage: usage, IceServers: req.IceServers, IceTransportPolicy: req.IceTransportPolicy,
 		MetadataEnabled: req.MetadataEnabled, PeerNodeID: node, FabricIndex: fabric, Sdp: req.Sdp,
@@ -618,7 +720,10 @@ func (p *Provider) provideOffer(ctx context.Context, fields any) (any, error) {
 		if err := p.checkTurnsOrStuns(req.IceServers); err != nil { // :1046-1051
 			return nil, err
 		}
-		if p.atSessionBound(fabric) {
+		var refused bool
+		if refused, crossed, err = p.admitNew(ctx, fabric); err != nil {
+			return nil, err
+		} else if refused {
 			return nil, errSessionBound
 		}
 		if args.SessionID, err = p.generateSessionID(); err != nil { // :1054-1060
@@ -628,15 +733,24 @@ func (p *Provider) provideOffer(ctx context.Context, fields any) (any, error) {
 	}
 	session, err := p.port.ProvideOffer(ctx, args) // :1101-1108
 	if err != nil {
+		if newSession {
+			p.settleClaim(fabric, crossed, false)
+		}
 		return nil, portError("ProvideOffer", err)
 	}
 	if err := p.upsertSession(contract.OriginCommand, session); err != nil { // :1111
-		if req.WebRtcSessionId.Null {
+		if newSession {
+			p.settleClaim(fabric, crossed, false)
 			return nil, p.abandonSession(ctx, session.Id, err)
 		}
 		// A re-offer: the table still holds the session as it was, and
 		// the controller can end it.
 		return nil, spec.Errorf(im.StatusFailure, "%v", err)
+	}
+	if newSession {
+		p.settleClaim(fabric, crossed, true)
+	} else {
+		p.touch(existing.Id) // an accepted re-offer (decision 704)
 	}
 	resp := wpdef.ProvideOfferResponse{WebRtcSessionId: session.Id}
 	if req.VideoStreamId != nil { // :1117-1121
@@ -671,6 +785,7 @@ func (p *Provider) provideAnswer(ctx context.Context, fields any) (any, error) {
 	if err := p.port.ProvideAnswer(ctx, req.WebRtcSessionId, req.Sdp); err != nil { // :1149
 		return nil, portError("ProvideAnswer", err)
 	}
+	p.touch(req.WebRtcSessionId)
 	return nil, nil
 }
 
@@ -693,6 +808,7 @@ func (p *Provider) provideIceCandidates(ctx context.Context, fields any) (any, e
 	if err := p.port.ProvideIceCandidates(ctx, req.WebRtcSessionId, slices.Clone(req.IceCandidates)); err != nil { // :1191
 		return nil, portError("ProvideICECandidates", err)
 	}
+	p.touch(req.WebRtcSessionId)
 	return nil, nil
 }
 

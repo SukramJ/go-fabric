@@ -45,6 +45,7 @@ func (p *Provider) MatterDropFabric(ctx context.Context, fabricIndex uint8) erro
 	p.op.Lock()
 	defer p.op.Unlock()
 	p.mu.Lock()
+	delete(p.spent, fabricIndex) // a spent claim goes with its fabric (decision 713)
 	var ids []uint16
 	for _, s := range p.sessions {
 		if s.FabricIndex == fabricIndex {

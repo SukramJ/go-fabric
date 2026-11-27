@@ -141,7 +141,14 @@ func (p *Provider) IceCandidates(ctx context.Context, sessionID uint16, candidat
 // reached at all (decisions 654, 663) — also on a provider no
 // [PeerConnector] was attached to, which sends nothing and returns
 // [ErrNoPeerConnector] (decision 686). The command's error is returned,
-// joined with the removal's when the table refused the shorter one.
+// joined with the removal's when the table refused the shorter one. A
+// session another removal takes first — the requestor's EndSession,
+// RemoveSession, an eviction at a bound ([ProviderConfig.EvictIdle]) —
+// is that removal's to end: End then sends nothing and returns what it
+// returns for a session the table does not hold — [ErrUnknownSession],
+// [ErrNoPeerConnector] without a connector — so the requestor is told
+// once by an eviction, and not at all after a RemoveSession, which
+// never tells it.
 //
 // chip's camera app sends End without waiting for its response
 // (SendEndCommand :1301-1329, InvokeCommandRequest with logging
@@ -159,7 +166,13 @@ func (p *Provider) End(ctx context.Context, sessionID uint16, reason uint8) erro
 	if !found {
 		return targetErr(peers, sessionID)
 	}
-	rerr := p.removeSession(contract.OriginHostSet, sessionID)
+	removed, rerr := p.removeSessionReport(contract.OriginHostSet, sessionID)
+	if rerr == nil && !removed {
+		// A racing removal — an eviction, RemoveSession, the requestor's
+		// EndSession — took the session between the lookup and here: its
+		// remover owns the end, so no second End goes out (issue #634).
+		return targetErr(peers, sessionID)
+	}
 	var serr error
 	if peers == nil {
 		serr = ErrNoPeerConnector
@@ -179,6 +192,9 @@ func (p *Provider) signal(ctx context.Context, sessionID uint16, commandID uint3
 	if err != nil {
 		return err
 	}
+	// The camera's signalling is the session's activity at the call
+	// (decision 704), whatever the requestor answers.
+	p.touch(sessionID)
 	return p.send(ctx, peers, session, commandID, fields)
 }
 
@@ -222,10 +238,7 @@ func (p *Provider) target(sessionID uint16) (PeerConnector, ProviderSession, boo
 // step says it began, the line after says how it ended (issue #596 B).
 // The lines go to [ProviderConfig.Logger], slog.Default when nil.
 func (p *Provider) send(ctx context.Context, peers PeerConnector, session ProviderSession, commandID uint32, fields spec.Encodable) error {
-	log := p.cfg.Logger
-	if log == nil {
-		log = slog.Default()
-	}
+	log := p.logger()
 	attrs := []any{
 		slog.Int("webrtc_session_id", int(session.Id)), slog.Int("fabric_index", int(session.FabricIndex)),
 		slog.Uint64("node_id", session.PeerNodeId), slog.Uint64("command", uint64(commandID)),
@@ -245,4 +258,12 @@ func (p *Provider) send(ctx context.Context, peers PeerConnector, session Provid
 		return fmt.Errorf("camera: WebRTC session %d: %w", session.Id, err)
 	}
 	return nil
+}
+
+// logger is [ProviderConfig.Logger], slog.Default when nil.
+func (p *Provider) logger() *slog.Logger {
+	if p.cfg.Logger == nil {
+		return slog.Default()
+	}
+	return p.cfg.Logger
 }

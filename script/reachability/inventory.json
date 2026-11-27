@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10983,
+  "entry_points": 11003,
   "initializers": 374,
   "entry_packages": [
     ".",
@@ -298,9 +298,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 28755,
-    "reachable": 22345,
-    "whitelisted": 6388,
+    "total_exported": 28757,
+    "reachable": 22346,
+    "whitelisted": 6389,
     "unreachable": 22
   },
   "by_package": [
@@ -12860,7 +12860,7 @@
       "identifier": "ICEServer",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/provider.go",
-      "line": 34
+      "line": 35
     },
     {
       "package": "cluster/camera",
@@ -12895,7 +12895,7 @@
       "identifier": "OfferArgs",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/provider.go",
-      "line": 38
+      "line": 39
     },
     {
       "package": "cluster/camera",
@@ -12916,14 +12916,14 @@
       "identifier": "ProviderPort",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/provider.go",
-      "line": 36
+      "line": 37
     },
     {
       "package": "cluster/camera",
       "identifier": "ProviderSession",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/provider.go",
-      "line": 32
+      "line": 33
     },
     {
       "package": "cluster/camera",
@@ -12959,6 +12959,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/camera/export_test.go",
       "line": 9
+    },
+    {
+      "package": "cluster/camera",
+      "identifier": "SetEvictHook",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/camera/export_test.go",
+      "line": 21
     },
     {
       "package": "cluster/camera",
@@ -29527,7 +29534,7 @@
       "identifier": "TestKitSettingsBesideHostServerOrWithoutPortRefused",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/declare_settings_p8a5_test.go",
-      "line": 22
+      "line": 23
     },
     {
       "package": "device",
@@ -29702,7 +29709,7 @@
       "identifier": "TestProviderSessionBoundsThroughTheFacade",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/defaults_camera_test.go",
-      "line": 222
+      "line": 224
     },
     {
       "package": "device",
@@ -30052,7 +30059,7 @@
       "identifier": "TestZonesThroughTheFacadeContinueAfterThePortsLastID",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/defaults_camera_test.go",
-      "line": 77
+      "line": 79
     },
     {
       "package": "diag",
