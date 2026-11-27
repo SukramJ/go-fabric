@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"thingfabric.dev/go-fabric/clock/clocktest"
 	"thingfabric.dev/go-fabric/cluster/camera"
 	"thingfabric.dev/go-fabric/cluster/spec"
 	avdef "thingfabric.dev/go-fabric/cluster/spec/cameraavsettingsuserlevelmanagement"
@@ -274,24 +275,34 @@ func TestProviderSessionBoundsThroughTheFacade(t *testing.T) {
 			t.Fatalf("%+v: %v, want ErrNegativeMaxSessions", decl, err)
 		}
 	}
-	// Issue #634 (decisions 702, 711): EvictIdle and EvictAcrossFabrics
-	// reach the kit — with a bound of one and an EvictIdle of a
-	// nanosecond, the second ProvideOffer evicts the first session
-	// instead of being refused — and a negative EvictIdle is refused.
+	// Issue #634 (decisions 702, 711, 712): EvictIdle and
+	// EvictAcrossFabrics reach the kit, and the kit reads the device's
+	// clock — with a bound of one, the second ProvideOffer is refused
+	// until the first session has been idle EvictIdle on that clock, and
+	// then evicts it.
 	d, err := newWith(CameraType(), testOptions("evicting"), streams(), wpdef.Declare{
-		ProviderPort: boundProvider{}, MaxSessions: 1, EvictIdle: time.Nanosecond, EvictAcrossFabrics: true,
+		ProviderPort: boundProvider{}, MaxSessions: 1, EvictIdle: time.Minute, EvictAcrossFabrics: true,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
+	fake := clocktest.New(time.Unix(1_000_000, 0))
+	d.clock.setNode(fake) // as the node does when the device is added
 	p := d.Server(wpdef.ClusterID).(*camera.Provider)
-	for i := range 2 {
-		if err := offer(p); err != nil {
-			t.Fatalf("ProvideOffer %d with EvictIdle: %v", i+1, err)
-		}
+	if err := offer(p); err != nil {
+		t.Fatalf("the first ProvideOffer: %v", err)
 	}
-	if ids := p.Sessions(); len(ids) != 1 || ids[0].Id != 1 {
-		t.Fatalf("CurrentSessions %+v, want session 1 alone", ids)
+	fake.Advance(time.Minute - time.Second)
+	var sc im.StatusCodeError
+	if err := offer(p); !errors.As(err, &sc) || sc.MatterStatusCode() != im.StatusResourceExhausted {
+		t.Fatalf("the second ProvideOffer before EvictIdle = %v, want RESOURCE_EXHAUSTED", err)
+	}
+	fake.Advance(time.Second)
+	if err := offer(p); err != nil {
+		t.Fatalf("the second ProvideOffer at EvictIdle: %v", err)
+	}
+	if ids := p.Sessions(); len(ids) != 1 || ids[0].Id == 0 {
+		t.Fatalf("CurrentSessions %+v, want the new session alone", ids)
 	}
 	if _, err := newWith(CameraType(), testOptions("negative-evict"), streams(), wpdef.Declare{ProviderPort: boundProvider{}, EvictIdle: -time.Second}); !errors.Is(err, camera.ErrNegativeEvictIdle) {
 		t.Fatalf("negative EvictIdle: %v, want ErrNegativeEvictIdle", err)

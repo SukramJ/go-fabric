@@ -74,14 +74,13 @@ type evictRig struct {
 func newEvictRig(t *testing.T, edit func(*camera.ProviderConfig)) *evictRig {
 	t.Helper()
 	port := &evictPort{mockProvider: &mockProvider{}}
-	cfg := camera.ProviderConfig{Port: port, Streams: cameraStreams(), EvictIdle: evictIdle, Logger: slog.New(slog.DiscardHandler)}
+	clk := clocktest.New(time.Unix(1_000_000, 0))
+	cfg := camera.ProviderConfig{Port: port, Streams: cameraStreams(), EvictIdle: evictIdle, Logger: slog.New(slog.DiscardHandler), Clock: clk}
 	edit(&cfg)
 	p, err := camera.NewProvider(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	clk := clocktest.New(time.Unix(1_000_000, 0))
-	camera.SetProviderClock(p, clk)
 	peers := newEndPeers()
 	p.AttachPeerConnector(peers)
 	return &evictRig{p: p, port: port, peers: peers, clk: clk}

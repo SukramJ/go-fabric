@@ -91,10 +91,10 @@ func (p *Provider) touch(id uint16) {
 // entry (702). An entry is taken only when its signalling is EvictIdle old
 // and when its going makes room — a table over the bound through the
 // host's rows is refused (706). Ties go to the entry first in the table.
-func (p *Provider) admission(fabric uint8) (refuse bool, victim *ProviderSession) {
+func (p *Provider) admission(fabric uint8) (refuse bool, victim *ProviderSession, crossed bool) {
 	total, perFabric := p.cfg.MaxSessions, p.cfg.MaxSessionsPerFabric
 	if total == 0 && perFabric == 0 {
-		return false, nil
+		return false, nil, false
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -104,10 +104,10 @@ func (p *Provider) admission(fabric uint8) (refuse bool, victim *ProviderSession
 	}
 	atTotal := total > 0 && len(p.sessions) >= total
 	if !atTotal && (perFabric == 0 || held[fabric] < perFabric) {
-		return false, nil
+		return false, nil, false
 	}
 	if p.activity == nil {
-		return true, nil
+		return true, nil, false
 	}
 	room := func(v ProviderSession) bool {
 		if total > 0 && len(p.sessions)-1 >= total {
@@ -120,19 +120,52 @@ func (p *Provider) admission(fabric uint8) (refuse bool, victim *ProviderSession
 		return perFabric == 0 || n < perFabric
 	}
 	now := p.clock.Now()
-	if atTotal && p.cfg.EvictAcrossFabrics {
+	if atTotal && p.cfg.EvictAcrossFabrics && !p.spentLocked(fabric, now) {
 		if share := p.share(held, fabric); held[fabric] < share {
 			borrowed := func(s ProviderSession) bool { return s.FabricIndex != fabric && held[s.FabricIndex] > share }
 			if v, ok := p.idlestLocked(now, borrowed); ok && room(v) {
-				return false, &v
+				return false, &v, true
 			}
 		}
 	}
 	own := func(s ProviderSession) bool { return s.FabricIndex == fabric }
 	if v, ok := p.idlestLocked(now, own); ok && room(v) {
-		return false, &v
+		return false, &v, false
 	}
-	return true, nil
+	return true, nil, false
+}
+
+// spentLocked reports whether the fabric's claim on other fabrics'
+// entries is spent (decision 713): its offer failed after it took another
+// fabric's entry, less than EvictIdle ago, and no session of it has been
+// stored since. An expired mark is dropped. The caller holds mu.
+func (p *Provider) spentLocked(fabric uint8, now time.Time) bool {
+	at, ok := p.spent[fabric]
+	if !ok {
+		return false
+	}
+	if now.Sub(at) >= p.cfg.EvictIdle {
+		delete(p.spent, fabric)
+		return false
+	}
+	return true
+}
+
+// settleClaim records the outcome of a new session's offer for the
+// fabric's claim (decision 713): stored clears the mark; a failure — the
+// port's error or the table's refusal — after a cross-fabric eviction
+// (crossed) marks the claim spent, so a camera that keeps refusing the
+// fabric costs other fabrics at most one entry per EvictIdle.
+func (p *Provider) settleClaim(fabric uint8, crossed, stored bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	switch {
+	case p.spent == nil:
+	case stored:
+		delete(p.spent, fabric)
+	case crossed:
+		p.spent[fabric] = p.clock.Now()
+	}
 }
 
 // share is a fabric's fair share of MaxSessions (decisions 708, 709): the
@@ -175,21 +208,24 @@ func (p *Provider) idlestLocked(now time.Time, match func(ProviderSession) bool)
 
 // admitNew admits a new session of the accessing fabric, evicting the
 // victim [Provider.admission] names; refused reports a refusal at the
-// bound. It runs under the command serialisation. A victim a host's End
+// bound, crossed an eviction of another fabric's entry. It runs under the command serialisation. A victim a host's End
 // or RemoveSession removed meanwhile is not ended again, and the bound is
 // judged once more; a second such race refuses.
-func (p *Provider) admitNew(ctx context.Context, fabric uint8) (refused bool, err error) {
+func (p *Provider) admitNew(ctx context.Context, fabric uint8) (refused, crossed bool, err error) {
 	for range 2 {
-		refuse, victim := p.admission(fabric)
+		refuse, victim, cross := p.admission(fabric)
 		if refuse || victim == nil {
-			return refuse, nil
+			return refuse, false, nil
+		}
+		if p.beforeEvictForTests != nil {
+			p.beforeEvictForTests(*victim)
 		}
 		removed, err := p.evict(ctx, *victim)
 		if err != nil || removed {
-			return false, err
+			return false, cross && removed, err
 		}
 	}
-	return true, nil
+	return true, false, nil
 }
 
 // evict ends the victim to make room for a new session: it leaves

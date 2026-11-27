@@ -159,7 +159,7 @@ func newProviderServer(b defaultBuild) (contract.ClusterServer, error) {
 	}
 	cfg := camera.ProviderConfig{
 		Port: d.ProviderPort, MaxSessions: d.MaxSessions, MaxSessionsPerFabric: d.MaxSessionsPerFabric,
-		EvictIdle: d.EvictIdle, EvictAcrossFabrics: d.EvictAcrossFabrics, Logger: b.logger,
+		EvictIdle: d.EvictIdle, EvictAcrossFabrics: d.EvictAcrossFabrics, Logger: b.logger, Clock: b.clock,
 	}
 	if av, ok := b.sibling(csdef.ClusterID).(*camera.AvStream); ok {
 		cfg.Streams = av

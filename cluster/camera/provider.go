@@ -144,8 +144,15 @@ type ProviderConfig struct {
 	DataVersion *cluster.DataVersionTracker
 	// Logger receives the Debug lines of the camera's signals to the
 	// requestor (provider_peer.go: reaching the requestor and invoking
-	// the command, with their duration and error); slog.Default when nil.
+	// the command, with their duration and error) and the lines of an
+	// eviction at a bound (provider_cap.go): camera.provider.evicted and
+	// camera.provider.evict.no_end at Debug, camera.provider.evict.port_failed
+	// at Warn; slog.Default when nil.
 	Logger *slog.Logger
+	// Clock reads the time of the sessions' activity
+	// ([ProviderConfig.EvictIdle]) and of the signals' Debug lines; nil is
+	// the system clock (decision 712).
+	Clock clock.Clock
 }
 
 // Provider implements [contract.ClusterServer] for WebRtcTransportProvider:
@@ -167,7 +174,8 @@ type Provider struct {
 	port ProviderPort
 	cfg  ProviderConfig
 	view streamView
-	// clock times the Debug lines of the signals to the requestor (send).
+	// clock times the Debug lines of the signals to the requestor (send)
+	// and the activity of the sessions ([ProviderConfig.Clock]).
 	clock clock.Clock
 
 	// op serialises the commands and the fabric removal: each holds it
@@ -187,6 +195,13 @@ type Provider struct {
 	// activity is each entry's last accepted signalling, kept only while
 	// eviction is on ([ProviderConfig.EvictIdle], provider_cap.go).
 	activity map[uint16]time.Time
+	// spent holds, per fabric, when its offer failed after it took
+	// another fabric's entry: until EvictIdle has passed or a session of
+	// it is stored, it takes only its own (decision 713, provider_cap.go).
+	spent map[uint8]time.Time
+	// beforeEvictForTests, nil in production, runs between the admission
+	// and the eviction's removal, so a test can race the removal.
+	beforeEvictForTests func(victim ProviderSession)
 	// peers reaches a session's requestor for the camera's signals
 	// ([Provider.AttachPeerConnector]); nil until the node attaches one.
 	peers PeerConnector
@@ -225,9 +240,9 @@ func NewProvider(cfg ProviderConfig) (*Provider, error) {
 	if cfg.EvictIdle < 0 {
 		return nil, fmt.Errorf("%w: %v", ErrNegativeEvictIdle, cfg.EvictIdle)
 	}
-	p := &Provider{port: cfg.Port, cfg: cfg, view: streamView{cfg.Streams}, clock: clock.System{}}
+	p := &Provider{port: cfg.Port, cfg: cfg, view: streamView{cfg.Streams}, clock: clock.Or(cfg.Clock)}
 	if p.evicting() {
-		p.activity = map[uint16]time.Time{}
+		p.activity, p.spent = map[uint16]time.Time{}, map[uint8]time.Time{}
 	}
 	handlers := map[uint32]spec.CommandHandler{
 		wpdef.CmdSolicitOffer:         serial(&p.op, p.solicitOffer),
@@ -589,7 +604,8 @@ func (p *Provider) solicitOffer(ctx context.Context, fields any) (any, error) {
 		return nil, spec.Errorf(im.StatusDynamicConstraintError, "WebRtcTransportProvider: the camera cannot provide StreamUsage %d", r.usage)
 	}
 	node, fabric := peerOf(ctx)
-	if refused, err := p.admitNew(ctx, fabric); err != nil {
+	refused, crossed, err := p.admitNew(ctx, fabric)
+	if err != nil {
 		return nil, err
 	} else if refused {
 		return p.refuseSolicitOffer(ctx, req, node, fabric, videos, audios)
@@ -605,11 +621,14 @@ func (p *Provider) solicitOffer(ctx context.Context, fields any) (any, error) {
 	}
 	session, deferred, err := p.port.SolicitOffer(ctx, args) // :801-808
 	if err != nil {
+		p.settleClaim(fabric, crossed, false)
 		return nil, portError("SolicitOffer", err)
 	}
 	if err := p.upsertSession(contract.OriginCommand, session); err != nil { // :811
+		p.settleClaim(fabric, crossed, false)
 		return nil, p.abandonSession(ctx, session.Id, err)
 	}
+	p.settleClaim(fabric, crossed, true)
 	resp := wpdef.SolicitOfferResponse{WebRtcSessionId: session.Id, DeferredOffer: deferred}
 	if req.VideoStreamId != nil { // :826-830
 		resp.VideoStreamId = streamIDOf(session.VideoStreamId)
@@ -666,6 +685,7 @@ func (p *Provider) provideOffer(ctx context.Context, fields any) (any, error) {
 		return nil, spec.Errorf(im.StatusInvalidCommand, "WebRtcTransportProvider: a new session needs a StreamUsage")
 	}
 	node, fabric := peerOf(ctx)
+	newSession, crossed := req.WebRtcSessionId.Null, false
 	args := OfferArgs{
 		StreamUsage: usage, IceServers: req.IceServers, IceTransportPolicy: req.IceTransportPolicy,
 		MetadataEnabled: req.MetadataEnabled, PeerNodeID: node, FabricIndex: fabric, Sdp: req.Sdp,
@@ -694,7 +714,8 @@ func (p *Provider) provideOffer(ctx context.Context, fields any) (any, error) {
 		if err := p.checkTurnsOrStuns(req.IceServers); err != nil { // :1046-1051
 			return nil, err
 		}
-		if refused, err := p.admitNew(ctx, fabric); err != nil {
+		var refused bool
+		if refused, crossed, err = p.admitNew(ctx, fabric); err != nil {
 			return nil, err
 		} else if refused {
 			return nil, errSessionBound
@@ -706,18 +727,24 @@ func (p *Provider) provideOffer(ctx context.Context, fields any) (any, error) {
 	}
 	session, err := p.port.ProvideOffer(ctx, args) // :1101-1108
 	if err != nil {
+		if newSession {
+			p.settleClaim(fabric, crossed, false)
+		}
 		return nil, portError("ProvideOffer", err)
 	}
-	if !req.WebRtcSessionId.Null {
-		p.touch(existing.Id)
-	}
 	if err := p.upsertSession(contract.OriginCommand, session); err != nil { // :1111
-		if req.WebRtcSessionId.Null {
+		if newSession {
+			p.settleClaim(fabric, crossed, false)
 			return nil, p.abandonSession(ctx, session.Id, err)
 		}
 		// A re-offer: the table still holds the session as it was, and
 		// the controller can end it.
 		return nil, spec.Errorf(im.StatusFailure, "%v", err)
+	}
+	if newSession {
+		p.settleClaim(fabric, crossed, true)
+	} else {
+		p.touch(existing.Id) // an accepted re-offer (decision 704)
 	}
 	resp := wpdef.ProvideOfferResponse{WebRtcSessionId: session.Id}
 	if req.VideoStreamId != nil { // :1117-1121
