@@ -136,6 +136,33 @@ type RequestEncoding struct {
 	OmitFalseFlags bool
 }
 
+// FalseRequestFlagsOmittedFromRevision is the Interaction Model revision
+// from which a sender leaves out a SuppressResponse or TimedRequest that is
+// false — matter.js
+// InteractionClientMessenger.FALSE_REQUEST_FLAGS_OMITTED_FROM_REVISION
+// (packages/protocol/src/interaction/InteractionMessenger.ts:1569 at
+// db91886c).
+const FalseRequestFlagsOmittedFromRevision = 14
+
+// RequestFlagsForSending is the sender's rule for the flags of an Invoke
+// or Write request: a false flag is left out when omitFalseFlags is set
+// (the caller forces it), or when this node's revision own and the peer's
+// revision peer are both at least [FalseRequestFlagsOmittedFromRevision]
+// and the request is not a group request (a group's members' revisions are
+// unknown, so a group request keeps both flags unless forced). Otherwise
+// the flags go as given. Every client sender of an Invoke or Write takes
+// its [RequestEncoding] from here — client/interaction for unicast, groups
+// for group requests — the Write before it is chunked, so chunk sizes and
+// sent bytes agree. Mirrors matter.js
+// InteractionClientMessenger.requestFlagsForSending
+// (packages/protocol/src/interaction/InteractionMessenger.ts:1587-1611 at
+// db91886c, the rule :1594-1598). With this module's own revision
+// [MatterInteractionModelRevision] (12) only omitFalseFlags omits.
+func RequestFlagsForSending(omitFalseFlags, group bool, peer, own uint16) RequestEncoding {
+	return RequestEncoding{OmitFalseFlags: omitFalseFlags ||
+		(own >= FalseRequestFlagsOmittedFromRevision && !group && peer >= FalseRequestFlagsOmittedFromRevision)}
+}
+
 // MarshalTLVWith encodes w as a client sends it, its flags as how says.
 // Mirrors matter.js
 // packages/types/src/protocol/messages/TlvWriteRequest.ts:16-35 at

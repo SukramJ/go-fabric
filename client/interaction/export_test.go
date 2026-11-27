@@ -134,17 +134,13 @@ func InvokeChunkCharge(payload []byte) int {
 	return invokeCharge(payload, &resp)
 }
 
-// ReportStatusUnacknowledged starts a report on s and tells s the peer
-// never acknowledged our status to it — to a chunk with more to follow
-// when chunk, to the final report otherwise: the test seam of
-// ClientInteractionSubscribeTest.ts:199-218 at b25ed960, which calls
-// reportStatusUnacknowledged(nextReportNumber(), "final").
-func ReportStatusUnacknowledged(s *Subscription, chunk bool) {
-	status := reportStatusFinal
-	if chunk {
-		status = reportStatusChunk
-	}
-	s.reportStatusUnacknowledged(s.nextReportNumber(), status)
+// ReportInterrupted starts a report on s and tells s it was interrupted
+// as interruption says ("chunk-unacknowledged", "final-unacknowledged" or
+// "chunk-missing"): the test seam of ClientInteractionSubscribeTest.ts:199-218
+// at db91886c, which calls
+// reportInterrupted(nextReportNumber(), "final-unacknowledged").
+func ReportInterrupted(s *Subscription, interruption string) {
+	s.reportInterrupted(s.nextReportNumber(), reportInterruption(interruption))
 }
 
 // EstablishedCount is the number of subscriptions c established that

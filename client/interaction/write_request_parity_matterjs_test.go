@@ -18,6 +18,7 @@ package interaction_test
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -73,6 +74,15 @@ var writeOnOff = []interaction.WriteRequest{{Path: attrPath(1, 6, 0), Value: wri
 
 func TestWriteRequestBuildBasic(t *testing.T) {
 	t.Parallel()
+	t.Run("carries omitFalseFlags to the request", func(t *testing.T) {
+		t.Parallel()
+		// WriteTest.ts:17-29 at db91886c (#5069): the option reaches the
+		// request; on the wire, its false TimedRequest is left out.
+		_, payload, _ := writeCaptured(t, writeOnOff, interaction.WriteOptions{OmitFalseFlags: true})
+		if tags := icmTopTags(t, payload); slices.Contains(tags, 1) {
+			t.Fatalf("WriteRequest fields %v: a false TimedRequest was sent", tags)
+		}
+	})
 	t.Run("creates write request with numeric IDs", func(t *testing.T) {
 		t.Parallel()
 		req, _, _ := writeCaptured(t, writeOnOff, interaction.WriteOptions{})

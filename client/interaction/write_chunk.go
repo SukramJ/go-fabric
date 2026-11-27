@@ -23,16 +23,20 @@ func writeValue(e *tlv.Encoder, tag tlv.Tag, v im.AttributeValue) {
 	}
 }
 
-// encodeWrite encodes req.
-func encodeWrite(req im.WriteRequest) ([]byte, error) {
+// encodeWrite encodes req, its flags as how says. The chunking measures
+// with the same how the chunks are sent with: the flags are decided once,
+// before the write is chunked, as matter.js applies requestFlagsForSending
+// before #chunkWriteRequest (InteractionMessenger.ts:1330-1331 at
+// db91886c), so every chunk goes without the omitted flags.
+func encodeWrite(req im.WriteRequest, how im.RequestEncoding) ([]byte, error) {
 	enc := tlv.NewEncoder()
-	req.MarshalTLV(enc, writeValue)
+	req.MarshalTLVWith(enc, writeValue, how)
 	return enc.Bytes()
 }
 
-// writeSize is the size of req's encoding.
-func writeSize(req im.WriteRequest) int {
-	b, err := encodeWrite(req)
+// writeSize is the size of req's encoding with how.
+func writeSize(req im.WriteRequest, how im.RequestEncoding) int {
+	b, err := encodeWrite(req, how)
 	if err != nil {
 		return 0
 	}
@@ -40,9 +44,10 @@ func writeSize(req im.WriteRequest) int {
 }
 
 // attributeDataSize is the size of w as one AttributeDataIB of a
-// WriteRequest (TlvAttributeData.encode).
+// WriteRequest (TlvAttributeData.encode) — a difference of two encodings
+// with the same flags, so the flags' encoding does not enter it.
 func attributeDataSize(w im.AttributeWrite) int {
-	return writeSize(im.WriteRequest{Writes: []im.AttributeWrite{w}}) - writeSize(im.WriteRequest{})
+	return writeSize(im.WriteRequest{Writes: []im.AttributeWrite{w}}, im.RequestEncoding{}) - writeSize(im.WriteRequest{}, im.RequestEncoding{})
 }
 
 // responseSize is the size of a WriteResponse of statuses.
@@ -82,14 +87,16 @@ func sameAttribute(a, b im.ConcreteAttributePath) bool {
 // message goes as one unless it holds a versioned ADD; a timed or
 // suppressed one that does not fit is [ErrRequestTooLarge], as is one
 // value that fits no message.
-func chunkWrite(req im.WriteRequest, maxPayload int) ([]im.WriteRequest, error) {
-	if one, err := fitsOneWrite(req, maxPayload); one || err != nil {
+//
+// how is the encoding of the flags every chunk is sent with.
+func chunkWrite(req im.WriteRequest, maxPayload int, how im.RequestEncoding) ([]im.WriteRequest, error) {
+	if one, err := fitsOneWrite(req, maxPayload, how); one || err != nil {
 		if err != nil {
 			return nil, err
 		}
 		return []im.WriteRequest{req}, nil
 	}
-	c := newWriteChunker(req, maxPayload)
+	c := newWriteChunker(req, maxPayload, how)
 	for _, w := range req.Writes {
 		if err := c.write(w); err != nil {
 			return nil, err
@@ -102,8 +109,8 @@ func chunkWrite(req im.WriteRequest, maxPayload int) ([]im.WriteRequest, error) 
 // fits, its statuses fit one WriteResponse, and it holds no versioned ADD
 // — a timed or suppressed write that fits goes as one either way, one that
 // does not is [ErrRequestTooLarge].
-func fitsOneWrite(req im.WriteRequest, maxPayload int) (bool, error) {
-	encodedSize := writeSize(req)
+func fitsOneWrite(req im.WriteRequest, maxPayload int, how im.RequestEncoding) (bool, error) {
+	encodedSize := writeSize(req, how)
 	statusesSize := 0
 	if !req.SuppressResponse {
 		for _, w := range req.Writes {
@@ -143,10 +150,10 @@ type writeChunker struct {
 	used, usedForStatuses int
 }
 
-func newWriteChunker(req im.WriteRequest, maxPayload int) *writeChunker {
+func newWriteChunker(req im.WriteRequest, maxPayload int, how im.RequestEncoding) *writeChunker {
 	header := req
 	header.Writes, header.MoreChunkedMessages = nil, true
-	return &writeChunker{header: header, maxPayload: maxPayload, available: maxPayload - writeSize(header), availableForStatuses: maxPayload - responseSize()}
+	return &writeChunker{header: header, maxPayload: maxPayload, available: maxPayload - writeSize(header, how), availableForStatuses: maxPayload - responseSize()}
 }
 
 func (c *writeChunker) flush() {

@@ -155,14 +155,14 @@ func TestClientInteractionSubscribeClosedWhileProcessingParity(t *testing.T) {
 // closesOnUnacknowledgedFinalStatus subscribes with req on the scripted
 // peer and reports whether an unacknowledged final report status ends the
 // subscription — closesOnUnacknowledgedFinalStatus of
-// ClientInteractionSubscribeTest.ts:199-218 at b25ed960.
+// ClientInteractionSubscribeTest.ts:199-218 at db91886c.
 func closesOnUnacknowledgedFinalStatus(t *testing.T, req interaction.SubscribeRequest) bool {
 	t.Helper()
 	s := newScripted(t)
 	reg := interaction.NewSubscriptions(interaction.SubscriptionsConfig{Clock: s.clock})
 	c := interaction.Bind(interaction.SessionProvider(s.mgr, s.session), interaction.Config{Subscriptions: reg})
 	sub := subscribed(t, s, c, req, 1)
-	interaction.ReportStatusUnacknowledged(sub, false)
+	interaction.ReportInterrupted(sub, "final-unacknowledged")
 	select {
 	case <-sub.Done():
 		return true

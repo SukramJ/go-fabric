@@ -159,7 +159,7 @@ func TestInteractionClientMessengerSubscribe(t *testing.T) {
 		// allDataVersionFiltersSent (:233-234): every filter was sent, so the
 		// wildcard subscription primes compactly — an unacknowledged final
 		// report status closes it (ClientInteraction.ts:82-99).
-		interaction.ReportStatusUnacknowledged(res.sub, false)
+		interaction.ReportInterrupted(res.sub, "final-unacknowledged")
 		select {
 		case <-res.sub.Done():
 		default:
@@ -177,7 +177,7 @@ func TestInteractionClientMessengerSubscribe(t *testing.T) {
 		c := interaction.Bind(interaction.SessionProvider(s.mgr, s.session), interaction.Config{Subscriptions: reg})
 		filters := manyFilters(200)
 		sub := subscribed(t, s, c, interaction.SubscribeRequest{Attributes: []im.ConcreteAttributePath{{}}, DataVersionFilters: filters}, 1)
-		interaction.ReportStatusUnacknowledged(sub, false)
+		interaction.ReportInterrupted(sub, "final-unacknowledged")
 		select {
 		case <-sub.Done():
 			t.Fatal("DataVersionFilters dropped, but the subscription was counted as priming compactly")
@@ -251,6 +251,23 @@ func TestInteractionClientMessengerWrites(t *testing.T) {
 			im.AttributeStatus{Path: attrPath(1, 0x1234, 1)}, im.AttributeStatus{Path: attrPath(1, 0x1234, 2)}))
 		if res := await(t, done); res.err != nil || len(res.res) != 2 {
 			t.Fatalf("statuses %+v (%v)", res.res, res.err)
+		}
+	})
+
+	t.Run("leaves false flags out of the encoded write when forced", func(t *testing.T) {
+		t.Parallel()
+		// InteractionClientMessengerTest.ts:602-610 at db91886c (#5069):
+		// with omitFalseFlags the WriteRequest carries neither flag.
+		s := newScripted(t)
+		c := interaction.New(s.mgr, s.session, nil)
+		done := writeAsync(c, []interaction.WriteRequest{icmWrite(1, icmOctets(icmEntry))}, interaction.WriteOptions{OmitFalseFlags: true})
+		req := s.next(t)
+		if tags := icmTopTags(t, req.payload); !slices.Equal(tags, []uint32{2, 3, 0xFF}) {
+			t.Fatalf("WriteRequest fields %v, want WriteRequests, MoreChunkedMessages and the revision", tags)
+		}
+		s.reply(t, req, im.InteractionModelProtocolID, im.OpcodeWriteResponse, writeResponse(t, im.AttributeStatus{Path: attrPath(1, 0x1234, 1)}))
+		if res := await(t, done); res.err != nil {
+			t.Fatal(res.err)
 		}
 	})
 

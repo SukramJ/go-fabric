@@ -54,7 +54,8 @@ func (c *Interaction) maxPathsPerInvoke() int {
 // Large Message quality, an interaction model revision other than the
 // default (:196-198), a DelayReportData (:203), an address override
 // (:209), an existing session required (ClientInteraction.ts:229 at
-// b25ed960) — goes on its own. Network does not block (:191): it picks the
+// b25ed960), OmitFalseFlags (omitFalseFlags, ClientInteraction.ts:223 at
+// db91886c) — goes on its own. Network does not block (:191): it picks the
 // batch's lane (:765). beforeDispatch, the remaining field isBatchable
 // classifies (:211), is "Server only" (Invoke.ts:52-55) and has no Go
 // client option. A command timed-required in the snapshot is a
@@ -69,7 +70,7 @@ func batchable(path im.ConcreteCommandPath, opts InvokeOptions) bool {
 		!opts.ExtendedFailSafeTimeout && opts.AdditionalMrpDelay == nil && !opts.large() &&
 		(opts.InteractionModelRevision == 0 || opts.InteractionModelRevision == im.MatterInteractionModelRevision) &&
 		opts.DelayReportData == nil && opts.AddressOverride == nil && !opts.RequireExistingSession &&
-		opts.ResponseArrived == nil
+		opts.ResponseArrived == nil && !opts.OmitFalseFlags
 }
 
 // batchLane is the commands queued for one network — matter.js BatchLane

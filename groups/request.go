@@ -32,6 +32,16 @@ type RequestOptions struct {
 	// list and one append per element, as a unicast write does (matter.js
 	// Write.ts chunkLists = true, :59, :149-171 at 0ceb202d).
 	DisableListChunking bool
+	// OmitFalseFlags leaves the false TimedRequest out of the request (the
+	// SuppressResponse a group request carries is true and stays). Without
+	// it a group request keeps both flags: the members' revisions are
+	// unknown ([im.RequestFlagsForSending] with group set). Mirrors matter.js
+	// RequestFlagsOptions.omitFalseFlags
+	// (packages/protocol/src/action/client/RequestFlagsOptions.ts:10-22 at
+	// db91886c), which a group request carries through ClientInteraction
+	// (ClientGroupInteraction.ts:79) to the same rule
+	// (InteractionMessenger.ts:1594-1598).
+	OmitFalseFlags bool
 }
 
 // Invoke sends one command to the group. The path names the cluster and
@@ -50,7 +60,7 @@ func (s *Sender) Invoke(ctx context.Context, path im.ConcreteCommandPath, fields
 	}
 	path.HasCluster, path.HasCommand = true, true
 	enc := tlv.NewEncoder()
-	im.MarshalInvokeRequestTLV(enc, im.InvokeRequest{SuppressResponse: true, Invokes: []im.CommandInvocation{{Path: path}}},
+	im.MarshalInvokeRequestTLVWith(enc, im.InvokeRequest{SuppressResponse: true, Invokes: []im.CommandInvocation{{Path: path}}},
 		func(e *tlv.Encoder, tag tlv.Tag, _ any) {
 			if fields == nil {
 				e.StartStruct(tag)
@@ -58,13 +68,19 @@ func (s *Sender) Invoke(ctx context.Context, path im.ConcreteCommandPath, fields
 				return
 			}
 			fields.EncodeTLV(e, tag)
-		})
+		}, groupRequestEncoding(opts))
 	payload, err := enc.Bytes()
 	if err != nil {
 		return fmt.Errorf("groups: encode InvokeRequest: %w", err)
 	}
 	s.logInvoke(path)
 	return s.Send(ctx, payload, im.InteractionModelProtocolID, im.OpcodeInvokeRequest)
+}
+
+// groupRequestEncoding is the encoding of a group request's flags: the
+// sender's rule for a group request, the peer's revision unknown.
+func groupRequestEncoding(opts RequestOptions) im.RequestEncoding {
+	return im.RequestFlagsForSending(opts.OmitFalseFlags, true, 0, uint16(im.MatterInteractionModelRevision))
 }
 
 // logInvoke logs a group invoke as it leaves, naming the group and the
@@ -121,12 +137,12 @@ func (s *Sender) Write(ctx context.Context, path im.ConcreteAttributePath, value
 		}
 	}
 	enc := tlv.NewEncoder()
-	im.WriteRequest{SuppressResponse: true, Writes: writes}.MarshalTLV(enc,
+	im.WriteRequest{SuppressResponse: true, Writes: writes}.MarshalTLVWith(enc,
 		func(e *tlv.Encoder, tag tlv.Tag, v im.AttributeValue) {
 			if value, ok := v.Value.(spec.Encodable); ok {
 				value.EncodeTLV(e, tag)
 			}
-		})
+		}, groupRequestEncoding(opts))
 	payload, err := enc.Bytes()
 	if err != nil {
 		return fmt.Errorf("groups: encode WriteRequest: %w", err)
