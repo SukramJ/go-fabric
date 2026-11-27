@@ -92,7 +92,56 @@ func newPanicError(r any) *PanicError {
 // The element is the caller's to keep; [tlv.Encoder.PutRawElement] writes
 // it back under the tag the message needs.
 func Encode(write func(enc *tlv.Encoder, tag tlv.Tag)) (element []byte, err error) {
-	enc := tlv.NewEncoder()
+	return encodeOn(tlv.NewEncoder(), write)
+}
+
+// Scratch is [Encode] on one encoder reused from value to value, for a
+// caller that encodes many values in a row — the report chunker's
+// resolver, one per chunker. It holds Encode's guarantees for every value:
+// the encoder is [tlv.Encoder.Reset] before each, so a predecessor that
+// panicked, left a container open or wrote two elements leaves nothing in
+// the next value; and after a value that failed, the encoder is dropped
+// and the next value gets a fresh one, so a state the failed write left
+// behind is never written on again. Each element returned is a copy the
+// caller keeps.
+//
+// The reuse has a cost Encode has not: a write function that retains the
+// *tlv.Encoder past its return and writes on it later writes into a later
+// value of the same Scratch, not into a dead encoder (see
+// [tlv.Encoder.Reset]). The contract forbids it (contract.ClusterServer,
+// MatterRead: an EncodeTLV writes exactly one element under the tag it is
+// handed, deterministic and free of side effects); a synchronous
+// misbehaviour is still contained to its own value. An asynchronous write
+// is a data race with the value being encoded: one that lands inside a
+// container that value has open passes the one-element check, and that
+// path goes out with foreign bytes and no FAILURE. Elements already
+// returned never change (each is a copy), and fabric masking still
+// applies to what goes out.
+//
+// The zero Scratch is ready to use. A Scratch is not safe for concurrent
+// use: one goroutine encodes on it at a time.
+type Scratch struct {
+	enc *tlv.Encoder
+}
+
+// Encode runs write on the scratch encoder, as the package [Encode] does
+// on a fresh one, and returns the one anonymous element it wrote.
+func (s *Scratch) Encode(write func(enc *tlv.Encoder, tag tlv.Tag)) (element []byte, err error) {
+	if s.enc == nil {
+		s.enc = tlv.NewEncoder()
+	} else {
+		s.enc.Reset()
+	}
+	element, err = encodeOn(s.enc, write)
+	if err != nil {
+		s.enc = nil
+	}
+	return element, err
+}
+
+// encodeOn runs write on enc, empty, and returns the one anonymous element
+// it wrote, a copy.
+func encodeOn(enc *tlv.Encoder, write func(enc *tlv.Encoder, tag tlv.Tag)) (element []byte, err error) {
 	if err := run(write, enc); err != nil {
 		return nil, err
 	}

@@ -69,8 +69,10 @@ type ClusterServer interface {
 	// encoder of its own (the bridge also runs it, the same way, when it
 	// compares a value for change or logs one), so it may run more than
 	// once for one value: it must be deterministic and free of side
-	// effects. It writes exactly one element under the tag it is handed.
-	// One that
+	// effects. It writes exactly one element under the tag it is handed,
+	// and it does not keep the *tlv.Encoder past its return: the encoder
+	// may be reset and reused for the next value (tlv.Encoder.Reset), so a
+	// write on a kept encoder lands in another value. One that
 	// panics, leaves a container open or writes no element or more than
 	// one answers FAILURE (an AttributeStatusIB) for its own path, logged
 	// at ERROR; the rest of the read, the priming report or the
@@ -1143,7 +1145,9 @@ const (
 // encoded once on the caller's goroutine before the event is recorded —
 // CPU only, no wait; a payload's EncodeTLV must therefore not take a lock
 // the caller holds — and again for each report that carries it, so the
-// encoder must be deterministic and free of side effects. A payload whose
+// encoder must be deterministic and free of side effects; like an
+// attribute's, it does not keep the *tlv.Encoder past its return (the
+// encoder may be reset and reused for the next value). A payload whose
 // encoder panics, leaves a container open or writes other than one
 // element is not recorded (no event number is consumed, no subscriber
 // hears of it) and is logged at ERROR; the call returns normally.

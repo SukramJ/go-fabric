@@ -257,7 +257,7 @@ var floors = []packageFloor{
 	{pkg: "thingfabric.dev/go-fabric/internal/forward", min: 100},
 	{pkg: "thingfabric.dev/go-fabric/internal/inflight", min: 100},
 	{pkg: "thingfabric.dev/go-fabric/internal/netwatch", min: 92},
-	{pkg: "thingfabric.dev/go-fabric/internal/reportchunk", min: 87, why: "review II C3: measured 87.4 with the R2-C2 chunking fixes tested"},
+	{pkg: "thingfabric.dev/go-fabric/internal/reportchunk", min: 91, why: "#635: measured 91.2 with the resolver scratch and the Encoded short-cuts tested"},
 	{pkg: "thingfabric.dev/go-fabric/internal/serialqueue", min: 97},
 	{
 		pkg:          "thingfabric.dev/go-fabric/internal/deviceseam",
