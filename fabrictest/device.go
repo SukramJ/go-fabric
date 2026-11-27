@@ -147,7 +147,7 @@ func (s *Site) AddDevice(topo Topology) *Device {
 // until the test adds to it ([Device.Act]); a restart builds the node from
 // cfg again. matter.js's MockSite.addNode builds a plain ServerNode from the
 // test's own options in the site's environment (mock-site.ts:59-106 at
-// b25ed960). A node that fails to build fails the test.
+// db91886c). A node that fails to build fails the test.
 func (s *Site) AddNode(cfg node.Config) *Device {
 	s.tb.Helper()
 	return s.addDevice(Topology{}, &cfg)

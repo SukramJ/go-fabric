@@ -23,7 +23,7 @@ import (
 // past it the close runs anyway, its CloseSession still sent. matter.js has
 // no such bound — its deferred close waits for the session's last exchange
 // however long that takes (packages/protocol/src/session/Session.ts:304-320,
-// packages/protocol/src/session/NodeSession.ts:438-462 at b25ed960), each
+// packages/protocol/src/session/NodeSession.ts:438-462 at db91886c), each
 // exchange bounded only by its own timers. The cap is this module's (owner
 // decision W6, 2026-11-22): the active set here is assembled from several
 // tables, and a leak in one of them must not pin a revoked PASE session —
@@ -56,18 +56,18 @@ type paseDeferredClose struct {
 //
 // Mirrors matter.js
 // packages/node/src/behaviors/administrator-commissioning/AdministratorCommissioningServer.ts:143-154
-// at b25ed960 (revokeCommissioning, step 1: `getPaseSession()` →
+// at db91886c (revokeCommissioning, step 1: `getPaseSession()` →
 // `paseSession.initiateClose()`), whose close is deferred while the session
 // has an active exchange:
-// packages/protocol/src/session/Session.ts:304-320 at b25ed960 (initiateClose),
-// packages/protocol/src/session/NodeSession.ts:438-448 at b25ed960 (deferredClose
+// packages/protocol/src/session/Session.ts:304-320 at db91886c (initiateClose),
+// packages/protocol/src/session/NodeSession.ts:438-448 at db91886c (deferredClose
 // set when hasActiveExchanges, Session.ts:381-383), and runs when the last
 // exchange closes:
-// packages/protocol/src/session/NodeSession.ts:455-462 at b25ed960.
+// packages/protocol/src/session/NodeSession.ts:455-462 at db91886c.
 // The graceful close's event is observed by
-// packages/protocol/src/protocol/ExchangeManager.ts:757-768 at b25ed960 (gracefulClose)
+// packages/protocol/src/protocol/ExchangeManager.ts:757-768 at db91886c (gracefulClose)
 // and answered with a CloseSession on the closing session by
-// packages/protocol/src/protocol/ExchangeManager.ts:790-800 at b25ed960 (#sendCloseSession)
+// packages/protocol/src/protocol/ExchangeManager.ts:790-800 at db91886c (#sendCloseSession)
 // (F-b25ed960-56).
 //
 // ctx is the revoke's: when it is the context of an interaction on one of
@@ -125,7 +125,7 @@ func (b *Bridge) markPASECloses(ids []uint16) []uint16 {
 	for _, id := range ids {
 		// paseClosing holds every deferred id and every id a force close
 		// waits to close (the fail-safe's rollback, CommissioningComplete):
-		// a closing session is not closed again (Session.ts:305-307 at b25ed960).
+		// a closing session is not closed again (Session.ts:305-307 at db91886c).
 		if _, closing := b.paseClosing[id]; closing {
 			continue
 		}
@@ -167,12 +167,12 @@ func (b *Bridge) paseCloseDeferred(sessionID uint16) bool {
 // paseSessionActive reports whether sessionID has an exchange in flight, the
 // Go union of matter.js's `hasActiveExchanges` (every MessageExchange of the
 // session, packages/protocol/src/session/Session.ts:381-383,
-// packages/protocol/src/protocol/MessageExchange.ts:369 at b25ed960): (a) a
+// packages/protocol/src/protocol/MessageExchange.ts:369 at db91886c): (a) a
 // handler turn running on it ([Bridge.enterSessionTurn]), (b) a message this
 // node sent on it still waiting for its acknowledgement — retransmitted
 // until acknowledged or given up, as matter.js holds an exchange whose last
 // message is unacknowledged
-// (packages/protocol/src/protocol/MessageExchange.ts:1187-1216 at b25ed960),
+// (packages/protocol/src/protocol/MessageExchange.ts:1187-1216 at db91886c),
 // (c) a timed window not yet elapsed or a chunked write still open. timedUntil
 // is the latest timed deadline when (c)'s timed windows are all that keep
 // it active. Two holds have no trigger of their own and end at
@@ -361,7 +361,7 @@ func (b *Bridge) refuseNewMessage(src net.Addr, hdr *message.Header, proto messa
 // as well when their exchange is gone; here they are acknowledged and not
 // served.
 // Mirrors matter.js packages/protocol/src/protocol/ExchangeManager.ts:433-438
-// at b25ed960 (a closing session takes no new exchange: logged, no ack).
+// at db91886c (a closing session takes no new exchange: logged, no ack).
 func (b *Bridge) refuseOnClosingPASE(hdr *message.Header, proto message.ProtocolHeader) bool {
 	if !proto.Initiator || !b.paseCloseDeferred(hdr.SessionID) {
 		return false

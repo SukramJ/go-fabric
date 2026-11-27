@@ -18,11 +18,11 @@ import (
 )
 
 // NOCSRCheck names a check of [ValidateNOCSR] — matter.js NocsrCheck
-// (packages/protocol/src/certificate/NocsrValidator.ts:14-36 at b25ed960).
+// (packages/protocol/src/certificate/NocsrValidator.ts:14-36 at db91886c).
 // The string values are matter.js's.
 type NOCSRCheck string
 
-// The checks, NocsrValidator.ts:14-36 at b25ed960.
+// The checks, NocsrValidator.ts:14-36 at db91886c.
 const (
 	// NOCSRFieldMissing: NOCSRElements or AttestationSignature is missing.
 	NOCSRFieldMissing NOCSRCheck = "FieldMissing"
@@ -46,7 +46,7 @@ const (
 )
 
 // NOCSRError is a CSRResponse that failed one of the [NOCSRCheck]s —
-// matter.js NocsrError (NocsrValidator.ts:38-47 at b25ed960), a
+// matter.js NocsrError (NocsrValidator.ts:38-47 at db91886c), a
 // CommissioningError there; the commissioner returns it as one.
 type NOCSRError struct {
 	Check   NOCSRCheck
@@ -61,7 +61,7 @@ func (e *NOCSRError) Error() string { return "attestation: " + string(e.Check) +
 func (e *NOCSRError) Unwrap() error { return e.Err }
 
 // NOCSRContext is what [ValidateNOCSR] works with — matter.js
-// NocsrValidator.Context (NocsrValidator.ts:50-61 at b25ed960).
+// NocsrValidator.Context (NocsrValidator.ts:50-61 at db91886c).
 type NOCSRContext struct {
 	// Challenge is the attestation challenge of the secure session the
 	// CSRRequest was sent on.
@@ -75,7 +75,7 @@ type NOCSRContext struct {
 // NOCSRResponse is a CSRResponse as decoded, so a mandatory field the
 // device left out is marked absent — matter.js
 // Partial<OperationalCredentials.CsrResponse> (NocsrValidator.ts:63-64 at
-// b25ed960).
+// db91886c).
 type NOCSRResponse struct {
 	// Elements and Signature are NOCSRElements and AttestationSignature.
 	Elements, Signature []byte
@@ -88,7 +88,7 @@ type NOCSRResponse struct {
 // public key of its CSR, as its 65-byte uncompressed point. Every check is
 // a hard failure, a [*NOCSRError]: unlike device attestation, no policy
 // can accept it. Mirrors matter.js
-// packages/protocol/src/certificate/NocsrValidator.ts:78-127 at b25ed960
+// packages/protocol/src/certificate/NocsrValidator.ts:78-127 at db91886c
 // (NocsrValidator.validate), check for check and in its order (Matter
 // Core §6.4.6.1.1, §11.18.4.1, §11.18.4.9).
 func ValidateNOCSR(ctx NOCSRContext, resp NOCSRResponse) ([]byte, error) {
@@ -129,7 +129,7 @@ func ValidateNOCSR(ctx NOCSRContext, resp NOCSRResponse) ([]byte, error) {
 
 // decodeCertSigningRequest is TlvCertSigningRequest
 // (packages/protocol/src/common/OperationalCredentialsTypes.ts:24-31 at
-// b25ed960): [1] certSigningRequest, [2] csrNonce (32 bytes), [3]-[5]
+// db91886c): [1] certSigningRequest, [2] csrNonce (32 bytes), [3]-[5]
 // vendor reserved. The nonce is returned for [ValidateNOCSR] to compare.
 func decodeCertSigningRequest(b []byte) (csr, nonce []byte, err error) {
 	n, err := spec.ReadElement(tlv.NewDecoder(b))
@@ -147,7 +147,7 @@ func decodeCertSigningRequest(b []byte) (csr, nonce []byte, err error) {
 
 // publicKeyFromCSR is Certificate.getPublicKeyFromCsr
 // (packages/protocol/src/certificate/kinds/Certificate.ts:842-903 at
-// b25ed960): version 0, an EC P-256 key, ecdsa-with-SHA256, the CSR's own
+// db91886c): version 0, an EC P-256 key, ecdsa-with-SHA256, the CSR's own
 // signature verified; the key as its 65-byte uncompressed point.
 func publicKeyFromCSR(der []byte) ([]byte, error) {
 	req, err := x509.ParseCertificateRequest(der)

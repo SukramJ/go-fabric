@@ -133,7 +133,7 @@ func (s *DoorLockServer) setUserLocked(ctx context.Context, req lockdef.SetUserR
 
 // modifyUserLocked is the Modify branch of setUserLocked: mirrors matter.js
 // packages/node/src/behaviors/door-lock/DoorLockServer.ts:293-335 at
-// b25ed960 (setUser, DataOperationType.Modify).
+// db91886c (setUser, DataOperationType.Modify).
 func (s *DoorLockServer) modifyUserLocked(ctx context.Context, req lockdef.SetUserRequest, existing *store.DoorLockUser, fabricIndex uint8) error {
 	userIndex := req.UserIndex
 	if existing == nil {
@@ -454,35 +454,35 @@ func (s *DoorLockServer) findUserIndexForCredential(credType uint8, index uint16
 //
 // Mirrors matter.js
 // packages/node/src/behavior/state/managed/values/StructManager.ts:278-297
-// at b25ed960 (a managed property set is validated; a throw undoes the
+// at db91886c (a managed property set is validated; a throw undoes the
 // set and reaches the caller) and
 // packages/node/src/behavior/state/validation/ValueValidator.ts:162-185
-// at b25ed960 (createEnumValidator: UnknownEnumValueError, status
+// at db91886c (createEnumValidator: UnknownEnumValueError, status
 // CONSTRAINT_ERROR). The state lists are
 // packages/node/src/behaviors/door-lock/DoorLockServer.ts:1547-1554 at
-// b25ed960 (State.users, State.credentials). A credential reference's
+// db91886c (State.users, State.credentials). A credential reference's
 // type is
-// packages/node/src/behaviors/door-lock/LockAuth.ts:34-35 at b25ed960
+// packages/node/src/behaviors/door-lock/LockAuth.ts:34-35 at db91886c
 // (CredentialRef). The user's enum fields are
-// packages/node/src/behaviors/door-lock/LockAuth.ts:55-62 at b25ed960
+// packages/node/src/behaviors/door-lock/LockAuth.ts:55-62 at db91886c
 // (userStatus, userType, credentialRule). A stored credential's type is
-// packages/node/src/behaviors/door-lock/LockAuth.ts:88-89 at b25ed960
+// packages/node/src/behaviors/door-lock/LockAuth.ts:88-89 at db91886c
 // (Credential). Users are stored by
-// packages/node/src/behaviors/door-lock/LockAuth.ts:173-179 at b25ed960
+// packages/node/src/behaviors/door-lock/LockAuth.ts:173-179 at db91886c
 // (addUser, replaceUser). Credentials are stored by
-// packages/node/src/behaviors/door-lock/LockAuth.ts:229-238 at b25ed960
+// packages/node/src/behaviors/door-lock/LockAuth.ts:229-238 at db91886c
 // (addCredential).
 //
 // matter.js refuses inside the assignment and leaves the rest of the
 // transaction to its caller: an error that leaves the act rolls back the
 // credential setCredential added before the user
 // (packages/node/src/behavior/context/server/LocalActorContext.ts:60-65
-// at b25ed960, act: a thrown actor rejects the transaction;
-// packages/general/src/transaction/Tx.ts:377-392 at b25ed960, reject:
+// at db91886c, act: a thrown actor rejects the transaction;
+// packages/general/src/transaction/Tx.ts:377-392 at db91886c, reject:
 // rollback), one a local caller catches inside the act is committed with
 // the act
 // (packages/node/src/behavior/context/server/LocalActorContext.ts:84 at
-// b25ed960, resolve). Here every invoke is one
+// db91886c, resolve). Here every invoke is one
 // commit, so a refused user always takes the credential added before it
 // with it — this module's transaction boundary, not a matter.js line.
 func (s *DoorLockServer) checkUserRecord(u *store.DoorLockUser) error {
@@ -512,18 +512,18 @@ func (s *DoorLockServer) checkUserRecord(u *store.DoorLockUser) error {
 //
 // Mirrors matter.js
 // packages/node/src/behavior/state/validation/ValueValidator.ts:162-185
-// at b25ed960 (createEnumValidator: definesValues, the valid ids and the
+// at db91886c (createEnumValidator: definesValues, the valid ids and the
 // range members; the message's stem). The member conformance follows
 // packages/node/src/behavior/state/validation/ValueValidator.ts:137 at
-// b25ed960 (every validator wrapped by the conformance validator) and
+// db91886c (every validator wrapped by the conformance validator) and
 // packages/node/src/behavior/state/validation/conformance-compiler.ts:215-217
-// at b25ed960 (an enum's members get member validation), and
+// at db91886c (an enum's members get member validation), and
 // packages/node/src/behavior/state/validation/conformance-compiler.ts:762-862
-// at b25ed960 (addEnumMemberValidation: a Nonconformant or Disallowed
+// at db91886c (addEnumMemberValidation: a Nonconformant or Disallowed
 // member is refused), with the message of
 // packages/node/src/behavior/state/validation/conformance-compiler.ts:734-746
-// at b25ed960 (disallowEnumValue) and the status of
-// packages/protocol/src/action/errors.ts:108-123 at b25ed960
+// at db91886c (disallowEnumValue) and the status of
+// packages/protocol/src/action/errors.ts:108-123 at db91886c
 // (EnumValueConformanceError: CONSTRAINT_ERROR).
 func (s *DoorLockServer) checkEnumValue(field string, e *spec.Enum, v uint8) error {
 	if len(e.Values) == 0 && len(e.Ranges) == 0 {

@@ -84,7 +84,7 @@ func TestDecodeRangeParity(t *testing.T) {
 		t.Parallel()
 		// List { anonymous uint8 7, endpoint 1, cluster 6 }: a tagged
 		// list refuses a non-context member (TlvObject.ts:205-214 at
-		// b25ed960; review II, R2-P6-wire-0504, Fable's read of sub
+		// db91886c; review II, R2-P6-wire-0504, Fable's read of sub
 		// round 1, H-5).
 		raw := []byte{0x17, 0x04, 0x07, 0x24, 0x02, 0x01, 0x24, 0x03, 0x06, 0x18}
 		if p, err := UnmarshalAttributePathTLV(tlv.NewDecoder(raw)); err == nil {

@@ -5,12 +5,12 @@
 // port of matter.js
 // packages/protocol/src/certificate/DeviceAttestationValidator.ts
 // (DeviceAttestationValidator.validate, :283-293, and the
-// validateCollecting it wraps, :295-694) at b25ed960, ADR 0020
+// validateCollecting it wraps, :295-694) at db91886c, ADR 0020
 // stage 2, with a static trust store ([PAAStore], [StaticStore],
 // [TestStore]) where matter.js consults its DclCertificateService.
 //
 // The package's comments cite that file as DAV: DAV:<n> is line n of
-// DeviceAttestationValidator.ts at b25ed960, and script/citecheck checks
+// DeviceAttestationValidator.ts at db91886c, and script/citecheck checks
 // each as a citation of that file.
 //
 // [Validate] runs the checks in matter.js's order: the DAC and PAI parse,

@@ -93,7 +93,7 @@ func TestReportedValueDecodedByShapeParityMatterjs(t *testing.T) {
 	t.Run("an integer of the other signedness is taken and bounds-checked", func(t *testing.T) {
 		t.Parallel()
 		// matter.js under relaxNumberTypeChecks (TlvNumber.ts:124-141 at
-		// b25ed960): a signed element for an unsigned field.
+		// db91886c): a signed element for an unsigned field.
 		if v, isNull, ok := reportedUint[uint8](log, "LocationCapability", 8, nodeOf(t, func(e *tlv.Encoder) { e.PutInt(anon, 2) })); !ok || isNull || v != 2 {
 			t.Fatalf("signed 2 for a uint8: %d, null %v, ok %v", v, isNull, ok)
 		}

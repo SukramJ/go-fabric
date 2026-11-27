@@ -8,7 +8,7 @@
 // this protocol test lives in controller/client, so it is ported here. A
 // matter.js call without properties is the zero Properties; the jitter is
 // math/rand's, as matter.js's crypto randomness. The ICD idle-synced
-// ceiling cases follow the test at b25ed960
+// ceiling cases follow the test at db91886c
 // (PhysicalDevicePropertiesTest.ts:240-332).
 package client
 
@@ -205,7 +205,7 @@ func TestPhysicalDevicePropertiesICDCeilingParity(t *testing.T) {
 			}
 		})
 	}
-	// PhysicalDevicePropertiesTest.ts:263-288 at b25ed960: an
+	// PhysicalDevicePropertiesTest.ts:263-288 at db91886c: an
 	// IdleModeDuration shorter than the device ceiling leaves the device
 	// ceiling, with its jitter.
 	t.Run("uses the device ceiling for an ICD whose idleModeDuration is shorter", func(t *testing.T) {

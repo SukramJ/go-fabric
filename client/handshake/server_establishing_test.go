@@ -42,7 +42,7 @@ func TestCASEServerResponderSessionEstablishing(t *testing.T) {
 		// SessionsFor (routing, peer loss, close) sees the session while
 		// it establishes; OnSession, which feeds the peer set — the
 		// established view — runs only after the establishment
-		// (SessionManager.ts:702-705, PeerSet.ts:104-110 at b25ed960).
+		// (SessionManager.ts:702-705, PeerSet.ts:104-110 at db91886c).
 		r := newResponderRig(t)
 		ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 		defer cancel()
@@ -70,7 +70,7 @@ func TestCASEServerResponderSessionEstablishing(t *testing.T) {
 		// The session joins the established view — where the peer set
 		// adopts it — on its established event, at the Success's first
 		// transmission (CaseServer.ts:331, SessionManager.ts:1274-1280,
-		// PeerSet.ts:104-110 at b25ed960; findings F-b25ed960-35). The
+		// PeerSet.ts:104-110 at db91886c; findings F-b25ed960-35). The
 		// node's acknowledgements are lost, so the responder retransmits
 		// its Success: at the retransmission the session is handed over,
 		// while the send still waits for the acknowledgement.
@@ -107,7 +107,7 @@ func TestCASEServerResponderSessionEstablishing(t *testing.T) {
 		t.Parallel()
 		// Once the Success went out the initiator may use the session, so
 		// a later failure of its send does not close it
-		// (CaseServer.ts:337-342 at b25ed960; decision 288). The send
+		// (CaseServer.ts:337-342 at db91886c; decision 288). The send
 		// fails in its ack wait: the node's acknowledgements are lost and
 		// the responder is closed, which ends the wait.
 		r := newResponderRig(t)

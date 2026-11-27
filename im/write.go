@@ -203,7 +203,7 @@ func readAttributeData(dec *tlv.Decoder, valueReader AttributeValueReader) (Attr
 			}
 			// Path and Data are mandatory: matter.js
 			// packages/types/src/protocol/types/TlvAttributeData.ts:18-19 at
-			// b25ed960 (TlvField). Without the check an AttributeDataIB
+			// db91886c (TlvField). Without the check an AttributeDataIB
 			// without Data reached the server as a write of nil.
 			switch {
 			case !hasPath:

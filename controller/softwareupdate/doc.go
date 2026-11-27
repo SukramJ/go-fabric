@@ -3,7 +3,7 @@
 
 // Package softwareupdate is the controller's OTA push: matter.js's
 // SoftwareUpdateManager and OtaAnnouncements
-// (packages/node/src/behavior/system/software-update/ at b25ed960) and the
+// (packages/node/src/behavior/system/software-update/ at db91886c) and the
 // storage half of its DclOtaUpdateService
 // (packages/protocol/src/dcl/DclOtaUpdateService.ts).
 //

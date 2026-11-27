@@ -45,7 +45,7 @@ type sessionLister interface {
 // does); without one it does nothing.
 //
 // Mirrors matter.js packages/protocol/src/common/FailsafeContext.ts:281-283
-// at b25ed960 (rollback, step 1: "Terminate any open PASE secure session by
+// at db91886c (rollback, step 1: "Terminate any open PASE secure session by
 // clearing any associated Secure Session Context at the Server" →
 // closePaseSession with the current exchange).
 func (b *Bridge) FailSafeExpired(ctx context.Context) {
@@ -88,7 +88,7 @@ func (b *Bridge) failSafeSessionsClosed(ctx context.Context) []uint16 {
 // context starts it records the window open now (none: 0), and when the
 // server closes it forgets the record, so the fail-safe the node's stop
 // expires counts for no window — matter.js closes the window before the
-// fail-safe at shutdown (DeviceCommissioner.ts:361-374 at b25ed960). It runs
+// fail-safe at shutdown (DeviceCommissioner.ts:361-374 at db91886c). It runs
 // under the server's lock and takes no lock of the bridge's.
 func (b *Bridge) trackFailSafeAttempt(_ context.Context, started bool) {
 	var armedIn uint64
@@ -210,17 +210,17 @@ func (b *Bridge) closePASESessionsOnCommissioningComplete(_ context.Context, res
 // named when this is called and closed by id: a PASE session a new
 // commissioning establishes before the response is out is not this
 // fail-safe context's and stays (matter.js closes the PASE session it
-// finds when the hook runs, FailsafeContext.ts:191-196 at b25ed960,
+// finds when the hook runs, FailsafeContext.ts:191-196 at db91886c,
 // closePaseSession). closing, when set, runs with the named ids just
 // before they close. It returns the named ids.
 //
 // The deferral is matter.js's force close with the current exchange:
-// packages/protocol/src/common/FailsafeContext.ts:283 at b25ed960
+// packages/protocol/src/common/FailsafeContext.ts:283 at db91886c
 // (rollback → closePaseSession with currentExchange) reaches
-// packages/protocol/src/session/Session.ts:336-342 at b25ed960
+// packages/protocol/src/session/Session.ts:336-342 at db91886c
 // (initiateForceClose: deferredClose only for the current exchange among
 // the PASE session's own exchanges, the others closed), and
-// Session.ts:315-317 at b25ed960 holds the close only then. matter.js tests whether
+// Session.ts:315-317 at db91886c holds the close only then. matter.js tests whether
 // the command's exchange is one of the PASE session's own; here that is
 // whether the interaction's session id is one of the named ids — exact,
 // not "is PASE":
@@ -252,9 +252,9 @@ func (b *Bridge) closePASESessions(ctx context.Context, closing func(ids []uint1
 // close is deferred left out: they are closing, and a close finds only a
 // PASE session that is not — matter.js's getPaseSession skips a closing
 // session (packages/protocol/src/session/SessionManager.ts:660-664 at
-// b25ed960), so neither the fail-safe's rollback nor CommissioningComplete
+// db91886c), so neither the fail-safe's rollback nor CommissioningComplete
 // force-closes a session a revoke closes gracefully, and a second revoke
-// does not close it again (Session.ts:305-307 at b25ed960). Empty when the
+// does not close it again (Session.ts:305-307 at db91886c). Empty when the
 // [SessionRegistry] does not list its sessions.
 func (b *Bridge) listPASESessions() []uint16 {
 	b.mu.RLock()

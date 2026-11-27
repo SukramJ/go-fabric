@@ -134,7 +134,7 @@ func (p *Peer) busyRemaining() time.Duration {
 // properties its network profile is selected by — matter.js
 // Peer.physicalProperties, which the client node sets
 // (packages/node/src/behavior/system/network/NetworkClient.ts:71 at
-// b25ed960). nil removes it: the peer's medium is unknown.
+// db91886c). nil removes it: the peer's medium is unknown.
 func (p *Peer) SetMedium(fn func() Medium) {
 	if fn == nil {
 		p.mediumOf.Store(nil)
@@ -618,7 +618,7 @@ func (p *Peer) HasSession() bool { return p.NewestSession() != nil }
 // adopts it into the peer at its establishment
 // (packages/protocol/src/session/NodeSession.ts:214-225,
 // packages/protocol/src/session/SessionManager.ts:376-381,
-// packages/protocol/src/peer/PeerSet.ts:104 at b25ed960).
+// packages/protocol/src/peer/PeerSet.ts:104 at db91886c).
 func (p *Peer) NewestSession() *exchange.Session { return p.newestOn(nil) }
 
 // NewestSessionOn is [Peer.NewestSession] among the sessions over t —

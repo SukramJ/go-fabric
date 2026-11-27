@@ -158,7 +158,7 @@ type Subscription struct {
 // subscription reports on. It changes when a newer session of the
 // subscriber supersedes that session ([Manager.MoveSession]). Mirrors
 // matter.js packages/node/src/node/server/ServerSubscription.ts:214-219 at
-// b25ed960 (the session getter).
+// db91886c (the session getter).
 func (s *Subscription) CurrentSessionID() uint16 {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -413,10 +413,10 @@ func (s *Subscription) touchLastReport(now time.Time) {
 // initial report afterwards (ServerSubscription.ts: the subscription is
 // activated only once the initial report completed — activate() (:415)
 // sets #sendUpdatesActivated,
-// packages/node/src/node/server/ServerSubscription.ts:433 at b25ed960).
+// packages/node/src/node/server/ServerSubscription.ts:433 at db91886c).
 // The events fired in that window go with them, urgent or not: matter.js
 // sends whatever is outstanding at activation, attribute changes and
-// events alike (ServerSubscription.ts:447-449 at b25ed960). There they
+// events alike (ServerSubscription.ts:447-449 at db91886c). There they
 // go at once; here they wait for MinIntervalFloor, as connectedhomeip
 // holds the floor from the establishment: the priming done, the handler
 // is registered with the scheduler at now (src/app/ReadHandler.cpp:249-259,

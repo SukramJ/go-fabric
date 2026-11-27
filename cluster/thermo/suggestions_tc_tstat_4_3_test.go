@@ -2,7 +2,7 @@
 // Copyright (C) 2026 SukramJ.
 
 // ThermostatSuggestions, the connectedhomeip cases matter.js's
-// ThermostatSuggestionsTest.ts (ported at b25ed960 in
+// ThermostatSuggestionsTest.ts (ported at db91886c in
 // thermostat_suggestions_parity_matterjs_test.go) does not hold: chip's
 // unit test TestSuggestionsAttributesAndAddRemoveCommands
 // (src/app/clusters/thermostat-server/tests/TestThermostatSuggestionsAndHold.cpp:161-242

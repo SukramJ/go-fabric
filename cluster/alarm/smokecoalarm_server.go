@@ -879,7 +879,7 @@ type pendingEvent struct {
 // SmokeCOState must not call Refresh itself.
 //
 // Each rule is the specification's, as matter.js carries it in
-// smoke-co-alarm-cluster.resource.ts (at b25ed960): SmokeAlarm / CoAlarm /
+// smoke-co-alarm-cluster.resource.ts (at db91886c): SmokeAlarm / CoAlarm /
 // LowBattery when the attribute "changes to either Warning or Critical
 // state" (:124, :133, :142-143); the Interconnect events are "generated
 // when the device hosting the server receives a smoke [CO] alarm from an

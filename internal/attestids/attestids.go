@@ -27,7 +27,7 @@ import (
 
 // The Matter attestation DN attributes: matter-oid-vid and matter-oid-pid
 // (matter.js names them VendorID and ProductID, DistinguishedName.ts:244
-// at b25ed960), and X.520 commonName (2.5.4.3), whose value carries
+// at db91886c), and X.520 commonName (2.5.4.3), whose value carries
 // the `Mvid:`/`Mpid:` fallback.
 var (
 	OIDVendorID   = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37244, 2, 1}
@@ -51,7 +51,7 @@ func (e *attributeError) Is(target error) bool { return target == ErrMalformedAt
 
 // FromName is the vendor and product id of one DN, as matter.js's
 // parseSubjectOrIssuer and decodeDistinguishedName read them
-// (Certificate.ts:302-382, DistinguishedName.ts:252-328 at b25ed960):
+// (Certificate.ts:302-382, DistinguishedName.ts:252-328 at db91886c):
 //
 //   - a matter-oid-vid or matter-oid-pid attribute must be exactly 4
 //     uppercase hex digits (parseMatterRdnHex, Certificate.ts:242-249,
@@ -85,7 +85,7 @@ func FromName(name pkix.Name, acceptMalformed bool) (vid, pid *uint16, err error
 // content bytes as text, whatever its string tag, as matter.js's
 // parseSubjectOrIssuer does (`Bytes.toString(Bytes.of(valueNode._bytes))`,
 // packages/protocol/src/certificate/kinds/Certificate.ts:321-326 at
-// b25ed960): "FFF1" in an OCTET STRING is 0xFFF1, in a BMPString it is
+// db91886c): "FFF1" in an OCTET STRING is 0xFFF1, in a BMPString it is
 // malformed. An attribute of other than two elements is skipped (:319); one
 // whose first element is not an OBJECT IDENTIFIER is skipped too, a rule of
 // this module (matter.js looks its bytes up by hex without a tag test,
@@ -211,7 +211,7 @@ func fromAttributes(attrs []attribute, acceptMalformed bool) (vid, pid *uint16, 
 }
 
 // maxFallbackCommonNameBytes is MAX_FALLBACK_COMMON_NAME_BYTES
-// (DistinguishedName.ts:345-346 at b25ed960).
+// (DistinguishedName.ts:345-346 at db91886c).
 const maxFallbackCommonNameBytes = 64
 
 // fallbackIDs is fallbackVidPid (DistinguishedName.ts:354-374 at
@@ -237,7 +237,7 @@ func fallbackIDs(commonNames []string) (vid, pid *uint16, err error) {
 }
 
 // ParseHexID is parseMatterRdnHex(field, text, 2) (Certificate.ts:242-249
-// at b25ed960): exactly 4 uppercase hex digits, nothing else.
+// at db91886c): exactly 4 uppercase hex digits, nothing else.
 func ParseHexID(s string) (uint16, bool) {
 	if !hexIDPattern.MatchString(s) {
 		return 0, false
@@ -254,7 +254,7 @@ var fallbackPatterns = map[string]*regexp.Regexp{
 }
 
 // FallbackID is parseMatterFallbackVidPid (DistinguishedName.ts:63-72 at
-// b25ed960): the leftmost prefix followed by 4 uppercase hex digits; the
+// db91886c): the leftmost prefix followed by 4 uppercase hex digits; the
 // prefix without them is an error. prefix is "Mvid:" or "Mpid:".
 func FallbackID(cn, prefix string) (*uint16, error) {
 	if m := fallbackPatterns[prefix].FindStringSubmatch(cn); m != nil {

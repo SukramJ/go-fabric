@@ -35,7 +35,7 @@ import (
 const scheduleHandleLength = 16
 
 // scheduleNameLength is the longest schedule name, the schema's "max 64"
-// (thermostat-cluster.element.ts:636 at b25ed960).
+// (thermostat-cluster.element.ts:636 at db91886c).
 const scheduleNameLength = 64
 
 // validScheduleDays are the weekday bits a transition may carry: Sunday to
@@ -197,7 +197,7 @@ func (r scheduleRules) validateSchedules(stored, list []Schedule) ([]Schedule, e
 
 // checkScheduleSizes holds a schedule to the schema's sizes: the handle,
 // the name, the preset handle and each transition's preset handle
-// (thermostat-cluster.element.ts:634-657 at b25ed960).
+// (thermostat-cluster.element.ts:634-657 at db91886c).
 func checkScheduleSizes(sc Schedule) error {
 	constraint := func(format string, args ...any) error {
 		return spec.Errorf(im.StatusConstraintError, "thermo: schedule: "+format, args...)

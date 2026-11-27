@@ -92,7 +92,7 @@ var _ OTAApplier = (*otaApplier)(nil)
 // RequestUserConsent implements [OTAApplier]. The node has no
 // user to ask; it declares CanConsent only in harness mode, where it
 // consents as the matter.js cert requestor does
-// (OtaRequestorTestInstance.ts:166-168 at b25ed960).
+// (OtaRequestorTestInstance.ts:166-168 at db91886c).
 func (a *otaApplier) RequestUserConsent(context.Context, uint32, string) (bool, error) {
 	return a.harness, nil
 }

@@ -158,7 +158,7 @@ func TestTcpChannelName(t *testing.T) {
 
 func TestTcpChannelOversizedMessageHandling(t *testing.T) {
 	// The four cases of matter.js #4793 (TcpChannelTest.ts:226-311 at
-	// b25ed960): MAX_TCP_MESSAGE_SIZE excludes the length header, and
+	// db91886c): MAX_TCP_MESSAGE_SIZE excludes the length header, and
 	// several complete frames in one read are all taken.
 	t.Run("rejects a message one byte over MAX_TCP_MESSAGE_SIZE", func(t *testing.T) {
 		client, c, msgs := tcpChannelPair(t, "1.2.3.4", 5000)

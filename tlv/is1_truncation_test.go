@@ -68,7 +68,7 @@ func TestOctetString_IS1BytePreserved(t *testing.T) {
 
 // A string cut at its IS1 keeps the length it arrived with, so a bounded
 // consumer can check that first, as matter.js TlvString.ts:69-77 at
-// b25ed960 does (`byteLengthOf(value) > this.maxLength` before the slice): a
+// db91886c does (`byteLengthOf(value) > this.maxLength` before the slice): a
 // 40-byte NodeLabel whose sixth byte is 0x1F reads as "ABCDE" with
 // RawLength 40, which a "max 32" consumer refuses (cluster/spec
 // DecodeStringIn, the bridge's write path). A string without IS1 has no

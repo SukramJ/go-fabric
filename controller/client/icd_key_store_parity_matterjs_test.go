@@ -80,7 +80,7 @@ func TestIcdClientKeyStoreParity(t *testing.T) {
 // try, on failure follows the committed registration again and rethrows,
 // and register awaits it (IcdClient.ts:356-372, :576-591 at b25ed960).
 // The memory state staying after a phase-two failure is shown for the
-// offered key (IcdClientTest.ts:806-824 at b25ed960); register goes
+// offered key (IcdClientTest.ts:806-824 at db91886c); register goes
 // through the same #commitIfOwned.
 func TestIcdClientRegisterFailsWhenTheStoreRefuses(t *testing.T) {
 	t.Parallel()

@@ -153,7 +153,7 @@ func TestTimeFormatConfig(t *testing.T) {
 // TestTimeFormatConfigStoredParityMatterJS ports the second stored-value
 // case of matter.js's describe "TimeFormatLocalizationServer"
 // (packages/node/test/behaviors/time-format-localization/TimeFormatLocalizationServerTest.ts
-// :262-279 at b25ed960), which needs a configured calendar list: the
+// :262-279 at db91886c), which needs a configured calendar list: the
 // first run lists [Gregorian, Buddhist] and a controller writes Buddhist;
 // the second lists [Chinese, Coptic] and starts at Chinese. matter.js
 // takes the list's first because neither the stored nor the detected

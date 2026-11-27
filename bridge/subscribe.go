@@ -143,7 +143,7 @@ func (b *Bridge) peerSchedule(sessionID uint16) (idle, active, threshold time.Du
 }
 
 // maxScheduleTime is matter.js's maxResponseTimeOf (MRP.ts:198-224 at
-// b25ed960): every transmission's maximum interval (full jitter) summed,
+// db91886c): every transmission's maximum interval (full jitter) summed,
 // on the active interval while active and the wait has not passed
 // threshold, else on the idle one, each with pad added unamplified.
 func maxScheduleTime(idle, active, threshold time.Duration, isActive bool, pad time.Duration) time.Duration {
@@ -3070,7 +3070,7 @@ func quieterAttribute(clusterID, attrID uint32) bool {
 // BatTimeToFullCharge: "According to specs changes to these attributes
 // should not occur more often than every 10 seconds"
 // (packages/node/src/behaviors/power-source/PowerSourceServer.ts:25-34 at
-// b25ed960, minimumEmitInterval = Seconds(10)).
+// db91886c, minimumEmitInterval = Seconds(10)).
 const powerSourceBatteryQuietInterval = 10 * time.Second
 
 // quietIntervalOf is the throttle interval of a quieter attribute:
@@ -3678,7 +3678,7 @@ func (e *occupancyEvents) check() {
 // endpoint's measurement-projected server changes to a value: matter.js
 // emits the event with each measurement its server's setMeasurement sets
 // (packages/node/src/behaviors/electrical-energy-measurement/
-// ElectricalEnergyMeasurementServer.ts:44-62 at b25ed960), connectedhomeip
+// ElectricalEnergyMeasurementServer.ts:44-62 at db91886c), connectedhomeip
 // when a snapshot changes the attribute to a value that is not null
 // (src/app/clusters/electrical-energy-measurement-server/
 // ElectricalEnergyMeasurementCluster.cpp:442-469 at 6170af84). The

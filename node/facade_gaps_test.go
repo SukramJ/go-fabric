@@ -26,7 +26,7 @@ import (
 // its id. matter.js tests no list of its own: SessionsBehaviorTest checks
 // the sessions' activity and intervals, SubscriptionsServerTest the
 // persisted records across restarts — the record Snapshot copies
-// (SubscriptionsServer.ts:148-158 at b25ed960).
+// (SubscriptionsServer.ts:148-158 at db91886c).
 func TestSubscriptionSnapshot(t *testing.T) {
 	t.Parallel()
 	site := quietSite(t)
@@ -128,7 +128,7 @@ func TestTopologyScopeTagsLabels(t *testing.T) {
 // the cluster, the attribute and OriginControllerWrite — inline through
 // Config.Observers and queued through ObserveAsync. The node observer
 // tests' counterpart in matter.js is the per-behavior `$Changed` event
-// (packages/node/src/behavior/Events.ts:52-56 at b25ed960); matter.js has
+// (packages/node/src/behavior/Events.ts:52-56 at db91886c); matter.js has
 // no node-wide one to port.
 func TestOnAttributeChanged(t *testing.T) {
 	t.Parallel()

@@ -24,7 +24,7 @@ import (
 // (logReadAttributeReport) and a subscription's priming report
 // (primingSource.log) — never carry a value the model marks secret. They
 // mirror the attribute read log of
-// matter.js packages/protocol/src/action/server/AttributeReadResponse.ts:303-306 at b25ed960,
+// matter.js packages/protocol/src/action/server/AttributeReadResponse.ts:303-306 at db91886c,
 // which passes the value through SecretRedaction.redact; this module redacts
 // always (no Logger.redactSecrets switch).
 

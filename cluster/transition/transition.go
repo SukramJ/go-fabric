@@ -236,7 +236,7 @@ func (e *Engine) Start(t Transition) error { return e.StartAll(t) }
 // does, the targets of the immediate ones applied in a single Apply.
 // matter.js starts a command's transitions inside the command's
 // transaction (moveToColorLogic starts currentX then currentY,
-// ColorControlServer.ts:797-813 at b25ed960), so an immediate transition's
+// ColorControlServer.ts:797-813 at db91886c), so an immediate transition's
 // values reach the state in one commit and a hook on the committed state
 // sees both at once; a step of a gradual transition applies every
 // property's value together anyway (Transitions.ts:537-574). Apply's error
@@ -344,7 +344,7 @@ func (e *Engine) beginLocked(t Transition) (Change, bool) {
 		}
 	} else if (t.Rate < 0 && current == prop.Min) || (t.Rate > 0 && current == prop.Max) {
 		// A bounded property at its bound in the direction of travel does
-		// not move (Transitions.ts:165-169 at b25ed960). matter.js applies
+		// not move (Transitions.ts:165-169 at db91886c). matter.js applies
 		// the check to a cyclic property without a target as well; this
 		// engine does not — the wheel wraps (see the package doc).
 		return Change{}, false
@@ -742,11 +742,11 @@ func (e *Engine) step(now time.Time) {
 		if err := e.cfg.Apply(changes); err != nil {
 			// A refused step ends every transition, as matter.js's step
 			// `.catch` calls `stop` on a step error (Transitions.ts:594-600
-			// at b25ed960). It ends them as a cancel does — Settled per
+			// at db91886c). It ends them as a cancel does — Settled per
 			// name, RemainingTime 0 reported where something was — so no
 			// subscriber keeps a RemainingTime above 0 for a transition
 			// that no longer runs (R2-P6-err-1415, ahead of matter.js, whose
-			// `stop` reports nothing, Transitions.ts:263-284 at b25ed960;
+			// `stop` reports nothing, Transitions.ts:263-284 at db91886c;
 			// the rule is the one connectedhomeip quotes and implements,
 			// "When it changes to 0." (LevelControlCluster.cpp:688-691,
 			// :706 at 6170af84)).

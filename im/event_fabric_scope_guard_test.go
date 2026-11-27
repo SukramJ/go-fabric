@@ -16,7 +16,7 @@ import (
 // (field 254) is fabric-scoped; matter.js filters a fabric-scoped event
 // that is not fabric-sensitive too when the read asks for fabric
 // filtering (packages/protocol/src/action/server/EventReadResponse.ts:353-364
-// at b25ed960), a branch this module does not have. At the pinned snapshot
+// at db91886c), a branch this module does not have. At the pinned snapshot
 // every such event is fabric-sensitive, so the branch has no case; this
 // test fails when a snapshot brings one that is not, naming the event —
 // the branch is then owed in AuthorizeEventReports.

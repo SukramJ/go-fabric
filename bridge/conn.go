@@ -205,14 +205,14 @@ func sendVia(listener *udp.Listener, dst net.Addr, datagram []byte) error {
 // it. The UDP path keeps its rule — the source address of the newest such
 // message wins, connectedhomeip's rule; matter.js adopts the address only
 // of a message that opens a new exchange (ExchangeManager.ts:474-480 at
-// b25ed960; by_design BD-chip-SessionRouteByNewCounter). A session is
+// db91886c; by_design BD-chip-SessionRouteByNewCounter). A session is
 // never moved
 // between transports or connections: matter.js replaces a session's
 // channel only when both the old and the new one are UDP
-// (MessageChannel.ts:155-164 at b25ed960), so a session first seen on a TCP
+// (MessageChannel.ts:155-164 at db91886c), so a session first seen on a TCP
 // connection stays bound to it, and one first seen over UDP stays on
 // UDP. The binding is what the connection's drop evicts
-// (ExchangeManager.ts:708-722 #sessionsOnChannel at b25ed960).
+// (ExchangeManager.ts:708-722 #sessionsOnChannel at db91886c).
 //
 // "The same session" is the session object, not the id: an id is
 // reused once its session is gone, and the new session binds afresh
@@ -489,7 +489,7 @@ func (b *Bridge) bindEstablishedSession(src net.Addr, h any) {
 //
 // Only a TCP connection is closed: matter.js schedules the check for a
 // session whose transport channel is TCP (ExchangeManager.ts:779-784 at
-// b25ed960), so a BLE connection stays when its PASE session goes — it
+// db91886c), so a BLE connection stays when its PASE session goes — it
 // ends with the central or with the node leaving the radio.
 func (b *Bridge) closeConnRoute(r *connRoute) {
 	if r == nil || r.conn == nil {
@@ -548,7 +548,7 @@ func (b *Bridge) sessionHoldsSubscription(sessionID uint16) bool {
 // deadlines, exchange reply routes and ack obligations
 // ([Bridge.purgeSessionState]), forgets the session's route and closes a TCP
 // connection whose last session this was (unbindSessionRoute;
-// matter.js ExchangeManager.ts:748-755 at b25ed960). Calling it for a session the
+// matter.js ExchangeManager.ts:748-755 at db91886c). Calling it for a session the
 // bridge never routed, or twice, is a no-op.
 func (b *Bridge) SessionClosed(sessionID uint16) {
 	// A revoked PASE session that closed another way than its deferred
@@ -625,13 +625,13 @@ func (b *Bridge) receive(ctx context.Context, buf []byte, c transport.Conn) erro
 		// An unsecured (PASE / CASE handshake) message is served on the
 		// connection like any other: matter.js creates the unsecured
 		// session for an inbound message from whatever channel carried it
-		// (ExchangeManager.ts:324-327 at b25ed960 `createUnsecuredSession({
+		// (ExchangeManager.ts:324-327 at db91886c `createUnsecuredSession({
 		// channel, initiatorNodeId })`), and its secure-channel servers never ask
 		// which transport they run on. Replies go back on the connection
 		// (sendVia) without MRP (routeUsesMRP). The handshake holds the
 		// connection open while it runs (holdHandshake, settleHandshake),
 		// as matter.js counts the unsecured session on the channel
-		// (ExchangeManager.ts:708-722 at b25ed960).
+		// (ExchangeManager.ts:708-722 at db91886c).
 	}
 	return b.dispatch(ctx, buf, route)
 }
@@ -652,7 +652,7 @@ func (b *Bridge) handleTCPMessage(c *tcp.Conn, msg []byte, release func()) {
 // It runs when the close begins (the close callback of transport/tcp
 // Listener.Serve), while a handler that passed the reader's closed check
 // before the close may still be dispatching: matter.js delivers nothing on a closed channel
-// (TcpChannel.ts:196-198 at b25ed960), but such a handler binds its
+// (TcpChannel.ts:196-198 at db91886c), but such a handler binds its
 // session to the dead connection after the first eviction. So the
 // connection's handlers are waited for and the eviction runs once more
 // (review II, R2-P6-conc-0306, the TCP half; the BLE receiver's wait is
@@ -671,7 +671,7 @@ func (b *Bridge) handleTCPClose(c *tcp.Conn) {
 // connection, not by the route c maps to now: a handler that took the
 // route before an earlier eviction forgot it can bind a session to that
 // route afterwards. Mirrors matter.js ExchangeManager.ts:707-722 at
-// b25ed960 (#sessionsOnChannel matches a session whose transport channel
+// db91886c (#sessionsOnChannel matches a session whose transport channel
 // is the connection). Idempotent: a second call evicts only what bound
 // since the first.
 func (b *Bridge) evictConn(c transport.Conn) []uint16 {
@@ -698,7 +698,7 @@ func (b *Bridge) evictConn(c transport.Conn) []uint16 {
 	for i, sid := range sids {
 		// One line per evicted session, as matter.js
 		// packages/protocol/src/protocol/ExchangeManager.ts:729 at
-		// b25ed960 logs per session.
+		// db91886c logs per session.
 		b.logger.Debug("matter.tcp.evict.session",
 			slog.String("conn", routes[i].String()),
 			slog.Int("session_id", int(sid)))

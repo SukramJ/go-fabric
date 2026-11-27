@@ -378,7 +378,7 @@ const bleStopTimeout = 5 * time.Second
 
 // followOnBLE advertises the own window adv announces over BLE while the
 // node has no fabric — matter.js adds the BLE advertiser only to an
-// uncommissioned node (ServerNetworkRuntime.ts:255-275 at b25ed960), and
+// uncommissioned node (ServerNetworkRuntime.ts:255-275 at db91886c), and
 // its peripheral registers the GATT service only once it advertises
 // (BlenoBleServer.ts:224-231). A node with a fabric — committed or still
 // under the fail-safe — advertises nothing over BLE; the GATT service and
@@ -734,7 +734,7 @@ func stoppedAs(err error) error {
 //
 // Mirrors matter.js DeviceCommissioner.allowBasicCommissioning
 // (packages/protocol/src/protocol/DeviceCommissioner.ts:129-136 at
-// b25ed960), which
+// db91886c), which
 // opens the window with the node's configured passcode; ADR 0025 principle
 // 3 (the window's wiring stays behind [Node.Bridge]). Before [Node.Start]
 // completed it returns [ErrNotStarted], and from the first [Node.Stop] on

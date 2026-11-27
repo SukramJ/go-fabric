@@ -117,7 +117,7 @@ func TestSubscriptionAliveFollowsTheReportsHooks(t *testing.T) {
 
 // TestSubscriptionAliveNotAfterStop: an alive hook queued behind a report
 // does not run once the node stopped meanwhile — matter.js asks isCurrent
-// after the drain (NetworkClient.ts:184-189 at b25ed960). Run after the
+// after the drain (NetworkClient.ts:184-189 at db91886c). Run after the
 // stop, it latched the fabric-label reconciliation of a stopped node.
 func TestSubscriptionAliveNotAfterStop(t *testing.T) {
 	t.Parallel()
@@ -302,7 +302,7 @@ func TestEstablishedAliveFollowsThePrimingReportsHooks(t *testing.T) {
 
 // TestOneAlivePerSubscriptionGoingLive: a subscription going live emits
 // exactly one SubscriptionAlive. matter.js gates a report's alive on the
-// subscription id (NetworkClient.ts:179-191 at b25ed960) and assigns the id
+// subscription id (NetworkClient.ts:179-191 at db91886c) and assigns the id
 // only after the priming report's updated returned (ClientInteraction.ts:1083
 // before :1086, SustainedSubscription.ts:224 before :226 at db021da0), so
 // the priming report emits none and the going-live emission

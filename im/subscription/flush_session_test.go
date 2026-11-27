@@ -18,12 +18,12 @@ import (
 // moved onto a newer session is flushed with that one and not with the
 // one it left. matter.js hands every subscription of a closing session
 // that very session (packages/protocol/src/session/NodeSession.ts:383-395
-// at b25ed960, closeSubscriptions, `flush ? this : undefined` at :386),
+// at db91886c, closeSubscriptions, `flush ? this : undefined` at :386),
 // and a subscription is a member of the set of the session it currently
 // reports on: activation adds it there
 // (packages/node/src/node/server/ServerSubscription.ts:425 at b25ed960),
 // and #follow moves it into the newer session's set
-// (ServerSubscription.ts:820-834 at b25ed960). Review II, pin lift
+// (ServerSubscription.ts:820-834 at db91886c). Review II, pin lift
 // b25ed960, F-b25ed960-43 (P6-B).
 func TestFlushSessionFollowsAMovedSubscription(t *testing.T) {
 	t.Parallel()

@@ -58,7 +58,7 @@ func TestClientSubscriptionsResetTimer(t *testing.T) {
 }
 
 // TestClientSubscriptionsDelete ports the "delete" group
-// (ClientSubscriptionsTest.ts:82-111 at b25ed960, #4947): the liveness
+// (ClientSubscriptionsTest.ts:82-111 at db91886c, #4947): the liveness
 // timer stops once the last peer subscription leaves
 // (ClientSubscriptions.ts:176-187). matter.js counts the timers named
 // "Subscription timeout"; the Go fake clock lists the armed durations, and

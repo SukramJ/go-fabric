@@ -4,7 +4,7 @@
 package bridge
 
 // Ports by meaning of matter.js
-// packages/node/test/node/ServerSubscriptionTest.ts at b25ed960, the
+// packages/node/test/node/ServerSubscriptionTest.ts at db91886c, the
 // reporter-side rows of the session supersession cases: the count of failed
 // updates a move starts again (:1663) and a failure on the session the
 // subscription left, which is not counted and is resent at once on the new

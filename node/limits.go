@@ -79,7 +79,7 @@ type Limits struct {
 	// base interval on the exchange of every inbound BDX transfer its BDX
 	// responder accepts (an OTA requestor's image download); the backoff
 	// amplifies it. Mirrors matter.js LimitsConfig.bdxAdditionalMrpDelay
-	// (NetworkServer.ts:152-153 at b25ed960), the BDX class of the network
+	// (NetworkServer.ts:152-153 at db91886c), the BDX class of the network
 	// profile's MRP margins (NetworkProfile.ts:156-159), applied as the
 	// exchange's peerAdditionalMrpDelay (BdxProtocol.ts:139-142). 0 adds
 	// none. Bound: not negative (SoftwareUpdateManager.ts:60-67,
@@ -88,7 +88,7 @@ type Limits struct {
 }
 
 // Access-control capacity bounds (Matter, access-control.element.ts:38-49
-// at b25ed960).
+// at db91886c).
 const (
 	minAccessControlEntriesPerFabric = 4
 	minSubjectsPerAccessControlEntry = 4

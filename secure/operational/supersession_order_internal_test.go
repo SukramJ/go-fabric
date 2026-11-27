@@ -6,7 +6,7 @@ package operational
 // The supersession hooks of one establishment run before those of the next
 // (F-b25ed960-40). matter.js emits them synchronously inside the
 // establishment (packages/protocol/src/session/SessionManager.ts:750-769
-// at b25ed960, #sessionEstablished), on one thread, so two establishments
+// at db91886c, #sessionEstablished), on one thread, so two establishments
 // never interleave their emits; here two goroutines can, between the
 // computation under the table's lock and the hook. No matter.js `it(`
 // covers it (single-threaded); the ported cases are

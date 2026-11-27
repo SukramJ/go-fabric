@@ -14,7 +14,7 @@ import (
 
 // TestLifecycle: New needs an interaction; a disabled node does not start
 // (ClientNetworkRuntime.ts:41-43); Enable starts it again
-// (ClientNode.ts:295-302 at b25ed960); a closed node does not start.
+// (ClientNode.ts:295-302 at db91886c); a closed node does not start.
 func TestLifecycle(t *testing.T) {
 	t.Parallel()
 	if _, err := client.New(client.Config{ID: "peer1"}); !errors.Is(err, client.ErrConfig) {

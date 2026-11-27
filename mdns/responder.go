@@ -163,7 +163,7 @@ type wire interface {
 	// listing, handed down to every interface of a publication round, as
 	// matter.js lists the interfaces once per round and hands each
 	// responder its own (MdnsServer.ts #publishOnListedInterfaces and
-	// #listInterfaces, :248-275, :413-421 at b25ed960).
+	// #listInterfaces, :248-275, :413-421 at db91886c).
 	links() []link
 	// link is one interface's entry, the zero link for one not listed:
 	// the answer path's single interface.
@@ -275,7 +275,7 @@ func (r *Responder) receive(buf []byte, ifIndex int, src *net.UDPAddr) {
 // first publication says goodbye to the records that left and announces
 // the new ones in one message — matter.js registers the new generator
 // under the service's name (MdnsServer.register, MdnsServer.ts:123-155 at
-// b25ed960) and its broadcast carries the goodbyes
+// db91886c) and its broadcast carries the goodbyes
 // (InterfaceResponder.ts:271-302).
 //
 // The advertised addresses are the host's, chosen per interface by the
@@ -367,7 +367,7 @@ func (r *Responder) hostPolicy() *hostNamePolicy {
 
 // removeLocked stops e's run, drops it and publishes the goodbyes of the
 // records no remaining service holds on every interface (MdnsServer.ts
-// #withdraw, :165-178 at b25ed960). Caller holds r.mu.
+// #withdraw, :165-178 at db91886c). Caller holds r.mu.
 func (r *Responder) removeLocked(e *entry) {
 	r.stopLocked(e)
 	delete(r.services, e.key)
@@ -379,7 +379,7 @@ func (r *Responder) removeLocked(e *entry) {
 // resetLocked drops the cached record sets after the records changed; what
 // peers cache stays, as matter.js rebuilds an interface's view and keeps
 // its peer cache (InterfaceResponder.ts #currentView, :791-830 at
-// b25ed960). Caller holds r.mu.
+// db91886c). Caller holds r.mu.
 func (r *Responder) resetLocked() {
 	clear(r.links)
 }
@@ -415,7 +415,7 @@ func (r *Responder) Active() []Service {
 // host that observed a link change (interface up, address assigned). The
 // interfaces' addresses are read again. It is matter.js
 // MdnsServer.broadcast with no service named: one publication per
-// interface (MdnsServer.ts:210-223 at b25ed960). [Responder.CheckInterfaces]
+// interface (MdnsServer.ts:210-223 at db91886c). [Responder.CheckInterfaces]
 // is the narrower call, which publishes only on the interfaces that
 // changed and repeats it a second later.
 func (r *Responder) TriggerReannounce(context.Context) {

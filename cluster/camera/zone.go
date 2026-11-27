@@ -77,7 +77,7 @@ type ZonesConfig struct {
 	TwoDCartesianMax Vertex
 	// Sensitivity is the value the host persisted, 1 to SensitivityMax
 	// (the model's constraint, zone-management.element.ts:58-59 at
-	// b25ed960); 0 starts at chip's 1 (ZoneManagementCluster.h:135).
+	// db91886c); 0 starts at chip's 1 (ZoneManagementCluster.h:135).
 	Sensitivity uint8
 	// Zones and Triggers are the ones the host persisted, chip's
 	// LoadZones and LoadTriggers (:113-172). A zone ID used twice is
@@ -92,7 +92,7 @@ type ZonesConfig struct {
 	// over the port's. The host learns each ID the server assigns through
 	// [ZonePort]'s CreateTwoDCartesianZone and persists it there; matter.js
 	// keeps it as the server's nonvolatile lastZoneId
-	// (ZoneManagementServer.ts:253-260 at b25ed960).
+	// (ZoneManagementServer.ts:253-260 at db91886c).
 	LastZoneID *uint16
 	// Port is the zone and trigger store; required.
 	Port ZonePort
@@ -112,7 +112,7 @@ type ZonesConfig struct {
 // host's [ZonePort] stores it, the zone limits, the Sensitivity write, and
 // the ZoneTriggered and ZoneStopped events the host reports. The command
 // rules are matter.js's ZoneManagementServer.ts and
-// TwoDCartesianGeometry.ts at b25ed960; the configuration limits and the
+// TwoDCartesianGeometry.ts at db91886c; the configuration limits and the
 // Sensitivity write are the model's constraints
 // (zone-management.element.ts:32-33, :35, :54-55, :58-59 at b25ed960),
 // checked as connectedhomeip's ValidateConfiguration and WriteAttribute
@@ -160,7 +160,7 @@ var (
 // NewZones builds a ZoneManagement server on cfg.Port. The configuration
 // rules are the model's constraints, checked as chip's Startup does
 // (ZoneManagementCluster.cpp:60-106 at 6170af84), and matter.js's
-// initialize (ZoneManagementServer.ts:70-78 at b25ed960): MaxZones not
+// initialize (ZoneManagementServer.ts:70-78 at db91886c): MaxZones not
 // below MaxUserDefinedZones with USERDEFINED, and no zone ID used twice.
 // The last assigned zone ID is cfg.LastZoneID, else the port's
 // [LastZoneIDSource] answer, read once here.
@@ -243,13 +243,13 @@ func NewZones(cfg ZonesConfig) (*Zones, error) {
 // (zonemanagement.Declare.ZonePort), which carries no LastZoneID. known
 // false continues after the highest ID in use. matter.js keeps the ID as
 // the server's nonvolatile lastZoneId (ZoneManagementServer.ts:253-260 at
-// b25ed960); here the host holds it (owner decisions O-1, O-7).
+// db91886c); here the host holds it (owner decisions O-1, O-7).
 type LastZoneIDSource interface {
 	LastZoneID() (zoneID uint16, known bool)
 }
 
 // repeatedZoneID reports the first zone ID zones use twice. Mirrors
-// matter.js ZoneManagementServer.ts:178-186 at b25ed960
+// matter.js ZoneManagementServer.ts:178-186 at db91886c
 // (#assertUniqueZoneIds).
 func repeatedZoneID(zones []Zone) (uint16, bool) {
 	seen := make(map[uint16]bool, len(zones))
@@ -263,14 +263,14 @@ func repeatedZoneID(zones []Zone) (uint16, bool) {
 }
 
 // maxZoneID is the highest zone ID the server assigns; the next ID after
-// it is 0 (matter.js ZoneManagementServer.ts:24 at b25ed960, MAX_ZONE_ID).
+// it is 0 (matter.js ZoneManagementServer.ts:24 at db91886c, MAX_ZONE_ID).
 const maxZoneID = 0xfffe
 
 // nextZoneID is the ID of a new zone: the one after last, skipping IDs in
 // use, so that a new zone does not take the ID of a zone just removed;
 // without a last ID, the one after the highest ID in use, because
 // manufacturer zones count toward the same sequence; 0 after maxZoneID.
-// Mirrors matter.js ZoneManagementServer.ts:236-250 at b25ed960
+// Mirrors matter.js ZoneManagementServer.ts:236-250 at db91886c
 // (#nextZoneId). The caller holds the zone limit, so an ID is free.
 func nextZoneID(zones []Zone, last *uint16) uint16 {
 	used := make(map[uint16]bool, len(zones))
@@ -460,7 +460,7 @@ func validateTwoDZone(zone TwoDZone) error {
 // (DYNAMIC_CONSTRAINT_ERROR), a duplicate zone of the same use and
 // vertices other than exclude (ALREADY_EXISTS) and a self-intersecting
 // polygon (DYNAMIC_CONSTRAINT_ERROR), in that order. Mirrors matter.js
-// ZoneManagementServer.ts:205-234 at b25ed960 (#assertVertices).
+// ZoneManagementServer.ts:205-234 at db91886c (#assertVertices).
 func (z *Zones) checkVertices(zone TwoDZone, exclude *uint16) error {
 	maxV := z.cfg.TwoDCartesianMax
 	for _, v := range zone.Vertices {
@@ -479,7 +479,7 @@ func (z *Zones) checkVertices(zone TwoDZone, exclude *uint16) error {
 
 // zoneExists reports a zone other than exclude with the use and the same
 // vertices in the same order (matter.js ZoneManagementServer.ts:218-224,
-// TwoDCartesianGeometry.ts:17-22 at b25ed960, verticesEqual).
+// TwoDCartesianGeometry.ts:17-22 at db91886c, verticesEqual).
 func (z *Zones) zoneExists(use zmdef.ZoneUseEnum, vertices []Vertex, exclude *uint16) bool {
 	z.mu.Lock()
 	defer z.mu.Unlock()
@@ -504,7 +504,7 @@ func zoneRequestOf[T any](fields any, name string) (T, error) {
 
 // assertFocusSupported refuses a Focus zone without FOCUSZONES
 // (CONSTRAINT_ERROR). Mirrors matter.js ZoneManagementServer.ts:199-203 at
-// b25ed960 (#assertFocusSupported).
+// db91886c (#assertFocusSupported).
 func (z *Zones) assertFocusSupported(zone TwoDZone) error {
 	if zone.Use == zmdef.ZoneUseFocus && !z.HasFeature("FOCUSZONES") {
 		return spec.Errorf(im.StatusConstraintError, "ZoneManagement: a Focus zone without FOCUSZONES")
@@ -513,7 +513,7 @@ func (z *Zones) assertFocusSupported(zone TwoDZone) error {
 }
 
 // createTwoDCartesianZone carries out CreateTwoDCartesianZone. Mirrors
-// matter.js ZoneManagementServer.ts:80-107 at b25ed960
+// matter.js ZoneManagementServer.ts:80-107 at db91886c
 // (createTwoDCartesianZone): a Focus zone only with FOCUSZONES,
 // RESOURCE_EXHAUSTED once MaxUserDefinedZones user-defined zones or
 // MaxZones zones exist, the vertex checks, then the next zone ID
@@ -523,7 +523,7 @@ func (z *Zones) assertFocusSupported(zone TwoDZone) error {
 // refuses after super (:61-63). The zone's constraints come first:
 // matter.js refuses a Name over 32 bytes and fewer than 3 vertices in the
 // interaction layer, before the command (ZoneManagementServerTest.ts:756-768
-// at b25ed960); Use and Color keep chip's ValidateTwoDCartesianZone
+// at db91886c); Use and Color keep chip's ValidateTwoDCartesianZone
 // (ZoneManagementCluster.cpp:445-460 at 6170af84). A zone the port stored
 // but the table refuses is removed at the port again before the command
 // answers FAILURE ([undoAtPort], R2-C2-err-1602).
@@ -570,7 +570,7 @@ func (z *Zones) createTwoDCartesianZone(ctx context.Context, fields any) (any, e
 
 // requireUserZone is the zone of id: NOT_FOUND for an unknown zone,
 // CONSTRAINT_ERROR for one that is not user-defined. Mirrors matter.js
-// ZoneManagementServer.ts:188-197 at b25ed960 (#requireUserZone).
+// ZoneManagementServer.ts:188-197 at db91886c (#requireUserZone).
 func (z *Zones) requireUserZone(id uint16) (Zone, error) {
 	z.mu.Lock()
 	defer z.mu.Unlock()
@@ -585,7 +585,7 @@ func (z *Zones) requireUserZone(id uint16) (Zone, error) {
 }
 
 // updateTwoDCartesianZone carries out UpdateTwoDCartesianZone. Mirrors
-// matter.js ZoneManagementServer.ts:109-121 at b25ed960
+// matter.js ZoneManagementServer.ts:109-121 at db91886c
 // (updateTwoDCartesianZone): the zone's constraints, then an unknown zone
 // NOT_FOUND, one not user-defined CONSTRAINT_ERROR, one of another type
 // DYNAMIC_CONSTRAINT_ERROR, a Focus zone only with FOCUSZONES, the vertex
@@ -626,7 +626,7 @@ func (z *Zones) updateTwoDCartesianZone(ctx context.Context, fields any) (any, e
 }
 
 // removeZone carries out RemoveZone. Mirrors matter.js
-// ZoneManagementServer.ts:123-130 at b25ed960 (removeZone): an unknown
+// ZoneManagementServer.ts:123-130 at db91886c (removeZone): an unknown
 // zone is NOT_FOUND, one not user-defined CONSTRAINT_ERROR, one a trigger
 // uses INVALID_IN_STATE; then the port.
 func (z *Zones) removeZone(ctx context.Context, fields any) (any, error) {
@@ -658,7 +658,7 @@ func (z *Zones) removeZone(ctx context.Context, fields any) (any, error) {
 // at most and MaxDuration at least InitialDuration (CONSTRAINT_ERROR); a
 // Sensitivity exactly with PERZONESENS (INVALID_COMMAND), 1 to
 // SensitivityMax (CONSTRAINT_ERROR). Mirrors matter.js
-// ZoneManagementServer.ts:133-152 at b25ed960 (createOrUpdateTrigger).
+// ZoneManagementServer.ts:133-152 at db91886c (createOrUpdateTrigger).
 func (z *Zones) validateTrigger(t ZoneTrigger) error {
 	switch {
 	case t.InitialDuration < 1, t.AugmentationDuration > t.InitialDuration, t.MaxDuration < t.InitialDuration: // :135-139
@@ -672,7 +672,7 @@ func (z *Zones) validateTrigger(t ZoneTrigger) error {
 }
 
 // createOrUpdateTrigger carries out CreateOrUpdateTrigger. Mirrors
-// matter.js ZoneManagementServer.ts:132-167 at b25ed960
+// matter.js ZoneManagementServer.ts:132-167 at db91886c
 // (createOrUpdateTrigger): the trigger's checks; an unknown zone is
 // NOT_FOUND, a 2D zone of another use than Motion CONSTRAINT_ERROR; then
 // the port creates or updates it, and the trigger replaces the zone's or
@@ -721,7 +721,7 @@ func (z *Zones) createOrUpdateTrigger(ctx context.Context, fields any) (any, err
 }
 
 // removeTrigger carries out RemoveTrigger. Mirrors matter.js
-// ZoneManagementServer.ts:169-176 at b25ed960 (removeTrigger): a zone
+// ZoneManagementServer.ts:169-176 at db91886c (removeTrigger): a zone
 // without a trigger is NOT_FOUND; then the port.
 func (z *Zones) removeTrigger(ctx context.Context, fields any) (any, error) {
 	req, err := zoneRequestOf[zmdef.RemoveTriggerRequest](fields, "RemoveTrigger")

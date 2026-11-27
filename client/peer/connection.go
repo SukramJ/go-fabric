@@ -636,7 +636,7 @@ func (c *connection) shiftLocked(discovered []discovery.Address) target {
 //
 // Ahead of matter.js and chip: compareDesirability ranks an address by
 // class, health and DNS priority and knows no host
-// (ServerAddressSet.ts:165-184 at b25ed960); chip's lookup scores an
+// (ServerAddressSet.ts:165-184 at db91886c); chip's lookup scores an
 // address by class alone, every IPv6 link-local first, and keeps the
 // DNS-SD interface only for link-local (src/lib/dnssd/IPAddressSorter.cpp:44-50,
 // src/lib/address_resolve/AddressResolve_DefaultImpl.cpp:130-141 at
@@ -913,7 +913,7 @@ func (c *connection) fallbackSupersededLocked() bool {
 // (unicastDestination, HintAddresses),
 // since any host on the link can send the record that names it (review
 // II, R2-P3-ctl-lan-09). matter.js takes a discovered address as it
-// stands (IpService.ts:392-407 at b25ed960, unicastDestination's doc).
+// stands (IpService.ts:392-407 at db91886c, unicastDestination's doc).
 func (c *connection) addAddressLocked(a discovery.Address) {
 	if !unicastDestination(a.IP) {
 		return

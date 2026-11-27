@@ -269,7 +269,7 @@ func TestDecommissionParity(t *testing.T) {
 
 	t.Run("accepts another decommission after a failed one", func(t *testing.T) {
 		t.Parallel()
-		// DecommissionTest.ts:205-222 at b25ed960: removeFabric patched to
+		// DecommissionTest.ts:205-222 at db91886c: removeFabric patched to
 		// throw PeerUnresponsiveError, two decommissions in a row, each
 		// rejected with it — the first failed attempt does not block the
 		// second — and the node kept. The patch, not a dropped datagram,

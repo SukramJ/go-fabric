@@ -99,7 +99,7 @@ func New(cfg HeldConfig) (*Server, error) {
 		s.startUp = clonePtr(cfg.StartUpCurrentLevel)
 		// Mirrors matter.js
 		// packages/node/src/behaviors/level-control/LevelControlServer.ts:205-245
-		// at b25ed960 (initializeLighting): not after a software update,
+		// at db91886c (initializeLighting): not after a software update,
 		// not under an Aggregator (W3-clua2-02).
 		if !cfg.Bridged && cfg.BootReason != bootReasonSoftwareUpdateCompleted {
 			s.applyStartUpLevel()

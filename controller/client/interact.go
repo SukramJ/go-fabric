@@ -29,7 +29,7 @@ var (
 )
 
 // ReadRequest is a read through the node — matter.js ClientRead
-// (packages/protocol/src/action/client/ClientRead.ts:15 at b25ed960): the
+// (packages/protocol/src/action/client/ClientRead.ts:15 at db91886c): the
 // paths and filters it sends ([ReadPaths], embedded as ReadRequest, its
 // fields promoted) and IncludeKnownVersions.
 type ReadRequest struct {
@@ -42,7 +42,7 @@ type ReadRequest struct {
 // SubscribeRequest is a subscription through the node — matter.js
 // ClientSubscribe with ClientNodeInteraction's includeKnownVersions
 // (packages/node/src/node/client/ClientNodeInteraction.ts:111-124 at
-// b25ed960): what it sends ([SubscribePaths], embedded, its fields
+// db91886c): what it sends ([SubscribePaths], embedded, its fields
 // promoted) and IncludeKnownVersions.
 type SubscribeRequest struct {
 	interaction.SubscribeRequest

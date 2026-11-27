@@ -16,7 +16,7 @@ import (
 )
 
 // The cases of matter.js packages/general/test/net/
-// NetworkInterfaceChangesTest.ts at b25ed960 that a Go watcher has, ported
+// NetworkInterfaceChangesTest.ts at db91886c that a Go watcher has, ported
 // by meaning: a fake host whose interfaces the test edits, the fake clock
 // for the periodic check.
 

@@ -342,7 +342,7 @@ func readCommandInvocation(dec *tlv.Decoder, fieldsReader CommandFieldsReader) (
 			}
 			// CommandPath is mandatory: matter.js
 			// packages/types/src/protocol/types/TlvCommandData.ts:17 at
-			// b25ed960 (TlvField).
+			// db91886c (TlvField).
 			if !hasPath {
 				return CommandInvocation{}, fmt.Errorf("%w: %w", ErrInvalidInvokeRequest, missingField(tagCmdDataPath, "CommandDataIB.CommandPath"))
 			}
@@ -736,7 +736,7 @@ func HandleInvokeRequest(ctx context.Context, d Dispatcher, req InvokeRequest) I
 	// fabric 0 without PASE is no grant either, the implicit Administer is
 	// keyed on the auth mode alone (matter.js
 	// packages/protocol/src/interaction/FabricAccessControl.ts:189-191 at
-	// b25ed960, `authMode === Pase && isCommissioning`).
+	// db91886c, `authMode === Pase && isCommissioning`).
 	ctx = WithAuthority(ctx, func(endpoint uint16, clusterID uint32, privilege uint8) StatusCode {
 		if g.pase {
 			return StatusSuccess

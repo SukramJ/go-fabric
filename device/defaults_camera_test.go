@@ -74,7 +74,7 @@ func (k keptZones) LastZoneID() (uint16, bool) { return k.last, true }
 // through the device facade, restarted with its zones 0 and 1 and a port
 // that reports 2 as the last ID it was handed (zone 2 was removed), gives
 // the next zone 3 — matter.js "does not reuse the ID of a removed zone
-// after a restart" (ZoneManagementServerTest.ts:272-292 at b25ed960);
+// after a restart" (ZoneManagementServerTest.ts:272-292 at db91886c);
 // before owner decision O-7 the facade passed no last ID and the zone got 2.
 func TestZonesThroughTheFacadeContinueAfterThePortsLastID(t *testing.T) {
 	square := func(offset uint16) zmdef.TwoDCartesianZoneStruct {

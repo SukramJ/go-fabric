@@ -253,7 +253,7 @@ type Exchange struct {
 	lastActive    time.Time
 	// registeredBefore is the manager's registration count when the
 	// exchange was created: the peer loss it reports spares the sessions
-	// registered since (ExchangeManager.ts:623 at b25ed960).
+	// registered since (ExchangeManager.ts:623 at db91886c).
 	registeredBefore uint64
 	// queuedCounted are the queued messages counted as delivered work
 	// (Manager.inflight), held the ones the reader took and has not yet
@@ -723,7 +723,7 @@ func (x *Exchange) sendPad() Pad {
 // larger of our own network's margin and the peer's for the exchange's
 // traffic class — the exchange's PeerAdditionalMrpDelay, else the
 // session's peer margins.
-// Mirrors matter.js packages/protocol/src/protocol/MessageExchange.ts:1281-1284 at b25ed960
+// Mirrors matter.js packages/protocol/src/protocol/MessageExchange.ts:1281-1284 at db91886c
 // (#sendAdditionalDelay).
 func (x *Exchange) sendAdditionalDelay() time.Duration {
 	if x.peerAdditional != nil {
@@ -752,7 +752,7 @@ func (x *Exchange) baseBackoffLocked() time.Duration { return x.backoffForLocked
 // budgetSpentLocked reports whether transmission number n may not be sent
 // any more, by MaxRetransmissions (negative unlimited) or by
 // RetransmissionTimeLimit once [MaxTransmissions] went out.
-// Mirrors matter.js packages/protocol/src/protocol/MessageExchange.ts:938-949 at b25ed960
+// Mirrors matter.js packages/protocol/src/protocol/MessageExchange.ts:938-949 at db91886c
 // (#isTransmissionBudgetSpent).
 func (x *Exchange) budgetSpentLocked(n int) bool {
 	if limit := x.sendOpts.MaxRetransmissions; limit >= 0 && n >= cmp.Or(limit, MaxTransmissions) {

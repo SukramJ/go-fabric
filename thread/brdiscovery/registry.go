@@ -4,7 +4,7 @@
 // Package brdiscovery is a passive registry of the Thread border routers
 // on the LAN, discovered over DNS-SD: a port of matter.js
 // packages/thread-br-client/src/discovery/BorderRouterRegistry.ts at
-// b25ed960 for the fields a network topology needs. It watches the
+// db91886c for the fields a network topology needs. It watches the
 // `_meshcop._udp.local` and `_trel._udp.local` instances the controller's
 // DNS-SD cache (client/discovery) admits, keys each border router by its
 // extended address — the TXT `xa`, 8 bytes, or for a TREL instance the
@@ -39,7 +39,7 @@ import (
 // listed after it was last seen; pruning is lazy, on [Registry.List],
 // [Registry.Get] and a newly discovered instance. Mirrors matter.js
 // packages/thread-br-client/src/discovery/BorderRouterRegistry.ts:28-33
-// (STALE_RETENTION, 24 hours) at b25ed960.
+// (STALE_RETENTION, 24 hours) at db91886c.
 const StaleRetention = 24 * time.Hour
 
 // maxEntries caps the registry; a new border router past it evicts the
@@ -60,7 +60,7 @@ const maxInstances = 512
 
 // The service suffixes the registry watches. Mirrors matter.js
 // packages/thread-br-client/src/discovery/BorderRouterRegistry.ts:34-37 at
-// b25ed960.
+// db91886c.
 const (
 	meshcopType   = "_meshcop._udp.local"
 	trelType      = "_trel._udp.local"
@@ -70,7 +70,7 @@ const (
 
 // Entry is one border router — matter.js BorderRouterEntry
 // (packages/thread-br-client/src/discovery/BorderRouterEntry.ts:15-27 at
-// b25ed960) for the fields a topology reads.
+// db91886c) for the fields a topology reads.
 type Entry struct {
 	// ExtAddress is the border router's 64-bit Thread extended address,
 	// 16 upper-case hex digits: the key, the value a commissioned node's
@@ -94,7 +94,7 @@ type EventKind uint8
 
 // The event kinds — matter.js's events.added, updated and removed
 // (packages/thread-br-client/src/discovery/BorderRouterRegistry.ts:73-77 at
-// b25ed960).
+// db91886c).
 const (
 	// EventAdded: a border router entered the registry.
 	EventAdded EventKind = iota + 1
@@ -165,7 +165,7 @@ type watcher interface {
 // New starts a registry on names: it watches the border routers'
 // instances and asks the LAN once for both service types, as matter.js's
 // start does (packages/thread-br-client/src/discovery/BorderRouterRegistry.ts:121-136
-// at b25ed960). The cache must admit the two types — client/discovery
+// at db91886c). The cache must admit the two types — client/discovery
 // admits them by default.
 func New(names *discovery.Names, cfg Config) *Registry {
 	r := newRegistry(names, cfg)
@@ -345,7 +345,7 @@ func (r *Registry) deliver() {
 // pruneLocked drops every entry no instance carries whose LastSeen is
 // older than [StaleRetention]. Mirrors matter.js
 // packages/thread-br-client/src/discovery/BorderRouterRegistry.ts:181-193
-// (#pruneExpired) at b25ed960.
+// (#pruneExpired) at db91886c.
 func (r *Registry) pruneLocked() {
 	cutoff := r.clk.Now().Add(-StaleRetention)
 	for _, xa := range slices.Clone(r.order) {
@@ -407,7 +407,7 @@ func (r *Registry) observeLocked(st discovery.NameState) {
 // goneLocked is an instance whose last record went: its source no longer
 // carries the entry, which keeps its fields and its LastSeen. Mirrors
 // matter.js packages/thread-br-client/src/discovery/BorderRouterRegistry.ts:269-304
-// (#onInstanceChanged) at b25ed960.
+// (#onInstanceChanged) at db91886c.
 func (r *Registry) goneLocked(key, source string) {
 	delete(r.evicted, key)
 	inst, ok := r.instances[key]
@@ -479,14 +479,14 @@ func (r *Registry) upsertLocked(st discovery.NameState, inst *instance) {
 	// An instance whose xa changed is repointed without its source leaving
 	// the previous entry, so that entry keeps the source (and is never
 	// pruned as stale) until it is evicted. Mirrors matter.js
-	// BorderRouterRegistry.ts:470-472 (tracking.xaKey = xaKey) at b25ed960.
+	// BorderRouterRegistry.ts:470-472 (tracking.xaKey = xaKey) at db91886c.
 	inst.xa = xa
 }
 
 // evictOldestLocked removes the oldest stale entry, else the oldest live
 // one, and ignores its instances until they go and come back. Mirrors
 // matter.js packages/thread-br-client/src/discovery/BorderRouterRegistry.ts:565-610
-// (#evictOldest) at b25ed960, where the evicted entry's instance observers
+// (#evictOldest) at db91886c, where the evicted entry's instance observers
 // are released.
 func (r *Registry) evictOldestLocked() bool {
 	var stale, live string
@@ -557,7 +557,7 @@ func (r *Registry) tombstoneLocked(key string) {
 // rawHex is key's raw TXT bytes as upper-case hex, "" when absent, empty
 // or not n bytes long. Mirrors matter.js
 // packages/thread-br-client/src/discovery/BorderRouterRegistry.ts:630-634
-// (rawHex) at b25ed960.
+// (rawHex) at db91886c.
 func rawHex(p discovery.Parameters, key string, n int) string {
 	b, ok := p.Raw(key)
 	if !ok || len(b) == 0 || len(b) != n {
@@ -569,7 +569,7 @@ func rawHex(p discovery.Parameters, key string, n int) string {
 // xaOfTrelInstance is the extended address a TREL instance's name states:
 // its first label when that is 16 hex digits, upper-cased. Mirrors
 // matter.js packages/thread-br-client/src/discovery/BorderRouterRegistry.ts:642-647
-// (deriveXaFromTrelInstance) at b25ed960.
+// (deriveXaFromTrelInstance) at db91886c.
 func xaOfTrelInstance(qname string) string {
 	label, _, _ := strings.Cut(qname, ".")
 	if len(label) != 16 {

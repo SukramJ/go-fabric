@@ -861,7 +861,7 @@ func TestCameraSimZoneTriggers(t *testing.T) {
 
 	// The server assigns the zone IDs (camera.Zones, decision 290), from 0
 	// and without reusing a removed zone's (matter.js
-	// ZoneManagementServer.ts:243-250 at b25ed960); the port keeps them.
+	// ZoneManagementServer.ts:243-250 at db91886c); the port keeps them.
 	zero, one := simZone(t, c, 0), simZone(t, c, 100)
 	if zero != 0 || one != 1 {
 		t.Fatalf("the first zones = %d, %d; want 0, 1", zero, one)

@@ -48,5 +48,5 @@ var UseOTAHarness func(cfg any) bool
 // the release the module implements. TESTING ONLY: a test stands in for a
 // node of an older release, as matter.js's IcdClientTest sets
 // basicInformation.specificationVersion (IcdClientTest.ts:567-582 at
-// b25ed960). Reports false when cfg is not a *node.Config.
+// db91886c). Reports false when cfg is not a *node.Config.
 var UseSpecificationVersion func(cfg any, version uint32) bool

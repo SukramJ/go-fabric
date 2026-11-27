@@ -2,7 +2,7 @@
 // Copyright (C) 2026 SukramJ.
 
 // A port of matter.js packages/node/test/behaviors/unit-localization/
-// UnitLocalizationServerTest.ts at b25ed960, by meaning. matter.js sets
+// UnitLocalizationServerTest.ts at db91886c, by meaning. matter.js sets
 // the server's state on the root (rootWith :17-24) and writes as a
 // controller (writeTemperatureUnit :37-49); the Go form is the
 // constructor's configuration and a MatterWrite on the built server, the
@@ -144,7 +144,7 @@ func TestUnitLocalizationServerParityMatterJS(t *testing.T) {
 
 	// Go's own: an empty, non-nil list is no configuration, as matter.js's
 	// `!supportedTemperatureUnits?.length` (UnitLocalizationServer.ts:18
-	// at b25ed960).
+	// at db91886c).
 	t.Run("seeds an empty SupportedTemperatureUnits with Celsius and Fahrenheit", func(t *testing.T) {
 		t.Parallel()
 		srv := build(t, core.UnitLocalizationConfig{SupportedTemperatureUnits: []unitdef.TempUnitEnum{}})

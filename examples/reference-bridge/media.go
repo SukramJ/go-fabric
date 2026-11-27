@@ -69,7 +69,7 @@ import (
 // The test suite's content app (AppTv.cpp:548-551, :667-669). Its setup
 // PIN is the one matter.js's test device returns and accepts,
 // CHIP_TV_SETUP_PIN (support/chip-testing/src/cluster/
-// TestAccountLoginServer.ts:12 at b25ed960), the default of chip's
+// TestAccountLoginServer.ts:12 at db91886c), the default of chip's
 // AccountLoginManager (examples/tv-app/tv-common/clusters/account-login/
 // AccountLoginManager.h:35 at 6170af84): TC-ALOGIN-12.2 logs in with it
 // (TC-ALOGIN-12.2.test.ts:51). chip's own dynamically installed content

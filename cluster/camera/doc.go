@@ -28,7 +28,7 @@
 //     capture, reference-counted for the transports.
 //   - [Zones] serves ZoneManagement (0x0550) after matter.js
 //     (packages/node/src/behaviors/zone-management/ZoneManagementServer.ts
-//     and TwoDCartesianGeometry.ts at b25ed960): the zones and triggers
+//     and TwoDCartesianGeometry.ts at db91886c): the zones and triggers
 //     behind the [ZonePort], the zone IDs the server assigns
 //     ([ZonesConfig].LastZoneID or the port's [LastZoneIDSource]), the
 //     polygon rules ([ZoneSelfIntersecting]); the configuration limits and

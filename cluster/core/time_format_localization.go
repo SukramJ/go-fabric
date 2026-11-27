@@ -57,7 +57,7 @@ type TimeFormatLocalizationConfig struct {
 // unless NoFeatures.
 //
 // Mirrors matter.js packages/node/src/behaviors/time-format-localization/
-// TimeFormatLocalizationServer.ts at b25ed960: the server is the behavior
+// TimeFormatLocalizationServer.ts at db91886c: the server is the behavior
 // .with("CalendarFormat") (:16) — NoFeatures is the behavior without it,
 // whose initialize (:17-42) returns after the hour format (:21-23). It
 // seeds an empty or unset SupportedCalendarTypes with [ActiveCalendarType]
@@ -83,7 +83,7 @@ type TimeFormatLocalizationConfig struct {
 // is CONSTRAINT_ERROR: the model constraint is "in
 // supportedCalendarTypes", enforced by matter.js's validator
 // (packages/node/src/behavior/state/validation/constraint.ts:157-168 at
-// b25ed960) — and
+// db91886c) — and
 // by the generated runtime before the sink sees the value
 // (spec.Instance.ValidateWrite) — and
 // by connectedhomeip (src/app/clusters/time-format-localization-server/

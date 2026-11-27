@@ -6,7 +6,7 @@ package setup
 import "testing"
 
 // TestVerhoeffParityMatterJS mirrors
-// packages/general/test/math/VerhoeffTest.ts:10-16 at b25ed960
+// packages/general/test/math/VerhoeffTest.ts:10-16 at db91886c
 // (computeChecksum "236" is 3): the check digit a manual pairing code
 // closes with (verhoeffCheck).
 func TestVerhoeffParityMatterJS(t *testing.T) {

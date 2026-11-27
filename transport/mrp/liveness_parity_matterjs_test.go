@@ -4,7 +4,7 @@
 package mrp_test
 
 // A port of matter.js packages/protocol/test/protocol/MessageExchangeTest.ts
-// :207-355 at b25ed960, describe "liveness kick on duplicate", against the
+// :207-355 at db91886c, describe "liveness kick on duplicate", against the
 // predicate both exchange implementations share. matter.js drives a
 // MessageExchange to the duplicate; here the state it reaches is stated:
 // SLOW_PEER (both intervals 7 s, active threshold 200 ms) arms the BDX cap

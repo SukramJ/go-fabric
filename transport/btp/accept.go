@@ -42,7 +42,7 @@ var ErrNoConnection = errors.New("btp: nil GATT connection or open function")
 
 // Accept serves the peripheral's side of the Matter GATT service on c —
 // matter.js BlenoBleServer (packages/nodejs-ble/src/BlenoBleServer.ts at
-// b25ed960), with the platform cut away. It registers its handlers on c
+// db91886c), with the platform cut away. It registers its handlers on c
 // and returns at once:
 //
 //   - The accept starts the handshake timer of [ConnRspTimeout]: a central

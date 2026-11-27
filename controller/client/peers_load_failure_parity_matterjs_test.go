@@ -76,7 +76,7 @@ func TestPeersLoadFailureParity(t *testing.T) {
 }
 
 // TestPeersLoadFailureByAddressParity ports PeersLoadFailureTest.ts:147-169
-// at b25ed960, "finds a peer that cannot load and the peers
+// at db91886c, "finds a peer that cannot load and the peers
 // after it by address": peer1's stored commissionedAt is not a timestamp,
 // so it loads unavailable; its stored peer address still finds it
 // (ClientNode.peerAddress reads storage when the commissioning state did
@@ -122,7 +122,7 @@ func TestPeersLoadFailureByAddressParity(t *testing.T) {
 	}
 	// Peers.commissioned lists the healthy node alone, as the first case
 	// asserts for an orphaned fabric (PeersLoadFailureTest.ts:123-125 at
-	// b25ed960). The case ported here asserts nothing about it: for this
+	// db91886c). The case ported here asserts nothing about it: for this
 	// corruption the assertion is Go's own.
 	if c := sr.reg.Commissioned(); len(c) != 1 || c[0] != healthy {
 		t.Fatalf("commissioned %v, want the healthy node alone", c)

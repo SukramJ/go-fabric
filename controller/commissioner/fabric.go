@@ -197,7 +197,7 @@ func (f *Fabric) CurrentLabel() string {
 // SetLabel sets the fabric's label and saves the fabric record when it
 // changed — after matter.js Fabric.setLabel (Fabric.ts:193-201 at
 // db021da0), which sets it before it persists, and bounds the label at 32
-// UTF-8 bytes since #4995 (Fabric.ts:194 at b25ed960); here the bound is
+// UTF-8 bytes since #4995 (Fabric.ts:194 at db91886c); here the bound is
 // [MaxLabelLength] bytes, the same, and a
 // changed label is persisted before it takes effect (the module's own
 // rule, decision 155): a longer one is [ErrLabel], an unchanged one is
@@ -329,7 +329,7 @@ func newFabric(c *ca.CA, cfg FabricConfig) (*Fabric, error) {
 }
 
 // loadFabric rebuilds a fabric from its stored record — the load half of
-// matter.js FabricManager's construction (FabricManager.ts:85-89 at b25ed960,
+// matter.js FabricManager's construction (FabricManager.ts:85-89 at db91886c,
 // Fabric.create over each stored Fabric.Config), for the one fabric a
 // controller owns. A stored label over [MaxLabelLength] bytes is cut
 // (storedLabel), warned through cfg.Logger, and the record saved once
@@ -576,7 +576,7 @@ const (
 )
 
 // Operational node id range — matter.js packages/types/src/datatype/
-// NodeId.ts:27-28 (OPERATIONAL_NODE_MIN, OPERATIONAL_NODE_MAX) at b25ed960.
+// NodeId.ts:27-28 (OPERATIONAL_NODE_MIN, OPERATIONAL_NODE_MAX) at db91886c.
 const (
 	operationalNodeMin uint64 = 0x0000_0000_0000_0001
 	operationalNodeMax uint64 = 0xFFFF_FFEF_FFFF_FFFF

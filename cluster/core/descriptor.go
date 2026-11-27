@@ -203,7 +203,7 @@ func (d *Descriptor) MatterRead(attrID uint32) (any, bool) {
 		// arrives for a cluster that is NOT in ServerList — or when a
 		// cluster IS in ServerList but never produces an AttributeReport.
 		// Mirrors matter.js DescriptorServer.#serverList
-		// (DescriptorServer.ts:275-284 at b25ed960): always derived from the set of
+		// (DescriptorServer.ts:275-284 at db91886c): always derived from the set of
 		// mounted behaviors, never hardcoded. The provider closure is
 		// the go-fabric equivalent — set after endpoint composition
 		// is complete so the list cannot drift from the actual mounted
@@ -422,7 +422,7 @@ func (d *Descriptor) SetPartsListProvider(p func() []uint16) {
 // the advertised ServerList cannot drift from it.
 //
 // Mirrors matter.js DescriptorServer.#serverList
-// (packages/node/src/behaviors/descriptor/DescriptorServer.ts:275-284 at b25ed960):
+// (packages/node/src/behaviors/descriptor/DescriptorServer.ts:275-284 at db91886c):
 // always derived from `endpoint.behaviors.supported`, never hardcoded.
 //
 // Pass nil to revert to the static list (only used by unit tests that

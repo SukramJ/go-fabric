@@ -78,7 +78,7 @@ import (
 const ClusterIDClosureDimension = cd.ClusterID
 
 // DeviceTypeClosurePanel is the ClosurePanel device type
-// (closure-panel-device.element.ts:13 at b25ed960, id 0x231), which
+// (closure-panel-device.element.ts:13 at db91886c, id 0x231), which
 // mandates ClosureDimension.
 const DeviceTypeClosurePanel uint16 = 0x0231
 

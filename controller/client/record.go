@@ -746,7 +746,7 @@ func (n *Node) PeerAddress() (addr PeerAddress, ok bool) {
 // (packages/node/src/behavior/system/commissioning/CommissioningClient.ts
 // :193, :698-712, :762-771 at b25ed960). A node that failed to load is not
 // commissioned, though [Node.PeerAddress] answers its stored address —
-// PeersLoadFailureTest.ts:123-125 at b25ed960 leaves such a peer out of
+// PeersLoadFailureTest.ts:123-125 at db91886c leaves such a peer out of
 // peers.commissioned (the orphaned-fabric case).
 func (n *Node) IsCommissioned() bool {
 	_, ok := n.commissionedAddress()

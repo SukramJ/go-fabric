@@ -92,7 +92,7 @@ type ICDUserActiveModeTrigger struct {
 }
 
 // ICDModeEvent is a transition of the device's idle/active mode
-// (matter.js IcdManagementServer.ts:813-820 at b25ed960, Events).
+// (matter.js IcdManagementServer.ts:813-820 at db91886c, Events).
 type ICDModeEvent uint8
 
 // The three events.

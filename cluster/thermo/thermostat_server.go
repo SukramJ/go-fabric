@@ -2040,7 +2040,7 @@ func (s *ThermostatServer) MatterEvents() []uint32 { return s.inst.MatterEvents(
 // afterwards, and it closes every atomic write in progress with its
 // timeout, as matter.js's [Symbol.asyncDispose] closes the
 // AtomicWriteHandler (ThermostatServer.ts:3088-3091 at b25ed960; its close,
-// AtomicWriteHandler.ts:92-97 at b25ed960). A LocalTemperatureChange
+// AtomicWriteHandler.ts:92-97 at db91886c). A LocalTemperatureChange
 // waiting for the end of its window is dropped, as a closed node runs no
 // timer (ThermostatEventsTest.ts:795-812 at b25ed960, "generates no event
 // after the node closed"). The server stays usable: the

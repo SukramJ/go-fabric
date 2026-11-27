@@ -18,7 +18,7 @@ import (
 func ptr[T any](v T) *T { return &v }
 
 // TestCheckScheduleSizes: the schema's field sizes
-// (thermostat-cluster.element.ts:634-657 at b25ed960), held by the rules
+// (thermostat-cluster.element.ts:634-657 at db91886c), held by the rules
 // for the host's SetSchedules as the schema holds a controller's write.
 func TestCheckScheduleSizes(t *testing.T) {
 	long := []byte(strings.Repeat("x", 17))

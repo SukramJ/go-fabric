@@ -201,7 +201,7 @@ func TestLocalizationConfigurationStoredParityMatterJS(t *testing.T) {
 // TestUnitLocalizationStoredParityMatterJS ports the stored-value case of
 // matter.js's describe "UnitLocalizationServer"
 // (packages/node/test/behaviors/unit-localization/UnitLocalizationServerTest.ts
-// :153-170 at b25ed960): Fahrenheit stored, the list [Kelvin, Celsius],
+// :153-170 at db91886c): Fahrenheit stored, the list [Kelvin, Celsius],
 // the start Celsius (UnitLocalizationServer.ts:29-31). The node's list is
 // [Celsius, Fahrenheit] always, so the stored unit the list lacks is
 // Kelvin, put into the store under the key the first run's write of
@@ -240,7 +240,7 @@ func TestUnitLocalizationStoredParityMatterJS(t *testing.T) {
 // TestTimeFormatLocalizationStoredParityMatterJS ports the stored-value
 // case of matter.js's describe "TimeFormatLocalizationServer"
 // (packages/node/test/behaviors/time-format-localization/TimeFormatLocalizationServerTest.ts
-// :241-260 at b25ed960): Buddhist stored, the list [Gregorian, Chinese],
+// :241-260 at db91886c): Buddhist stored, the list [Gregorian, Chinese],
 // the start the detected Gregorian (TimeFormatLocalizationServer.ts:34-35).
 // The case runs on the node's start without Config.TimeFormat, whose
 // list is [Gregorian] (node/config.go TimeFormatConfig.core), so

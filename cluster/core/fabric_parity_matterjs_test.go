@@ -78,7 +78,7 @@ func TestFabricSetLabel(t *testing.T) {
 		}
 	})
 
-	// FabricTest.ts:140-144 at b25ed960 (#4995): 11 × "日" is 33 bytes in
+	// FabricTest.ts:140-144 at db91886c (#4995): 11 × "日" is 33 bytes in
 	// UTF-8 but 11 characters. This module counted the label's bytes
 	// already (BD-chip-FabricLabelBytes).
 	t.Run("rejects a label of fewer than 32 characters that exceeds 32 bytes", func(t *testing.T) {

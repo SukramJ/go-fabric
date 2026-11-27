@@ -15,11 +15,11 @@ type UpdateEventKind uint8
 // The kinds of an [UpdateEvent]. Available, Applying, Done and Failed are
 // matter.js's SoftwareUpdateManager events updateAvailable, updateApplying,
 // updateDone and updateFailed (packages/node/src/behavior/system/
-// software-update/SoftwareUpdateManager.ts:2280-2309 at b25ed960), emitted
+// software-update/SoftwareUpdateManager.ts:2280-2309 at db91886c), emitted
 // where matter.js emits them (requestConsentForUpdate,
-// SoftwareUpdateManager.ts:1257-1259 at b25ed960; #reportAttemptStatus,
-// SoftwareUpdateManager.ts:2021-2050 at b25ed960; #dequeue,
-// SoftwareUpdateManager.ts:529-537 at b25ed960, from #completeUpdate,
+// SoftwareUpdateManager.ts:1257-1259 at db91886c; #reportAttemptStatus,
+// SoftwareUpdateManager.ts:2021-2050 at db91886c; #dequeue,
+// SoftwareUpdateManager.ts:529-537 at db91886c, from #completeUpdate,
 // #retarget, #failUpdate and removeConsent). ConsentChanged,
 // CheckFinished, Queued and TransferStarted are this module's own:
 // matter.js emits nothing when a consent is added, removed or expires,
@@ -40,7 +40,7 @@ const (
 	// CheckForUpdates and the periodic check); Updates are the nodes it
 	// found an update for, Err the errors of the products whose check
 	// failed and was passed over (QueryUpdates itself goes on, as
-	// queryUpdates does, SoftwareUpdateManager.ts:810-870 at b25ed960).
+	// queryUpdates does, SoftwareUpdateManager.ts:810-870 at db91886c).
 	// Peer is the node of a check of one
 	// node, zero otherwise. Go-only.
 	UpdateCheckFinished
@@ -56,7 +56,7 @@ const (
 	// update on its own meanwhile, and UpdateDone follows when that
 	// succeeds. The update of a node deleted, or whose failed consent
 	// expired, ends without an event (SoftwareUpdateManager.ts:2303-2309 at
-	// b25ed960).
+	// db91886c).
 	UpdateFailed
 	// UpdateQueued: an update entered the queue (#queueUpdate)
 	// — a consent that queues, ForceUpdate, or a check that found an
@@ -99,13 +99,13 @@ func (k UpdateEventKind) String() string {
 // node came back from its restart, resubscribed or queried again below
 // the target version after it applied, or its query found no image for
 // the update (#failUpdate, SoftwareUpdateManager.ts:1142-1174 at
-// b25ed960).
+// db91886c).
 var ErrNotApplied = errors.New("softwareupdate: the node did not apply the update")
 
 // ErrUpdateCancelled is the Err of an [UpdateFailed] whose update was
 // cancelled before it applied — its consent removed (removeConsent,
-// SoftwareUpdateManager.ts:1694-1713 at b25ed960) — or that ended without a
-// consent left (#retarget, SoftwareUpdateManager.ts:487-496 at b25ed960).
+// SoftwareUpdateManager.ts:1694-1713 at db91886c) — or that ended without a
+// consent left (#retarget, SoftwareUpdateManager.ts:487-496 at db91886c).
 var ErrUpdateCancelled = errors.New("softwareupdate: the update was cancelled")
 
 // UpdateEvent is one report of [Manager.Observe].

@@ -17,7 +17,7 @@
 // roles). The central role is what the commissioner uses
 // (controller/ble); the peripheral role is the node's, served on a GATT
 // connection by [Accept] — matter.js's BlenoBleServer
-// (packages/nodejs-ble/src/BlenoBleServer.ts at b25ed960) without its
+// (packages/nodejs-ble/src/BlenoBleServer.ts at db91886c) without its
 // platform, so every BLE platform and the tests' in-memory radio share
 // it.
 //

@@ -47,7 +47,7 @@ const revocationTimeout = 3 * time.Second
 // lists an issuer's distribution points without a bound of its own, and
 // each download costs a connection and up to maxCRLSize. matter.js starts
 // them all at once (Promise.allSettled over crlPoints,
-// DclCertificateService.ts:1587-1593 at b25ed960) under no total bound
+// DclCertificateService.ts:1587-1593 at db91886c) under no total bound
 // (review II, R2-P3-net-05). A lookup the bound cuts short is incomplete:
 // not cached, its CRLs that did arrive still count.
 const (
@@ -391,7 +391,7 @@ func (s *CertificateStore) processRevocationPoint(ctx context.Context, p dcl.Rev
 const maxCRLSize = 1 << 20
 
 // downloadCRL fetches dataUrl (DclCertificateService.ts:1639-1647 at
-// b25ed960): a client error is a rejection, a server error, request
+// db91886c): a client error is a rejection, a server error, request
 // timeout or rate limit transient. The point's URL may be http or https:
 // matter.js fetches it without a scheme check (:1639-1641), and the
 // schema text it carries reads "All URLs SHALL use either the http or

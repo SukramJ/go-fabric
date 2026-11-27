@@ -17,7 +17,7 @@ import (
 // from the endpoints the node serves each time it advertises, until a type
 // is found, and that type from then on. Mirrors matter.js
 // packages/node/src/behavior/system/product-description/
-// ProductDescriptionServer.ts:43-63 at b25ed960 (#setDeviceType: a type
+// ProductDescriptionServer.ts:43-63 at db91886c (#setDeviceType: a type
 // the application set is kept; otherwise inferred, and while nothing is
 // found inferred again on the next change of the endpoint tree; once
 // found, the state is no longer UNKNOWN_DEVICE_TYPE and the inference does
@@ -53,14 +53,14 @@ func (c *commissionableDeviceType) resolve() uint32 {
 
 // inferDeviceType walks topo from the root as matter.js inferDeviceType
 // walks the endpoint tree (ProductDescriptionServer.ts:93-126 at
-// b25ed960): an endpoint whose DeviceTypeList holds RootNode, BridgedNode
+// db91886c): an endpoint whose DeviceTypeList holds RootNode, BridgedNode
 // or Aggregator is descended into, part by part; at an endpoint whose own
 // device type is of the simple class every other entry of its
 // DeviceTypeList is a candidate, and the first one is the answer. The
 // list is the endpoint's Descriptor DeviceTypeList as it is served, the
 // parts are its direct parts in the order its PartsList serves them, and
 // the class is the snapshot's classification of the endpoint's device type
-// (matter.js's EndpointType deviceClass, EndpointType.ts:31 at b25ed960 —
+// (matter.js's EndpointType deviceClass, EndpointType.ts:31 at db91886c —
 // Simple unless the endpoint type states another, as the utility and node
 // types of packages/node/src/endpoints/ do, the ones the snapshot
 // classifies "utility" and "node"). A device type the snapshot does not

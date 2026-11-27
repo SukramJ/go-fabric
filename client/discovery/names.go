@@ -73,7 +73,7 @@ const (
 // (review II, R2-P2-alloc-03; owner decision 45: the controller takes the
 // device side's policy against unauthenticated input). matter.js bounds
 // only the staged addresses (packages/general/src/net/dns-sd/DnssdNames.ts:21
-// at b25ed960, STAGED_IP_RECORDS_MAX_HOSTS); these are this module's own.
+// at db91886c, STAGED_IP_RECORDS_MAX_HOSTS); these are this module's own.
 const (
 	// maxRecordTTL is the longest a record is cached, whatever TTL its
 	// sender states: RFC 6762 §10's recommended TTL for records other than

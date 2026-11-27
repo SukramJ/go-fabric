@@ -1047,7 +1047,7 @@ func (s *Server) forward(name string, executes bool, before levelReading, call f
 // the command changed CurrentLevel from before, once
 // ([Server.bumpIfMoved]) — the one attribute of this cluster's state a
 // command changes (RemainingTime is computed, as matter.js's virtual
-// remainingTime is, LevelControlServer.ts:806-823 at b25ed960) — and a
+// remainingTime is, LevelControlServer.ts:806-823 at db91886c) — and a
 // refusal keeps it where it was. Under the engine every
 // change of CurrentLevel advanced it already ([Server.observeLevel]), and
 // every report of RemainingTime ([Server.initEngine]).

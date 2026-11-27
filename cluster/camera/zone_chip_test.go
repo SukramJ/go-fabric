@@ -4,7 +4,7 @@
 // ZoneManagement: a port of connectedhomeip
 // src/app/clusters/zone-management-server/tests/TestZoneManagementCluster.cpp
 // at 6170af84, by meaning — kept for the cases matter.js's
-// ZoneManagementServerTest.ts at b25ed960 has no counterpart for
+// ZoneManagementServerTest.ts at db91886c has no counterpart for
 // (zone_parity_matterjs_test.go ports that file; its polygon table
 // contains TestZonePolygon.cpp's and replaces it). chip's ClusterTester
 // reads, writes and invokes the cluster directly; here the server's
@@ -249,7 +249,7 @@ func TestChipZoneManagement(t *testing.T) { //nolint:funlen // one subtest per c
 		resp, st := invokeZones(z, zmdef.CmdCreateTwoDCartesianZone, createZoneRequest("Zone One", triangle(0)))
 		wantCode(t, "create", st, im.StatusSuccess)
 		// chip's delegate answered 1; the server assigns 0 to the first
-		// zone (ZoneManagementServer.ts:243-250 at b25ed960).
+		// zone (ZoneManagementServer.ts:243-250 at db91886c).
 		if r, _ := resp.(zmdef.CreateTwoDCartesianZoneResponse); r.ZoneId != 0 || m.created != 1 || !slices.Equal(m.ids, []uint16{0}) {
 			t.Fatalf("response %+v, created %d", resp, m.created)
 		}

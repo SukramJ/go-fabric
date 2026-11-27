@@ -87,7 +87,7 @@ func TestQuieterMirrorsMatterJSQuietEvent(t *testing.T) {
 // sets minimumEmitInterval to Seconds(10) on PowerSource's
 // BatPercentRemaining, BatTimeRemaining and BatTimeToFullCharge
 // (packages/node/src/behaviors/power-source/PowerSourceServer.ts:25-34 at
-// b25ed960; review II, R2-P4-nv-05b).
+// db91886c; review II, R2-P4-nv-05b).
 func TestQuieterTakesItsInterval(t *testing.T) {
 	t.Parallel()
 	clk := clocktest.New(time.Unix(1000, 0))

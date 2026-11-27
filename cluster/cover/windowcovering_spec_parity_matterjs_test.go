@@ -38,7 +38,7 @@ func TestServerMatchesTheGeneratedDefinition(t *testing.T) {
 // TestFeatureMapIsDerivedFromWhatTheServerServes pins the FeatureMaps the
 // server serves — every combination of Lift and Tilt, each with or
 // without its position-aware feature, as matter.js's WindowCoveringServer
-// branches per feature (WindowCoveringServer.ts:123-141 at b25ed960) —
+// branches per feature (WindowCoveringServer.ts:123-141 at db91886c) —
 // and the refusal of the rest, New with ErrFeatureMap,
 // NewWindowCoveringServer with a panic: AbsolutePosition, a position-aware
 // feature without its axis, no axis.
@@ -123,7 +123,7 @@ func TestLiftWithoutPositionAwareness(t *testing.T) {
 		}
 	}
 	// GoToLiftPercentage 0 is UpOrOpen, any other value DownOrClose
-	// (WindowCoveringServer.ts:586-590 at b25ed960; W3-club1-04).
+	// (WindowCoveringServer.ts:586-590 at db91886c; W3-club1-04).
 	for _, c := range []struct {
 		pct  uint16
 		want uint8

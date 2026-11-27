@@ -110,7 +110,7 @@ func TestConformanceApplicabilityParityMatterJS(t *testing.T) {
 }
 
 // TestAccessParityMatterJS mirrors
-// packages/model/test/aspects/AccessTest.ts:63-84 at b25ed960 (describe
+// packages/model/test/aspects/AccessTest.ts:63-84 at db91886c (describe
 // "readable" and "writable"): R makes an element readable and W
 // writable, whatever fabric and privilege flags stand beside them.
 func TestAccessParityMatterJS(t *testing.T) {
@@ -136,7 +136,7 @@ func TestAccessParityMatterJS(t *testing.T) {
 }
 
 // TestConstraintValuesParityMatterJS mirrors the value tests of
-// packages/model/test/aspects/ConstraintTest.ts:23-87 at b25ed960
+// packages/model/test/aspects/ConstraintTest.ts:23-87 at db91886c
 // ("accepts"/"rejects" over "0", "4", "-4", "min 4", "max 4" and
 // "4 to 44"), judged by a definition's CheckValue. The bigint value tests
 // beyond 2^53 are a findings-register row (float64 bounds).
@@ -185,7 +185,7 @@ func TestConstraintValuesParityMatterJS(t *testing.T) {
 
 // TestRequirementApplicabilityParityMatterJS mirrors
 // packages/model/test/logic/RequirementApplicabilityTest.ts:10-46 at
-// b25ed960: a requirement's conformance judged by the names that hold
+// db91886c: a requirement's conformance judged by the names that hold
 // (Sit) among the names known (Sit, Lit, Cooler); a name not known is
 // left conditional.
 func TestRequirementApplicabilityParityMatterJS(t *testing.T) {
@@ -219,7 +219,7 @@ func TestRequirementApplicabilityParityMatterJS(t *testing.T) {
 }
 
 // TestEffectiveAccessParityMatterJS mirrors
-// packages/model/test/logic/EffectiveAccessTest.ts:33-53 at b25ed960 on
+// packages/model/test/logic/EffectiveAccessTest.ts:33-53 at db91886c on
 // the access matter.js computes: the extractor writes each element's
 // effective access into parity/schema.json and script/clustergen into the
 // definition, and cluster/spec reads it. An attribute stating only "A" is

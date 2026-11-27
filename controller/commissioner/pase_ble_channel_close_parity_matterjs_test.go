@@ -4,7 +4,7 @@
 package commissioner
 
 // A port of matter.js packages/node/test/node/PaseBleChannelCloseTest.ts at
-// b25ed960 (#4908, #4922): a PASE session over a commissioning channel
+// db91886c (#4908, #4922): a PASE session over a commissioning channel
 // ends with the channel — at once while PASE runs, when the channel closed
 // while the session was created, and during the commissioning flow.
 // matter.js's SilentBleChannel is losingChannel; its ForwardingBleChannel,

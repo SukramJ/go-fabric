@@ -214,7 +214,7 @@ type paseProbe struct {
 // matter.js hands the command's exchange down
 // (packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts:90-95,
 // packages/protocol/src/common/FailsafeTimer.ts:61-65,
-// packages/protocol/src/common/FailsafeContext.ts:283 at b25ed960) and
+// packages/protocol/src/common/FailsafeContext.ts:283 at db91886c) and
 // the force close defers only for an exchange of the PASE session itself
 // (packages/protocol/src/session/Session.ts:336-339, :315-317 at
 // b25ed960): over CASE the PASE session is closed inside the handler,

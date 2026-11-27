@@ -20,7 +20,7 @@ import (
 
 // TestLightSwitchEntryKeys: a binding entry's key names every field that
 // makes it a distinct target, an absent field as "" (entryKey,
-// LightSwitchTestInstance.ts:65-68 at b25ed960), and the server's
+// LightSwitchTestInstance.ts:65-68 at db91886c), and the server's
 // generated entry and the node's resolved entry key alike.
 func TestLightSwitchEntryKeys(t *testing.T) {
 	t.Parallel()

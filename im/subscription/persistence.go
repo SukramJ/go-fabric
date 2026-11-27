@@ -192,7 +192,7 @@ type peerAddressWire struct {
 // attributePathWire is one persisted attribute path. WildcardPathFlags is
 // kept with its path, as matter.js persists `wildcardPathFlags` with each
 // attribute path (packages/node/src/behavior/system/subscriptions/
-// SubscriptionsServer.ts:87-106 at b25ed960), so a re-established
+// SubscriptionsServer.ts:87-106 at db91886c), so a re-established
 // wildcard subscription skips what the controller asked it to skip
 // (review II, R2-P6-store-0501). The WildcardFilterConfigurationVersion
 // is not kept: the same entry there carries none (:95-106).

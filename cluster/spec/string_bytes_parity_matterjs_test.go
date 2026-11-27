@@ -14,7 +14,7 @@ import (
 )
 
 // TestTlvStringBoundsInBytesParityMatterJS ports the bound cases of
-// packages/types/test/tlv/TlvStringTest.ts at b25ed960 (#4995) over
+// packages/types/test/tlv/TlvStringTest.ts at db91886c (#4995) over
 // [spec.DecodeStringIn], the decoder a generated "max N" field reads with:
 // a character string's minimum and maximum count UTF-8 bytes, also the
 // length a string cut at its IS1 arrived with.

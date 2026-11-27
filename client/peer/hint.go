@@ -138,7 +138,7 @@ var (
 //
 // matter.js has no such filter to mirror: it takes no hinted address, and
 // a discovered A or AAAA record's value becomes an address as it stands
-// (packages/general/src/net/dns-sd/IpService.ts:392-407 at b25ed960, ipOf:
+// (packages/general/src/net/dns-sd/IpService.ts:392-407 at db91886c, ipOf:
 // only a zone is added to fe80::/10).
 func unicastDestination(ip netip.Addr) bool {
 	ip = ip.Unmap().WithZone("")

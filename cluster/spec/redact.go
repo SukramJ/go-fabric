@@ -8,10 +8,10 @@ import "thingfabric.dev/go-fabric/tlv"
 // Secret redaction removes the values the model marks secret ([Field.Secret],
 // [Attribute.Secret]) from a value before the module logs it. It mirrors
 // matter.js's SecretRedaction namespace:
-// matter.js packages/model/src/logic/SecretRedaction.ts:17-147 at b25ed960
+// matter.js packages/model/src/logic/SecretRedaction.ts:17-147 at db91886c
 // with one difference: matter.js turns it off when Logger.redactSecrets is
 // false, by default true
-// (matter.js packages/general/src/log/Logger.ts:80-88 at b25ed960);
+// (matter.js packages/general/src/log/Logger.ts:80-88 at db91886c);
 // this module has no such switch, a marked secret never reaches its logs.
 //
 // The value is the TLV form, a [Node], walked by the model: a struct's
@@ -21,7 +21,7 @@ import "thingfabric.dev/go-fabric/tlv"
 // not by the names of its Go fields.
 
 // redactedText replaces each secret value.
-// Mirrors matter.js packages/model/src/logic/SecretRedaction.ts:21 at b25ed960 (PLACEHOLDER).
+// Mirrors matter.js packages/model/src/logic/SecretRedaction.ts:21 at db91886c (PLACEHOLDER).
 const redactedText = "(redacted)"
 
 // Redact returns n with every value model marks secret replaced by the
@@ -43,7 +43,7 @@ const redactedText = "(redacted)"
 // b25ed960): a value whose shape the model cannot walk may hold the
 // secret anywhere (review II, R2-C2-sec-1303, owner decision 525).
 //
-// Mirrors matter.js packages/model/src/logic/SecretRedaction.ts:32-37 at b25ed960
+// Mirrors matter.js packages/model/src/logic/SecretRedaction.ts:32-37 at db91886c
 // (redact), without the Logger.redactSecrets switch.
 func Redact(model *Field, n Node) Node {
 	if model == nil || !ContainsSecret(model) {
@@ -57,7 +57,7 @@ func Redact(model *Field, n Node) Node {
 // whole when the list itself is secret and the entry is not null;
 // otherwise it is redacted by the list's entry model.
 //
-// Mirrors matter.js packages/model/src/logic/SecretRedaction.ts:43-48 at b25ed960
+// Mirrors matter.js packages/model/src/logic/SecretRedaction.ts:43-48 at db91886c
 // (redactEntry), without the Logger.redactSecrets switch.
 func RedactEntry(list *Field, entry Node) Node {
 	if list == nil {
@@ -73,9 +73,9 @@ func RedactEntry(list *Field, entry Node) Node {
 // a list's entry, a struct's fields — is secret. A self-referencing struct
 // is searched once.
 //
-// Mirrors matter.js packages/model/src/logic/SecretRedaction.ts:66-89 at b25ed960
+// Mirrors matter.js packages/model/src/logic/SecretRedaction.ts:66-89 at db91886c
 // (containsSecret, searchSecret), without its per-model cache, and
-// matter.js packages/model/src/logic/SecretRedaction.ts:135-146 at b25ed960
+// matter.js packages/model/src/logic/SecretRedaction.ts:135-146 at db91886c
 // (childModelsOf).
 func ContainsSecret(model *Field) bool {
 	if model == nil {
@@ -108,7 +108,7 @@ func searchSecret(f *Field, visiting map[*Struct]bool) bool {
 }
 
 // redactValue redacts n by f: null first, then the mark, then the walk.
-// Mirrors matter.js packages/model/src/logic/SecretRedaction.ts:91-122 at b25ed960
+// Mirrors matter.js packages/model/src/logic/SecretRedaction.ts:91-122 at db91886c
 // (redactValue), except that a secret-bearing node of another type than
 // its model is redacted whole ([Redact]).
 func redactValue(f *Field, n Node) Node {
@@ -143,7 +143,7 @@ func redactValue(f *Field, n Node) Node {
 
 // redactMembers is a copy of the struct n with each member the model
 // defines redacted by its model, matched by field id.
-// Mirrors matter.js packages/model/src/logic/SecretRedaction.ts:124-133 at b25ed960
+// Mirrors matter.js packages/model/src/logic/SecretRedaction.ts:124-133 at db91886c
 // (redactProperties); a member the model does not define is kept.
 func redactMembers(s *Struct, n Node) Node {
 	out := Node{El: n.El, Children: make([]Node, len(n.Children))}

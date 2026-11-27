@@ -147,7 +147,7 @@ func TestServiceChangeUpdatesDiscoveryData(t *testing.T) {
 		}
 		// The replacement arrives later on the bubble's clock, as matter.js's
 		// test advances MockTime before it (DnssdNamesTest.ts:1203-1215 at
-		// b25ed960): the old record's eviction changes the parameters only
+		// db91886c): the old record's eviction changes the parameters only
 		// when a TXT record installed strictly after it remains
 		// (IpService.ts:240-247, Service.isSuperseded). Without the advance
 		// the step raced the first wait — when that wait found the record

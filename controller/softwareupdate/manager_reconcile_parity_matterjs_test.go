@@ -29,12 +29,12 @@ import (
 
 // The queue, consent and offer rules of matter.js's SoftwareUpdateManager
 // at b25ed960 (decision 292, wave P5-A) — OtaTest
-// (packages/node/test/behaviors/ota/OtaTest.ts at b25ed960), ported by
+// (packages/node/test/behaviors/ota/OtaTest.ts at db91886c), ported by
 // meaning on the manager rig, whose node seam is OtaTest's device
 // (initSiteWithoutTestImages: the test product at version 0).
 
 // storeImage stores an image of the test product at version in mode, as
-// OtaTest's storeImage (OtaTest.ts:3430-3444 at b25ed960).
+// OtaTest's storeImage (OtaTest.ts:3430-3444 at db91886c).
 func (r *managerRig) storeImage(t *testing.T, version uint32, mode Mode) {
 	t.Helper()
 	image, err := otaimage.Create(otaimage.CreateOptions{
@@ -62,7 +62,7 @@ func servingRig(t *testing.T, edit func(*Config)) *managerRig {
 }
 
 // offerToRequestor is what the manager offers the node for a QueryImage
-// from its version (OtaTest.ts:3540-3550 at b25ed960).
+// from its version (OtaTest.ts:3540-3550 at db91886c).
 func (r *managerRig) offerToRequestor(canConsent bool) (AvailableDetails, bool) {
 	return r.m.UpdateExistsFor(context.Background(), testPeer, provdef.QueryImageRequest{
 		VendorId: 0xFFF1, ProductId: 0x8001, SoftwareVersion: r.basic.SoftwareVersion,
@@ -75,7 +75,7 @@ var lastUpdateToken atomic.Uint64
 
 // deliverOffer makes the calls the OTA provider makes for a QueryImage
 // whose offer of version reached the node, and returns the attempt
-// (OtaTest.ts:91-104 at b25ed960).
+// (OtaTest.ts:91-104 at db91886c).
 func deliverOffer(t *testing.T, r *managerRig, version uint32) *mattercore.OTAUpdateAttempt {
 	t.Helper()
 	pp := providerPorts{r.m}
@@ -91,7 +91,7 @@ func deliverOffer(t *testing.T, r *managerRig, version uint32) *mattercore.OTAUp
 }
 
 // reportStatus delivers an offer of version as deliverOffer does and
-// reports status for it (OtaTest.ts:111-123 at b25ed960).
+// reports status for it (OtaTest.ts:111-123 at db91886c).
 func reportStatus(t *testing.T, r *managerRig, version uint32, status Status) *mattercore.OTAUpdateAttempt {
 	t.Helper()
 	a := deliverOffer(t, r, version)
@@ -168,7 +168,7 @@ type offered struct {
 // selectionRig is a serving rig that records the updates the check
 // reports to the node, with testImages as AllowTestImages and delegate as
 // DelegateConsentToRequestor (initSiteWithoutTestImages, OtaTest.ts:3275
-// at b25ed960).
+// at db91886c).
 func selectionRig(t *testing.T, testImages, delegate bool) (r *managerRig, query func() []offered) {
 	t.Helper()
 	var mu sync.Mutex
@@ -181,7 +181,7 @@ func selectionRig(t *testing.T, testImages, delegate bool) (r *managerRig, query
 			mu.Unlock()
 		}
 	})
-	// queryUpdates (OtaTest.ts:3466-3476 at b25ed960): the check with the
+	// queryUpdates (OtaTest.ts:3466-3476 at db91886c): the check with the
 	// stored images of the node's product group, as queryUpdates runs it
 	// for the rig's one node (the rig has no registry node).
 	query = func() []offered {
@@ -199,7 +199,7 @@ func selectionRig(t *testing.T, testImages, delegate bool) (r *managerRig, query
 
 // forceAndOffer forces version for testPeer's node, its announcement left
 // unanswered, and returns what the manager then offers the node's
-// QueryImage (OtaTest's forceUpdate, OtaTest.ts:3564-3572 at b25ed960, and
+// QueryImage (OtaTest's forceUpdate, OtaTest.ts:3564-3572 at db91886c, and
 // the query the device answers it with).
 func (r *managerRig) forceAndOffer(t *testing.T, version uint32) (AvailableDetails, bool) {
 	t.Helper()
@@ -216,13 +216,13 @@ func (r *managerRig) forceAndOffer(t *testing.T, version uint32) (AvailableDetai
 func storedFile(version uint32, mode Mode) string { return fileName(0xFFF1, 0x8001, mode, version) }
 
 // TestManagerStoredImageSelectionParity ports the stored-image selection
-// rows of OtaTest (OtaTest.ts at b25ed960): the update check and the
+// rows of OtaTest (OtaTest.ts at db91886c): the update check and the
 // QueryImage answer select the stored images alike — through
-// findApplicable (DclOtaUpdateService.ts:394-407 at b25ed960), production
+// findApplicable (DclOtaUpdateService.ts:394-407 at db91886c), production
 // images only without test images, on equal versions local, test, prod.
 func TestManagerStoredImageSelectionParity(t *testing.T) {
 	t.Parallel()
-	// OtaTest.ts:3591-3611 at b25ed960
+	// OtaTest.ts:3591-3611 at db91886c
 	t.Run("offers neither a stored local nor a stored test-net image", func(t *testing.T) {
 		t.Parallel()
 		r, query := selectionRig(t, false, true)
@@ -238,7 +238,7 @@ func TestManagerStoredImageSelectionParity(t *testing.T) {
 			t.Fatalf("offer %+v for the forced version 1, want none (NotAvailable)", d)
 		}
 	})
-	// OtaTest.ts:3613-3624 at b25ed960
+	// OtaTest.ts:3613-3624 at db91886c
 	t.Run("offers a stored production image, not a newer stored local image", func(t *testing.T) {
 		t.Parallel()
 		r, query := selectionRig(t, false, false)
@@ -251,7 +251,7 @@ func TestManagerStoredImageSelectionParity(t *testing.T) {
 			t.Fatalf("offer %+v %v, want the stored prod image of version 1", d, ok)
 		}
 	})
-	// OtaTest.ts:3709-3724 at b25ed960
+	// OtaTest.ts:3709-3724 at db91886c
 	t.Run("offers a stored test-net image over a stored production image of the same version once enabled", func(t *testing.T) {
 		t.Parallel()
 		r, query := selectionRig(t, true, false)
@@ -264,7 +264,7 @@ func TestManagerStoredImageSelectionParity(t *testing.T) {
 			t.Fatalf("offer %+v %v, want the stored test image of version 1", d, ok)
 		}
 	})
-	// OtaTest.ts:3726-3741 at b25ed960
+	// OtaTest.ts:3726-3741 at db91886c
 	t.Run("offers a stored local image over a stored production image of the same version once test images are enabled", func(t *testing.T) {
 		t.Parallel()
 		r, query := selectionRig(t, true, false)
@@ -280,7 +280,7 @@ func TestManagerStoredImageSelectionParity(t *testing.T) {
 }
 
 // TestManagerConsentParity ports the consent rows of addUpdateConsent and
-// forceUpdate (SoftwareUpdateManager.ts:1455-1625 at b25ed960).
+// forceUpdate (SoftwareUpdateManager.ts:1455-1625 at db91886c).
 func TestManagerConsentParity(t *testing.T) {
 	t.Parallel()
 	t.Run("refuses a consent for a peer address no node has", func(t *testing.T) {
@@ -339,9 +339,9 @@ func TestManagerConsentParity(t *testing.T) {
 // TestManagerFailedUpdateParity ports the failed update: its consent and
 // entry stay for 24 hours, without a second report, and leave without an
 // event — FAILED_UPDATE_RETENTION (SoftwareUpdateManager.ts:120-124 at
-// b25ed960), the failure and its expiry (SoftwareUpdateManager.ts:1142-1214
-// at b25ed960), the contract of the event (SoftwareUpdateManager.ts:2303-2309
-// at b25ed960).
+// db91886c), the failure and its expiry (SoftwareUpdateManager.ts:1142-1214
+// at db91886c), the contract of the event (SoftwareUpdateManager.ts:2303-2309
+// at db91886c).
 func TestManagerFailedUpdateParity(t *testing.T) {
 	t.Parallel()
 	t.Run("keeps the consent of a failed update for 24 hours and then drops it without an event", func(t *testing.T) {
@@ -492,7 +492,7 @@ func TestManagerCloseAbortsTheAnnouncement(t *testing.T) {
 }
 
 // announceLog records the announcements of the queue, as OtaTest's
-// interceptAnnouncements (OtaTest.ts:3478-3501 at b25ed960): reply answers
+// interceptAnnouncements (OtaTest.ts:3478-3501 at db91886c): reply answers
 // call n (counted from 1) in place of the node — at once with err, or, with
 // hang, never: the call waits for its abort.
 type announceLog struct {
@@ -661,7 +661,7 @@ func wantConsentsAndTargets(t *testing.T, r *managerRig, consents, targets []uin
 var unknownToken = []byte{1, 2, 3, 4, 5, 6, 7, 8}
 
 // TestManagerApplyOfTheTokenParity ports the apply rows of OtaTest's
-// applyRewritten cases (OtaTest.ts:1766-1949 at b25ed960) on the manager:
+// applyRewritten cases (OtaTest.ts:1766-1949 at db91886c) on the manager:
 // the apply table (applyUpdate, SoftwareUpdateManager.ts:1897-1956) and the
 // attempt an apply under an unknown token becomes.
 func TestManagerApplyOfTheTokenParity(t *testing.T) {
@@ -882,7 +882,7 @@ func TestManagerQueuePhasesParity(t *testing.T) {
 	// Go-titled (OtaTest.ts:5122 is not portable: Go's Manager is terminal
 	// after Close): the offline half — the attempts end, the entry keeps
 	// following its ended attempt, no event (#endAllAttempts,
-	// SoftwareUpdateManager.ts:1229-1237 at b25ed960).
+	// SoftwareUpdateManager.ts:1229-1237 at db91886c).
 	t.Run("keeps an update in progress with its ended attempt when the manager goes offline", func(t *testing.T) {
 		t.Parallel()
 		r := newManagerRig(t, nil)
@@ -901,7 +901,7 @@ func TestManagerQueuePhasesParity(t *testing.T) {
 	})
 	// Go-titled: a version below the target resets an update underway and
 	// the queue runs, so it is announced again (#onSoftwareVersionChanged,
-	// SoftwareUpdateManager.ts:1035-1089 at b25ed960).
+	// SoftwareUpdateManager.ts:1035-1089 at db91886c).
 	t.Run("announces an update again when the node restarts below its target before it applies", func(t *testing.T) {
 		t.Parallel()
 		r := newManagerRig(t, nil)
@@ -997,7 +997,7 @@ func TestManagerQueuePhasesParity(t *testing.T) {
 
 // TestManagerAdmitsANewQueryOfANodeWithARunningAttemptParity ports the
 // table of "admits a new query of a node with a running attempt"
-// (OtaTest.ts:5425-5545 at b25ed960; admitQuery,
+// (OtaTest.ts:5425-5545 at db91886c; admitQuery,
 // SoftwareUpdateManager.ts:1802-1881): per row, whether the query is
 // admitted, the attempt ended, the queued update still linked to it, the
 // startUp suppressed on the query's session, and how often the transfer
@@ -1110,8 +1110,8 @@ func TestManagerAdmitsANewQueryOfANodeWithARunningAttemptParity(t *testing.T) {
 // TestManagerBDXCancelOfRemovedConsentsParity ports "cancels / keeps the
 // BDX transfer of a node when all its consents are removed while its
 // update is announcing / failed / applying" (OtaTest.ts:6047-6080 at
-// b25ed960; removeConsent, SoftwareUpdateManager.ts:1670-1723 at
-// b25ed960).
+// db91886c; removeConsent, SoftwareUpdateManager.ts:1670-1723 at
+// db91886c).
 func TestManagerBDXCancelOfRemovedConsentsParity(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
@@ -1172,7 +1172,7 @@ func TestManagerRemovedConsentDisarmsParity(t *testing.T) {
 }
 
 // TestManagerDelegatedOfferParity ports the delegated offers through the
-// provider (OtaTest.ts:5216-5274 at b25ed960): the consent for the
+// provider (OtaTest.ts:5216-5274 at db91886c): the consent for the
 // offered version removed before the apply refuses it, although none was
 // stored; removed while the query runs, the query is answered NotAvailable.
 func TestManagerDelegatedOfferParity(t *testing.T) {
@@ -1241,7 +1241,7 @@ func TestManagerDelegatedOfferParity(t *testing.T) {
 
 // removingSource is the manager's image lookup that removes the node's
 // consent (for version, all for 0) once it found the image, as OtaTest's
-// RemovingOtaProviderServer (OtaTest.ts:3378-3392 at b25ed960).
+// RemovingOtaProviderServer (OtaTest.ts:3378-3392 at db91886c).
 type removingSource struct {
 	providerPorts
 	m       *Manager
@@ -1256,7 +1256,7 @@ func (s removingSource) QueryImage(ctx context.Context, p mattercore.OTAPeer, re
 
 // consentAskingSource offers the manager's image with consent required, as
 // OtaTest's ConsentRequiringOtaProviderServer override (OtaTest.ts:3338-3346
-// at b25ed960).
+// at db91886c).
 type consentAskingSource struct{ providerPorts }
 
 func (s consentAskingSource) QueryImage(ctx context.Context, p mattercore.OTAPeer, req provdef.QueryImageRequest) (mattercore.OTAImage, bool, error) {
@@ -1267,7 +1267,7 @@ func (s consentAskingSource) QueryImage(ctx context.Context, p mattercore.OTAPee
 
 // TestManagerConsentRequiredOverrideParity ports "asks for consent instead
 // of delegating it when an override requires consent while delegation is
-// off" (OtaTest.ts:4696 at b25ed960): a requestor that can consent is not
+// off" (OtaTest.ts:4696 at db91886c): a requestor that can consent is not
 // delegated the consent while the delegation is off, so the provider asks
 // its consent hook.
 func TestManagerConsentRequiredOverrideParity(t *testing.T) {
@@ -1318,7 +1318,7 @@ func (r *managerRig) staleOnce(during func()) {
 // TestManagerPresenceAsOfTheRun (review-a M1; C-23): the queue run and the
 // check's cleanup judge a peer gone only for what was there when they read
 // the registry — matter.js reads #peerOf inside the change
-// (SoftwareUpdateManager.ts:1346-1353 at b25ed960) — so an update queued
+// (SoftwareUpdateManager.ts:1346-1353 at db91886c) — so an update queued
 // while the manager's lock was released for that read stays.
 func TestManagerPresenceAsOfTheRun(t *testing.T) {
 	t.Parallel()
@@ -1353,7 +1353,7 @@ func TestManagerPresenceAsOfTheRun(t *testing.T) {
 
 // TestManagerChangeEmitsItsOwnEvents (review-a L1; C-23): the events of a
 // change run when that change ends, on its caller — #mutate
-// (SoftwareUpdateManager.ts:539-561 at b25ed960) — not in another change
+// (SoftwareUpdateManager.ts:539-561 at db91886c) — not in another change
 // that took the lock while it read the registry.
 func TestManagerChangeEmitsItsOwnEvents(t *testing.T) {
 	t.Parallel()
@@ -1382,7 +1382,7 @@ func TestManagerChangeEmitsItsOwnEvents(t *testing.T) {
 }
 
 // TestManagerProductCheckQueuesParity ports #checkProductForUpdates
-// (SoftwareUpdateManager.ts:876-938 at b25ed960; C-22): a node removed
+// (SoftwareUpdateManager.ts:876-938 at db91886c; C-22): a node removed
 // during the check is skipped; a consent for the product queues its
 // version, and updateAvailable is asked when there is none or it is below
 // the version found.
@@ -1443,8 +1443,8 @@ func TestManagerProductCheckQueuesParity(t *testing.T) {
 
 // TestManagerForceRunsTheQueueFirstParity (F2; C-23): forceUpdate's
 // #storeConsent runs the queue (#queueUpdate,
-// SoftwareUpdateManager.ts:1266-1293 at b25ed960) before the forced
-// announcement (SoftwareUpdateManager.ts:1521 at b25ed960), so a waiting
+// SoftwareUpdateManager.ts:1266-1293 at db91886c) before the forced
+// announcement (SoftwareUpdateManager.ts:1521 at db91886c), so a waiting
 // update of another node is announced too.
 func TestManagerForceRunsTheQueueFirstParity(t *testing.T) {
 	t.Parallel()
@@ -1482,7 +1482,7 @@ func TestManagerErrNoNodeIsNotApplicable(t *testing.T) {
 // TestManagerGoneNodeConsentReported (F4): the check's cleanup reports the
 // consent of a gone node removed, as NodeDeleted does (Go-only
 // UpdateConsentChanged; #forgetPeer deletes it, SoftwareUpdateManager.ts:312-342
-// at b25ed960).
+// at db91886c).
 func TestManagerGoneNodeConsentReported(t *testing.T) {
 	t.Parallel()
 	r := newManagerRig(t, nil)

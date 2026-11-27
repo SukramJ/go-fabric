@@ -70,7 +70,7 @@ func (s *Service) Resolve(ctx context.Context) ([]Address, error) {
 // address that arrives ends the resolution as before. Ahead of matter.js,
 // which starts a discovery for every SRV target without addresses
 // (packages/general/src/net/dns-sd/IpServiceResolution.ts:54-62 at
-// b25ed960); the rule is this module's (review II, U3-ctl-lan-1).
+// db91886c); the rule is this module's (review II, U3-ctl-lan-1).
 const maxHostDiscoveries = 4
 
 // hasAddress reports whether nm holds an A or AAAA record.

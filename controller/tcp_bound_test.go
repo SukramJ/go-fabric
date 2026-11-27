@@ -112,7 +112,7 @@ func (p *takenTCPPorts) attempts() []string {
 // TestControllerRetriesAnAutoAssignedPortTakenForTCP (review II,
 // R2-P5-tassert-02): with TCP incoming, an auto-assigned port that is
 // taken for TCP is given up and the UDP and TCP pair bound again, as
-// matter.js's ServerNetworkRuntime.ts:212-231 does (b25ed960); a port
+// matter.js's ServerNetworkRuntime.ts:212-231 does (db91886c); a port
 // the host chose — here a socket it gave — is tried once, and an
 // auto-assigned one at most ten times. Not parallel: the TCP constructor
 // it replaces is the package's.

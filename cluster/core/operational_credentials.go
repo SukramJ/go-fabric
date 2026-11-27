@@ -2150,7 +2150,7 @@ func (o *OperationalCredentials) failSafeKeyPair() (priv *ecdsa.PrivateKey, draw
 // buildPKCS10CSR creates the DER-encoded PKCS#10 certification request
 // with `priv` as the subject key — [mattercert.CreateCSR], the request
 // matter.js's Certificate.createCertificateSigningRequest builds
-// (Certificate.ts:259-272 at b25ed960): the placeholder subject `O=CSR`,
+// (Certificate.ts:259-272 at db91886c): the placeholder subject `O=CSR`,
 // which the CA replaces with the operational subject DN when issuing the
 // NOC, signed ECDSA-SHA256 per Matter §6.4.1.2.
 func buildPKCS10CSR(priv *ecdsa.PrivateKey) ([]byte, error) {
@@ -2614,7 +2614,7 @@ func fabricInstalled(fabrics []store.FabricRecord, fabricID uint64, rootPub []by
 // nocVerifier is the verifier of a NOC chain under the trust root: built
 // from the root certificate when it is held, so a root-signed NOC's
 // authorityKeyIdentifier is checked against the root's
-// subjectKeyIdentifier (matter.js Noc.ts:174-188 at b25ed960); from the
+// subjectKeyIdentifier (matter.js Noc.ts:174-188 at db91886c); from the
 // root's public key alone for a legacy fabric row without the certificate.
 func nocVerifier(rcac, rootPublicKey []byte) (*mattercert.Verifier, error) {
 	if len(rcac) > 0 {
@@ -2891,7 +2891,7 @@ func (o *OperationalCredentials) handleUpdateFabricLabel(ctx context.Context, fi
 	resp, relabelled, err := o.relabel(ctx, idx, req.Label)
 	// The fabric changed: matter.js Fabric.setLabel persists it and the
 	// node reports an "updated" fabric (Fabric.ts:193-204 and
-	// OperationalCredentialsServer.ts:405 at b25ed960;
+	// OperationalCredentialsServer.ts:405 at db91886c;
 	// FabricManager.ts:265-275 at b25ed960). The hook runs after nocMu is
 	// released.
 	if relabelled {
@@ -2904,7 +2904,7 @@ func (o *OperationalCredentials) handleUpdateFabricLabel(ctx context.Context, fi
 // step under nocMu: of two fabrics relabelled to one label at once, the
 // second sees the first one's label and is answered LabelConflict (review
 // II, R4-conc-4053). matter.js does the find and setLabel in one handler
-// (OperationalCredentialsServer.ts:396-405 at b25ed960). relabelled
+// (OperationalCredentialsServer.ts:396-405 at db91886c). relabelled
 // reports a label that changed.
 func (o *OperationalCredentials) relabel(ctx context.Context, idx uint8, label string) (resp any, relabelled bool, err error) {
 	o.nocMu.Lock()
@@ -2933,7 +2933,7 @@ func (o *OperationalCredentials) relabel(ctx context.Context, idx uint8, label s
 		}
 	}
 	// matter.js Fabric.setLabel persists, and so reports, only a label
-	// that changed (Fabric.ts:199-201 at b25ed960).
+	// that changed (Fabric.ts:199-201 at db91886c).
 	prev, prevErr := o.store.GetFabric(ctx, idx)
 	relabelled = prevErr != nil || prev.Label != label
 	if err := o.store.UpdateFabricLabel(ctx, idx, label); err != nil {

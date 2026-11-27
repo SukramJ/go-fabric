@@ -226,7 +226,7 @@ func readInvokeResponseIB(dec *tlv.Decoder, fieldsReader CommandFieldsReader) (e
 
 // readCommandStatusIB reads a CommandStatusIB after its opener. Its path
 // and its status are mandatory (matter.js TlvCommandStatus.ts:16-17 at
-// b25ed960, both TlvField).
+// db91886c, both TlvField).
 func readCommandStatusIB(dec *tlv.Decoder, ent *InvokeResponseEntry) error {
 	sawPath, sawStatus := false, false
 	for {
@@ -286,7 +286,7 @@ func readCommandStatusIB(dec *tlv.Decoder, ent *InvokeResponseEntry) error {
 }
 
 // readStatusIBFields reads a StatusIB's fields after its opener. Status
-// is mandatory (matter.js TlvStatus.ts:15 at b25ed960), as
+// is mandatory (matter.js TlvStatus.ts:15 at db91886c), as
 // [UnmarshalStatusIBTLV] holds it: a block without it is refused, not
 // read as Success; a member it does not know is skipped whole (review
 // II, R2-P1-req2-09).

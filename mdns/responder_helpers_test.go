@@ -21,7 +21,7 @@ import (
 // The responder's tests run it over a fake transport and the fake clock —
 // matter.js's MdnsServerTest drives MdnsServer through a simulated
 // UdpMulticastServer under MockTime (packages/protocol/test/mdns/
-// MdnsServerTest.ts:50-102 at b25ed960). No socket, no sleep.
+// MdnsServerTest.ts:50-102 at db91886c). No socket, no sleep.
 
 // sentPacket is one packet the responder sent.
 type sentPacket struct {
@@ -379,7 +379,7 @@ func goodbyeRecords(rrs []dns.RR) []dns.RR {
 
 // goodbyeOf is the goodbye the responder sends for rrs once no published
 // record is left of their sets: TTL 0, the cache-flush bit on the unique
-// types only (InterfaceResponder.ts:503-507 at b25ed960).
+// types only (InterfaceResponder.ts:503-507 at db91886c).
 func goodbyeOf(rrs []dns.RR) []dns.RR {
 	out := goodbyeRecords(rrs)
 	for _, rr := range out {

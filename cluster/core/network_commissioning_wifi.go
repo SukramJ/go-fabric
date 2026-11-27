@@ -956,7 +956,7 @@ func (w *WiFiNetworkCommissioning) driverSwitch(ctx context.Context, v bool) err
 // ConnectNetwork, the one chip driver that models the switch
 // (src/platform/OpenThread/GenericNetworkCommissioningThreadDriver.cpp:205-213
 // at 6170af84; N4-d4wifi-1); matter.js has no server logic here
-// (NetworkCommissioningServer.ts:18 at b25ed960). The DataVersion advances
+// (NetworkCommissioningServer.ts:18 at db91886c). The DataVersion advances
 // with the attribute and the change is reported through OnAttributeChange,
 // so a persister stores it (R2-C2-store-1001); the rejoin of the committed network is not started,
 // the command's own join being the join. A driver that does not switch on

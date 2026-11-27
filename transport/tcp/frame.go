@@ -11,7 +11,7 @@ import (
 
 // FramingHeaderSize is the size of the length prefix in front of every
 // message. Mirrors matter.js
-// packages/protocol/src/transport/tcp/TcpChannel.ts:29 at b25ed960
+// packages/protocol/src/transport/tcp/TcpChannel.ts:29 at db91886c
 // (FRAMING_HEADER_SIZE = 4).
 const FramingHeaderSize = 4
 
@@ -29,23 +29,23 @@ const DefaultMaxPayloadSize = 64_000
 var (
 	// ErrMessageTooLarge is returned by [Conn.Send] for a message above
 	// the connection's [Conn.MaxMessageSize] — matter.js
-	// MessageTooLargeError (TcpChannel.ts:116-120 at b25ed960).
+	// MessageTooLargeError (TcpChannel.ts:116-120 at db91886c).
 	ErrMessageTooLarge = errors.New("tcp: message exceeds the TCP limit")
 	// ErrConnClosed is returned by [Conn.Send] after the connection
-	// closed (TcpChannel.ts:111-113 at b25ed960).
+	// closed (TcpChannel.ts:111-113 at db91886c).
 	ErrConnClosed = errors.New("tcp: connection closed")
 	// ErrZeroLengthFrame closes a connection that announced an empty
 	// message: one can never hold the mandatory message header
-	// (TcpChannel.ts:245-249 at b25ed960).
+	// (TcpChannel.ts:245-249 at db91886c).
 	ErrZeroLengthFrame = errors.New("tcp: zero-length frame")
 	// ErrFrameTooLarge closes a connection that announced a message
-	// above the limit (TcpChannel.ts:251-256 at b25ed960).
+	// above the limit (TcpChannel.ts:251-256 at db91886c).
 	ErrFrameTooLarge = errors.New("tcp: announced message exceeds the TCP limit")
 )
 
 // encodeFrame prefixes msg with its 4-byte little-endian length; msg may
 // carry maxPayloadSize bytes. Mirrors TcpChannel.ts:110-127 send at
-// b25ed960.
+// db91886c.
 func encodeFrame(msg []byte, maxPayloadSize int) ([]byte, error) {
 	if len(msg) > maxPayloadSize {
 		return nil, fmt.Errorf("%w: %d > %d", ErrMessageTooLarge, len(msg), maxPayloadSize)
@@ -59,7 +59,7 @@ func encodeFrame(msg []byte, maxPayloadSize int) ([]byte, error) {
 // assembler reassembles the messages of one connection from the byte
 // chunks the socket delivers. The Go translation of TcpChannel.ts's
 // #handleData (:195-206) and #extractMessages (:233-283) at
-// b25ed960.
+// db91886c.
 type assembler struct {
 	maxPayloadSize int
 	buf            []byte
@@ -77,7 +77,7 @@ func (a *assembler) push(chunk []byte) ([][]byte, error) {
 	// No cap on the buffered bytes: a header announcing more than the
 	// limit closes the connection, which bounds an incomplete message, and
 	// several complete frames in one read are all taken (TcpChannel.ts:204
-	// at b25ed960; the cap of twice the limit closed such a connection
+	// at db91886c; the cap of twice the limit closed such a connection
 	// until the db021da0 lift).
 	a.buf = append(a.buf, chunk...)
 	var out [][]byte

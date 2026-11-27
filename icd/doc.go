@@ -10,7 +10,7 @@
 // active mode and the peer's wakefulness a held interaction or a parked
 // subscription waits on. The message codec is [checkin].
 //
-// It is the Go reading of matter.js packages/protocol/src/icd at b25ed960
+// It is the Go reading of matter.js packages/protocol/src/icd at db91886c
 // (the eight modules packages/protocol/src/icd/index.ts:7-14 re-exports)
 // and of the device's mode machine
 // node/src/behaviors/icd-management/IcdMode.ts, one file per

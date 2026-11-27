@@ -179,14 +179,14 @@ func (c *Controller) otaNodeDeleted(p softwareupdate.Peer) {
 
 // armerContext is the reboot armer's view of the stack — matter.js's
 // SessionManager and ClientSubscriptions (RebootResubscribeArmer.ts:72-78
-// at b25ed960).
+// at db91886c).
 func (c *Controller) armerContext() peer.RebootArmerContext {
 	return peer.RebootArmerContext{
 		Clock: c.clock, Logger: c.log,
 		// The sessions registered before the returning one are given up,
 		// as handlePeerShutdown with that session does
 		// (RebootResubscribeArmer.ts:156-159, SessionManager.ts:722-735 at
-		// b25ed960) — whatever their creation times.
+		// db91886c) — whatever their creation times.
 		ClosePeerSessionsRegisteredBefore: func(p exchange.PeerAddress, keep peer.ArmerSession) {
 			mgr := c.live.mgr.Load()
 			as, ok := keep.(armerSession)
@@ -196,7 +196,7 @@ func (c *Controller) armerContext() peer.RebootArmerContext {
 			mgr.HandlePeerLossBefore(p, client.ErrPeerShutdown, as.s)
 		},
 		// The return's sessions: the returning one and every one
-		// registered since (RebootResubscribeArmer.ts:149 at b25ed960).
+		// registered since (RebootResubscribeArmer.ts:149 at db91886c).
 		SessionsRegisteredSince: func(s peer.ArmerSession) []peer.ArmerSession {
 			mgr := c.live.mgr.Load()
 			as, ok := s.(armerSession)
@@ -241,7 +241,7 @@ type armerObserver struct {
 }
 
 // sessionAdded feeds a peer's new session to the armer
-// (RebootResubscribeArmer.ts:133-164 at b25ed960).
+// (RebootResubscribeArmer.ts:133-164 at db91886c).
 func (c *Controller) sessionAdded(p *peer.Peer, s *exchange.Session) {
 	if c.armer != nil && s.IsSecure() {
 		c.armer.SessionAdded(armerSession{s: s, c: c})

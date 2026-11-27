@@ -113,7 +113,7 @@ type Constraint struct {
 	In string
 	// CpMax bounds a string's codepoints beside its length ("max
 	// 128{32}"); 0 states none. matter.js Constraint.cpMax
-	// (packages/model/src/aspects/Constraint.ts:60 at b25ed960).
+	// (packages/model/src/aspects/Constraint.ts:60 at db91886c).
 	CpMax int
 	// Entry constrains each entry of a list.
 	Entry *Constraint
@@ -186,7 +186,7 @@ type Field struct {
 	// its constraint, nor an enum to its values. matter.js relaxes a field
 	// by extending its server's schema (constraint "none",
 	// packages/node/src/behaviors/icd-management/IcdManagementServer.ts:58-75
-	// at b25ed960); empty for a field held to the model. On a list's
+	// at db91886c); empty for a field held to the model. On a list's
 	// [Type.Entry] it relaxes each entry, the list's own constraint
 	// staying the model's. Written by script/clustergen from its
 	// relaxation table (relaxed.go).
@@ -366,7 +366,7 @@ type Command struct {
 // applies before the server runs (requestTlv.validate,
 // packages/protocol/src/action/server/CommandInvokeResponse.ts:474-488,
 // and the model's validation, packages/node/src/node/integration/
-// ProtocolService.ts:671-705, at b25ed960). Written by script/clustergen
+// ProtocolService.ts:671-705, at db91886c). Written by script/clustergen
 // from its relaxation table.
 type RequestCheck struct {
 	// Unchecked: the request is not judged by the gate, and a generated
@@ -383,7 +383,7 @@ type RequestCheck struct {
 	// place of the schema's own — every error of its request, the
 	// decoder's and the gate's; zero keeps the schema's. matter.js's
 	// Supervision onValidationError, which answers errors[0]
-	// (ProtocolService.ts:693-694 at b25ed960), and whose command skips the
+	// (ProtocolService.ts:693-694 at db91886c), and whose command skips the
 	// request schema's own check (modelValidatedCommands,
 	// CommandInvokeResponse.ts:317, :359 at b25ed960).
 	Refusal im.StatusCode

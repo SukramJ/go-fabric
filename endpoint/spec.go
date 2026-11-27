@@ -147,7 +147,7 @@ type Spec struct {
 	// closes an endpoint and adds another under the same id: every one of
 	// its clusters starts at a new random DataVersion (matter.js
 	// packages/node/src/behavior/state/managed/Datasource.ts:763 at
-	// b25ed960) and the bridge reports every readable attribute but the
+	// db91886c) and the bridge reports every readable attribute but the
 	// changes-omitted ones to the running subscriptions
 	// (packages/node/src/node/integration/
 	// ProtocolService.ts:290-296). What a controller wrote under the key

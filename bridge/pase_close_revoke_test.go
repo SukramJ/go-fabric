@@ -133,10 +133,10 @@ func assertPASEClosed(t *testing.T, mgr *operational.Manager, sid uint16) {
 // TestSendCloseSessionReport_WireShapeMatchesMatterJS) on that session
 // before it closes, instead of learning by timeout. Mirrors matter.js
 // packages/node/src/behaviors/administrator-commissioning/AdministratorCommissioningServer.ts:143-147
-// at b25ed960 (initiateClose), whose gracefulClose
-// packages/protocol/src/protocol/ExchangeManager.ts:757-768 at b25ed960
+// at db91886c (initiateClose), whose gracefulClose
+// packages/protocol/src/protocol/ExchangeManager.ts:757-768 at db91886c
 // observes and answers with
-// packages/protocol/src/protocol/ExchangeManager.ts:790-800 at b25ed960
+// packages/protocol/src/protocol/ExchangeManager.ts:790-800 at db91886c
 // (#sendCloseSession) (F-b25ed960-56 (ii)).
 func TestRevokeWindowSendsCloseSessionOnThePASESession(t *testing.T) {
 	t.Parallel()
@@ -153,7 +153,7 @@ func TestRevokeWindowSendsCloseSessionOnThePASESession(t *testing.T) {
 		t.Parallel()
 		// The close, and with it the CloseSession, follows the
 		// command's response (matter.js NodeSession.ts:455-462 at
-		// b25ed960: the deferred close runs when the last exchange ends).
+		// db91886c: the deferred close runs when the last exchange ends).
 		dev, w, sid, peerSID, peer := revokePASEDevice(t)
 		after := &im.AfterResponse{}
 		ctx := im.WithAfterResponse(im.WithAuthModePASE(core.WithInvokeSessionID(context.Background(), sid)), after)

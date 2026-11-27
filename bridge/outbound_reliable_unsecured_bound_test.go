@@ -24,7 +24,7 @@ import (
 // would wait 0xFFFFFFFF ms — 49.7 days, before the backoff — for its first
 // retransmission; the bridge adopts them clamped to an hour
 // (handshakePeerTimingOf, owner decision 45). Neither reference clamps what a peer states (matter.js
-// packages/protocol/src/session/SessionIntervals.ts:52-53 at b25ed960, "SII/SAI
+// packages/protocol/src/session/SessionIntervals.ts:52-53 at db91886c, "SII/SAI
 // in the CASE/PASE session-parameter struct are uint32 and accepted
 // unbounded"; chip src/protocols/secure_channel/PairingSession.cpp:175-189 at
 // 6170af84).

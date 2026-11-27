@@ -90,7 +90,7 @@ func TestLocalStoreRefusesUndefinedEnumValues(t *testing.T) {
 		t.Parallel()
 		// by_design BD-Matter-DoorLock-RefusedModifyKeepsExpiryTimer:
 		// matter.js stops the timer before it refuses
-		// (DoorLockServer.ts:312-326 at b25ed960); here the refused
+		// (DoorLockServer.ts:312-326 at db91886c); here the refused
 		// command changes nothing, so the user is disabled at the deadline.
 		f := setUpScheduledLock(t, expiringUserTimeout(1), scheduledUser(lockdef.UserTypeExpiringUser, nil))
 		if err := f.unlockScheduled(); err != nil {
@@ -138,7 +138,7 @@ func TestLocalStoreRefusesUndefinedEnumValues(t *testing.T) {
 // wantDisallowedEnum asserts err is the store's refusal of a defined
 // member whose conformance the lock's features do not meet: the message
 // of matter.js's EnumValueConformanceError (conformance-compiler.ts:734-746
-// at b25ed960), CONSTRAINT_ERROR wrapping ErrEnumValueConformance.
+// at db91886c), CONSTRAINT_ERROR wrapping ErrEnumValueConformance.
 func wantDisallowedEnum(t *testing.T, err error, member string) {
 	t.Helper()
 	want := "Matter does not allow enum value " + member + " here"
@@ -154,7 +154,7 @@ func wantDisallowedEnum(t *testing.T, err error, member string) {
 // A defined value whose member conformance the lock's features do not
 // meet is refused at the store as well, following matter.js's store
 // validation (addEnumMemberValidation, conformance-compiler.ts:762-862 at
-// b25ed960; derived, not run); the request gate does the same for a peer.
+// db91886c; derived, not run); the request gate does the same for a peer.
 func TestLocalStoreRefusesFeatureDisallowedEnumValues(t *testing.T) {
 	t.Parallel()
 	noCOTA := func(c *lock.DoorLockConfig) { c.Features &^= lock.FeatureCOTA }

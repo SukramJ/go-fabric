@@ -228,7 +228,7 @@ type snapshotAccess struct {
 
 // String displays the access in the standard Matter syntax, as matter.js
 // Access.toString does (packages/model/src/aspects/Access.ts:193-223 at
-// b25ed960): rw, the fabric flag, the privileges — once when read and write
+// db91886c): rw, the fabric flag, the privileges — once when read and write
 // agree — and "T".
 func (a snapshotAccess) String() string {
 	var parts []string
@@ -731,7 +731,7 @@ func conformanceOrNone(c string) string {
 
 // writePrivilege is an attribute's write privilege from its effective
 // access in the snapshot: 0 for an attribute that is not writable (matter.js
-// Access.writable, packages/model/src/aspects/Access.ts:44-46 at b25ed960:
+// Access.writable, packages/model/src/aspects/Access.ts:44-46 at db91886c:
 // an rw other than "R"), else the level of writePriv — 3 Operate, 4 Manage,
 // 5 Administer. A writable attribute whose effective access names no write
 // privilege, or one this table does not know, is an error: the generator
@@ -916,7 +916,7 @@ func writeAccessFile(clusters []snapshotCluster) error {
 	}
 	buf.WriteString("}\n\n")
 	// readOnlyAttributes: the complement of matter.js's limits.writable
-	// (packages/protocol/src/action/server/AccessControl.ts:523 at b25ed960,
+	// (packages/protocol/src/action/server/AccessControl.ts:523 at db91886c,
 	// `access.writable && !fixed`), over every cluster of the snapshot. The
 	// ids of the global range are left to the write gate: the snapshot
 	// lists FeatureMap and ClusterRevision where a cluster's element file
@@ -968,7 +968,7 @@ func writeAccessFile(clusters []snapshotCluster) error {
 // globalAttributeFirst is the first id of the global attribute range
 // (GeneratedCommandList 0xFFF8 … ClusterRevision 0xFFFD; matter.js
 // packages/model/src/standard/elements/generated-command-list.element.ts:14
-// at b25ed960).
+// at db91886c).
 const globalAttributeFirst = 0xFFF8
 
 // writeTimedFile emits timedInvokePaths: every request command whose
@@ -1054,7 +1054,7 @@ func writeTimedFile(clusters []snapshotCluster) error {
 // attributeFabricScopes: every readable attribute (an rw other than "W")
 // whose effective access names fabric "F" or "S" — matter.js's
 // limits.fabricScoped (packages/protocol/src/action/server/AccessControl.ts:524
-// at b25ed960). A row states whether the attribute itself is "S" and the
+// at db91886c). A row states whether the attribute itself is "S" and the
 // ids of the fields of its list entry's struct whose access is "S". The
 // entry struct is looked up where the entry's scope names it: a
 // "<definition>.<name>" in the shared definitions, scope "cluster" in the
@@ -1708,7 +1708,7 @@ func schemaConformance(raw json.RawMessage) (string, error) {
 // isRequest reports whether m is a request command by its effective
 // direction (commandDirection). A command with no direction in either
 // layer is an error, not skipped: matter.js reads it as a request
-// (CommandModel.ts:23-25 at b25ed960, isRequest is "not a response"), so
+// (CommandModel.ts:23-25 at db91886c, isRequest is "not a response"), so
 // a writer that skipped it would leave a timed, Large Message or elevated
 // request out of its table (R2-P6-sec-2701; Fable fable-read-6b-gen R1).
 func isRequest(c snapshotCluster, m snapshotCommand) (bool, error) {

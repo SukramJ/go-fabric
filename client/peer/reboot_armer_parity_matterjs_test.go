@@ -4,7 +4,7 @@
 package peer
 
 // A port of matter.js packages/protocol/test/peer/RebootResubscribeArmerTest.ts
-// at b25ed960. matter.js drives the armer on a real SessionManager and
+// at db91886c. matter.js drives the armer on a real SessionManager and
 // ClientSubscriptions; the port drives it on a session table and a
 // subscription set that implement the armer's context the way those two do
 // (handlePeerShutdown with a session closes the sessions registered before
@@ -575,7 +575,7 @@ func TestRebootResubscribeArmerParity(t *testing.T) {
 // the deprecated ClosePeerSessionsBefore keeps its behaviour for the
 // deprecation window — the sessions created before the returning one
 // close, one created in the same instant stays (matter.js's deprecated
-// Timestamp form, SessionManager.ts:719-721 at b25ed960).
+// Timestamp form, SessionManager.ts:719-721 at db91886c).
 func TestRebootResubscribeArmerDeprecatedTimeClose(t *testing.T) {
 	t.Parallel()
 	clk := clocktest.New(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))

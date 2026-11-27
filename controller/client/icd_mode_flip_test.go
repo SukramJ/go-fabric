@@ -19,7 +19,7 @@ import (
 // sustained subscription live, with no SubscriptionStatusChanged(false),
 // as matter.js's IcdClient sets requiresAwait and notes the peer active
 // with no await between
-// (packages/node/src/behavior/system/icd/IcdClient.ts:166-178 at b25ed960).
+// (packages/node/src/behavior/system/icd/IcdClient.ts:166-178 at db91886c).
 // The same holds on the two-step form this replaced: the report's own
 // arrival notes the peer active before the mode hook runs, so on this path
 // the window is armed either way. The one-step state at the mode edge is

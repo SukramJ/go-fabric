@@ -144,7 +144,7 @@ type Element struct {
 	// #4995. It is 0 when nothing was cut. A bounded consumer refuses the
 	// element when RawLength exceeds its maximum, as matter.js checks the
 	// length before it truncates (packages/types/src/tlv/TlvString.ts:69-77
-	// at b25ed960). A uint32 beside the flags keeps Element at its size.
+	// at db91886c). A uint32 beside the flags keeps Element at its size.
 	RawLength uint32
 }
 
@@ -207,7 +207,7 @@ var (
 	// nullable-uint8 sentinel. Encode null via [Encoder.PutNull] instead.
 	//
 	// Mirrors matter.js packages/types/src/tlv/TlvNullable.ts:37-44 at
-	// b25ed960 — NullableSchema shrinks the max of UInt8 from 0xFF to
+	// db91886c — NullableSchema shrinks the max of UInt8 from 0xFF to
 	// 0xFE so that 0xFF is reserved as the null-sentinel wire value.
 	ErrUint8NullableSentinel = errors.New("tlv: uint8 nullable sentinel value")
 

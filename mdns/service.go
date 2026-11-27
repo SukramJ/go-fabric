@@ -268,7 +268,7 @@ func listHostNameIfaces() ([]hostNameIface, error) {
 // 6-byte MAC. "" when there is none; when the interfaces cannot be listed
 // the current name stays. Mirrors matter.js
 // packages/protocol/src/mdns/MdnsServer.ts:454-482 (#chooseHostname) at
-// b25ed960: a querier that hears the node on several interfaces must see
+// db91886c: a querier that hears the node on several interfaces must see
 // one host, so the name may not follow interface order.
 type hostNameChooser struct {
 	// mu guards current.
@@ -624,7 +624,7 @@ type CommissionableServiceConfig struct {
 	// Hints and PairingInstruction follow Matter §4.3.1.6 (`PH` / `PI`).
 	// Hints is the full pairing hint bitmap ([PairingHints]); zero sends
 	// [PairingHintsDefault] (powerCycle | deviceManual = 0x21), matching
-	// matter.js CommissionableMdnsAdvertisement.ts:81 at b25ed960
+	// matter.js CommissionableMdnsAdvertisement.ts:81 at db91886c
 	// (DEFAULT_PAIRING_HINT, MdnsConsts.ts:15). A hint and an instruction
 	// that do not belong together, and Hints set beside the deprecated
 	// PairingHint, fail [CommissionableServiceConfig.Validate].
@@ -674,7 +674,7 @@ type CommissionableServiceConfig struct {
 // `PH` key (Matter §4.3.1.6): bits 0 to 22, each one a way to put the
 // device into commissioning mode. matter.js models all 23 bits
 // (packages/protocol/src/advertisement/PairingHintBitmap.ts, the last
-// at :145 at b25ed960). connectedhomeip keeps the hint in 16 bits
+// at :145 at db91886c). connectedhomeip keeps the hint in 16 bits
 // (src/lib/dnssd/Types.h:240 at 6170af84) and reads a PH value above
 // 65535 as 0 (MakeU16FromAsciiDecimal, src/lib/dnssd/TxtFields.cpp:104-108,
 // called at :195-198, stored at :274-275): a hint with any of bits 16 to
@@ -685,7 +685,7 @@ type PairingHints uint32
 
 // The pairing hints, one bit each, in the order of the bitmap. The hints
 // of matter.js's instruction set (PAIRING_HINTS_REQUIRING_INSTRUCTION,
-// packages/protocol/src/mdns/MdnsConsts.ts:20-32 at b25ed960: bits 4, 8
+// packages/protocol/src/mdns/MdnsConsts.ts:20-32 at db91886c: bits 4, 8
 // to 12 and 15 to 19) need [CommissionableServiceConfig].PairingInstruction,
 // and at most one of them may be set ([CommissionableServiceConfig.Validate]).
 // Bits 20 to 22 are not in that set, although matter.js's bitmap comments
@@ -736,9 +736,9 @@ const PairingHintDefault uint16 = 0x21
 
 // pairingHintsRequiringInstruction is the pairing hints whose meaning
 // needs the `PI` key: matter.js PAIRING_HINTS_REQUIRING_INSTRUCTION
-// (packages/protocol/src/mdns/MdnsConsts.ts:20-32 at b25ed960), each at
+// (packages/protocol/src/mdns/MdnsConsts.ts:20-32 at db91886c), each at
 // its bit of PairingHintBitmap
-// (packages/protocol/src/advertisement/PairingHintBitmap.ts at b25ed960):
+// (packages/protocol/src/advertisement/PairingHintBitmap.ts at db91886c):
 // customInstruction 4, pressResetButtonForNumberOfSeconds 8,
 // pressResetButtonUntilLightBlinks 9,
 // pressResetButtonForNumberOfSecondsWithApplicationOfPower 10,

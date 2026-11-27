@@ -172,7 +172,7 @@ func TestUniqueIDPinned(t *testing.T) {
 // TestLocationCapability: GeneralCommissioning LocationCapability and the
 // RegulatoryConfig the node starts with are the configured value,
 // IndoorOutdoor when unset as matter.js's model default
-// (general-commissioning.element.ts:31-38 at b25ed960); IndoorOnly states
+// (general-commissioning.element.ts:31-38 at db91886c); IndoorOnly states
 // Indoor; an undefined enum value, or IndoorOnly beside another value, is
 // refused.
 func TestLocationCapability(t *testing.T) {

@@ -2,7 +2,7 @@
 // Copyright (C) 2026 SukramJ.
 
 // A port of matter.js packages/node/test/node/ClientBridgeStructureTest.ts
-// at b25ed960, the cases that feed the client structure Descriptor reports:
+// at db91886c, the cases that feed the client structure Descriptor reports:
 // how the controller builds the tree of a bridge peer — across two
 // interactions, with an endpoint no PartsList on the node names, with a
 // root that names only its aggregator, with lists that change, with an
@@ -801,7 +801,7 @@ func pairPeer(t *testing.T, st Store) (*Node, *warnRecorder) {
 
 // TestClientBridgeStructureRootNamesOnlyAggregatorParity is describe("a
 // peer whose root names only its aggregator") (ClientBridgeStructureTest.ts
-// :419-662 at b25ed960). Left: "keeps an endpoint added locally that no
+// :419-662 at db91886c). Left: "keeps an endpoint added locally that no
 // PartsList names" (endpoints.require; the Go image is built from reports
 // and its store only).
 func TestClientBridgeStructureRootNamesOnlyAggregatorParity(t *testing.T) {

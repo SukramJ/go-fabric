@@ -247,7 +247,7 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 	// Expedite it to due-now, flush the pump, drop processing — unless
 	// the liveness kick retransmitted the exchange's outstanding message,
 	// which acknowledges the duplicate itself ([Bridge.kickForLiveness]).
-	// Mirrors matter.js packages/protocol/src/protocol/MessageExchange.ts:514-523 at b25ed960
+	// Mirrors matter.js packages/protocol/src/protocol/MessageExchange.ts:514-523 at db91886c
 	// (duplicate + requiresAck: sendStandaloneAckForMessage without delay
 	// unless #kickRetransmissionForLiveness re-sent the pending message).
 	if duplicate {

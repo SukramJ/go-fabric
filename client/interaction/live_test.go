@@ -369,7 +369,7 @@ func TestLiveSustainedSurvivesRestart(t *testing.T) {
 	// read the initiator's Success on the handshake's exchange
 	// (client/handshake/server.go resume: nextMessage, completeEstablishmentOf,
 	// handOver; CaseServer.ts:204-206, SessionManager.ts:1274-1280,
-	// PeerSet.ts:104-110 at b25ed960). The report travels on the new session,
+	// PeerSet.ts:104-110 at db91886c). The report travels on the new session,
 	// which is routed while it establishes (NodeSession.ts:223-225), and the
 	// controller serves the unsecured session and each secure session on
 	// their own ordered queues (transport/message SessionOrderKey,

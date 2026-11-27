@@ -63,7 +63,7 @@ func eventReport(event, number uint64) im.EventReport {
 // TestReactionsNeedSubscription: a leave, shutDown or startUp delivered
 // without an active default subscription may be stale and is ignored
 // (Peers.ts:869-881, :899-908, :929-938 at b25ed960). The events come from the
-// newly-commissioned read, which emits them (NetworkClient.ts:304-309 at b25ed960)
+// newly-commissioned read, which emits them (NetworkClient.ts:304-309 at db91886c)
 // with no default subscription active; a host read would not emit them
 // at all (W4-ctlim-01).
 func TestReactionsNeedSubscription(t *testing.T) {
@@ -251,7 +251,7 @@ func (sr *scriptedRegistry) sendOn(t *testing.T, ch *channel.Session, id uint16,
 // TestReactionStartUp: Peers.#onStartUp — the sessions registered before
 // the peer's most recently active one are lost; that one and every session
 // registered after it stay, whatever their creation times
-// (Peers.ts:945-947, SessionManager.ts:722-735 at b25ed960). The port of
+// (Peers.ts:945-947, SessionManager.ts:722-735 at db91886c). The port of
 // ClientStartUpTest.ts's "closes the sessions registered before the
 // current session when startUp fires" on the registry's scripted peer: the
 // old session and the new one are created in the same instant, so a cut by

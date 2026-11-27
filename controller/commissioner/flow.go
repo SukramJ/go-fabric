@@ -73,7 +73,7 @@ const (
 // matter.js's destructuring of undefined fails on. It is not a
 // CommissioningError (:463-465). An empty CSRResponse is not one: it is
 // the NOCSR check ResponseEmpty, a commissioning error
-// (NocsrValidator.ts:86-91 at b25ed960).
+// (NocsrValidator.ts:86-91 at db91886c).
 var errUnexpectedResponse = errors.New("commissioner: unexpected response from the device")
 
 // errNoDACKey is the CSRResponse step reached without the DAC key the
@@ -128,7 +128,7 @@ type collectedData struct {
 	// vendorID and productID are BasicInformation's, nil when the device
 	// did not report them (collectedCommissioningData, its vendorId and
 	// productId optional: DeviceAttestationValidator.ts:239-243 at
-	// b25ed960).
+	// db91886c).
 	vendorID, productID          *uint16
 	supportsConcurrentConnection *bool
 	fabricIndex                  uint8
@@ -1273,7 +1273,7 @@ func (f *flow) deviceAttestation(ctx context.Context) (stepResult, error) {
 		// Declaration names this vendor and product: a mismatch with the
 		// BasicInformation VendorID or ProductID, or a value not reported,
 		// is the LevelError finding CertificationDeclarationFieldMismatch
-		// (DeviceAttestationValidator.ts:579-595 at b25ed960). No error
+		// (DeviceAttestationValidator.ts:579-595 at db91886c). No error
 		// and no error finding is what says it does (decision 105). The
 		// pair is recorded only when the chain was verified as well and no
 		// error finding stands (owner decision 119): a finding that a check
@@ -1421,7 +1421,7 @@ func (f *flow) certificates(ctx context.Context) (stepResult, error) {
 		var ne *attestation.NOCSRError
 		if errors.As(err, &ne) {
 			// NocsrError extends CommissioningError (NocsrValidator.ts:39
-			// at b25ed960).
+			// at db91886c).
 			return 0, newError(ErrCommissioning, ne.Message, ne)
 		}
 		return 0, err

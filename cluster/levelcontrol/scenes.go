@@ -43,7 +43,7 @@ func (s *Server) SetScenes(sc onoff.Scenes) {
 func (s *Server) MatterInvalidatesScenes() bool { return s.scenes.Load() != nil }
 
 // invalidateScenes is matter.js #invalidateScenes
-// (LevelControlServer.ts:760-763 at b25ed960):
+// (LevelControlServer.ts:760-763 at db91886c):
 // ScenesManagementServer.makeAllFabricSceneInfoEntriesInvalid, when the
 // endpoint has a ScenesManagement.
 func (s *Server) invalidateScenes() {

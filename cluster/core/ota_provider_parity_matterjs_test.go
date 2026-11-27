@@ -107,7 +107,7 @@ func TestParityMatterJS_OTAProviderResponseFields(t *testing.T) {
 }
 
 // The provider's answers of matter.js packages/node/test/behaviors/ota/OtaTest.ts
-// at b25ed960. matter.js drives a requestor to the provider on a MockSite
+// at db91886c. matter.js drives a requestor to the provider on a MockSite
 // pair and rewrites its requests (applyRewritten :1767-1851, the admission
 // table :5425-5545); the provider's answer is the observable, so these run
 // on the provider (otaFixture) and its default manager
@@ -126,7 +126,7 @@ func (f *otaFixture) removeConsent(version uint32, all bool) {
 }
 
 // TestParityMatterJS_OTAProviderApplyTable ports the apply rows of
-// OtaTest.ts :1853-1945 (applyRewritten), :1647 and :4975 at b25ed960:
+// OtaTest.ts :1853-1945 (applyRewritten), :1647 and :4975 at db91886c:
 // the table of SoftwareUpdateManager.applyUpdate (:1897-1956).
 func TestParityMatterJS_OTAProviderApplyTable(t *testing.T) {
 	t.Parallel()
@@ -219,7 +219,7 @@ func TestParityMatterJS_OTAProviderApplyTable(t *testing.T) {
 }
 
 // TestParityMatterJS_OTAProviderApplyDelay ports the wire half of OtaTest.ts
-// :2007-2027 at b25ed960: what a Proceed sends under the provider's apply
+// :2007-2027 at db91886c: what a Proceed sends under the provider's apply
 // delay, set by OTAProviderConfig's ApplyDelay field. The
 // RebootResubscribeArmer half is SoftwareUpdateManager's (the register
 // names it).
@@ -265,7 +265,7 @@ func TestParityMatterJS_OTAProviderApplyDelay(t *testing.T) {
 }
 
 // TestParityMatterJS_OTAProviderAdmission ports the admission table of
-// OtaTest.ts :5425-5545 at b25ed960 ("admits a new query of a node with a
+// OtaTest.ts :5425-5545 at db91886c ("admits a new query of a node with a
 // running attempt") on the default manager: the rows that read the
 // attempts and the transfer (SoftwareUpdateManager.admitQuery,
 // :1802-1881). The linked-update half (stillLinked, the suppressed
@@ -436,7 +436,7 @@ func TestParityMatterJS_OTAProviderConsentWhileQuerying(t *testing.T) {
 }
 
 // TestParityMatterJS_OTAProviderUpdateApplied ports the attempt's half of
-// OtaTest.ts :1682 and :4357 at b25ed960: NotifyUpdateApplied ends the
+// OtaTest.ts :1682 and :4357 at db91886c: NotifyUpdateApplied ends the
 // attempt of its token Done (#updateApplied :1970-1980), and one under an
 // unknown token ends none.
 func TestParityMatterJS_OTAProviderUpdateApplied(t *testing.T) {

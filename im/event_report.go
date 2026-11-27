@@ -263,14 +263,14 @@ func (rep EventReport) marshal(enc *tlv.Encoder, valueWriter EventDataWriter) {
 		// IsUrgent is a SubscribeRequest path qualifier; it MUST NOT appear in
 		// an EventDataIB path. Mirrors matter.js
 		// packages/protocol/src/interaction/AttributeDataEncoder.ts:137 at
-		// b25ed960 (#3988, Matter §8.9.3.4), which deletes isUrgent before
+		// db91886c (#3988, Matter §8.9.3.4), which deletes isUrgent before
 		// encoding the data path.
 		dataPath := rep.Path
 		dataPath.IsUrgent = false
 		dataPath.MarshalTLV(enc, tlv.ContextTag(tagEventDataPath))
 		// EventNumber and EpochTimestamp at the smallest fitting width.
 		// Mirrors matter.js packages/types/src/protocol/types/TlvEventData.ts:20,22
-		// at b25ed960 (TlvEventNumber / TlvPosixMs, both TlvUInt64, whose
+		// at db91886c (TlvEventNumber / TlvPosixMs, both TlvUInt64, whose
 		// length follows the value — TlvNumber.ts:295-299); chip reads the
 		// two through TLVReader::Get(uint64_t&), which takes any unsigned
 		// width (src/app/MessageDef/EventDataIB.cpp:169-177,

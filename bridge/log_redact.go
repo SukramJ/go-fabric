@@ -18,7 +18,7 @@ const redactedValue = "(redacted)"
 // loggedAttributeValue is an attribute value as the module's debug logs
 // carry it: the value with every part the model marks secret replaced.
 // The attribute read log of
-// matter.js packages/protocol/src/action/server/AttributeReadResponse.ts:303-306 at b25ed960
+// matter.js packages/protocol/src/action/server/AttributeReadResponse.ts:303-306 at db91886c
 // passes the value through SecretRedaction.redact; this module redacts
 // always, without matter.js's Logger.redactSecrets switch.
 //
@@ -64,7 +64,7 @@ func (l loggedAttributeValue) LogValue() slog.Value {
 // attribute) when it, or any member of it, is secret; nil for an attribute
 // without a secret and for a path no registered definition describes (no
 // model, nothing to redact: SecretRedaction.redact without a model,
-// matter.js packages/model/src/logic/SecretRedaction.ts:32-37 at b25ed960).
+// matter.js packages/model/src/logic/SecretRedaction.ts:32-37 at db91886c).
 func secretBearingAttribute(cluster, attribute uint32) *spec.Field {
 	def := spec.Lookup(cluster)
 	if def == nil {

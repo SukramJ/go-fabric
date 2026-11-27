@@ -122,7 +122,7 @@ func startSend(ctx context.Context, f *outboundFlow, modes []DriverMode, opts Se
 		maxLength = &l
 	}
 	// At most a 16-bit block size: a TCP exchange may carry more than the
-	// field holds (bdx-session-initiator.ts:155 at b25ed960, matter.js
+	// field holds (bdx-session-initiator.ts:155 at db91886c, matter.js
 	// #4793).
 	maxBlockSize := min(f.m.MaxPayloadSize()-blockCounterOverhead, 0xFFFF)
 	if opts.MaxBlockSize != 0 && maxBlockSize > int(opts.MaxBlockSize) {

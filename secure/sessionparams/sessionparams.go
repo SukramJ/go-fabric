@@ -75,7 +75,7 @@ type Parameters struct {
 // 0xFFFFFFFF ms would otherwise pace a handshake's retransmissions — and
 // the wait for their acknowledgement — over weeks. Both references take
 // the intervals of a PASE or CASE message as stated (matter.js
-// packages/protocol/src/session/SessionIntervals.ts:52-53 at b25ed960,
+// packages/protocol/src/session/SessionIntervals.ts:52-53 at db91886c,
 // "accepted unbounded"; connectedhomeip
 // src/protocols/secure_channel/PairingSession.cpp:175-189 at 6170af84).
 // A DNS-SD interval above one hour connectedhomeip reads as not stated
@@ -151,7 +151,7 @@ func (p Parameters) EffectiveMaxTCPMessageSize() uint32 {
 // R2-P6-par-2905). A reader here cannot tell an absent bitmap from 0
 // ([DecodeFields]). matter.js itself encodes the minimal width and
 // its decoder checks only the element type (TlvNumber.ts:118-143 at
-// b25ed960), so either width is accepted on the wire; the fixed width
+// db91886c), so either width is accepted on the wire; the fixed width
 // keeps the fixtures stable.
 func (p Parameters) Encode(enc *tlv.Encoder, outer tlv.Tag) {
 	enc.StartStruct(outer)
@@ -252,7 +252,7 @@ func DecodeFields(dec *tlv.Decoder) (Parameters, error) {
 }
 
 // fieldBits is the width of the field at context tag n
-// (PaseMessages.ts:28-55 at b25ed960: 1, 2, 6, 9 TlvUInt32; 3, 4, 5, 7 and
+// (PaseMessages.ts:28-55 at db91886c: 1, 2, 6, 9 TlvUInt32; 3, 4, 5, 7 and
 // the bitmap 8 TlvUInt16) and whether n is a field at all.
 func fieldBits(n uint32) (uint, bool) {
 	switch n {

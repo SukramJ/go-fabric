@@ -15,7 +15,7 @@ import (
 const (
 	// recordTTL is the TTL of every record the responder publishes, in
 	// seconds: matter.js builds each one with DEFAULT_MDNS_TTL (matter.js
-	// packages/general/src/codec/DnsCodec.ts:20 at b25ed960) — PTR, SRV,
+	// packages/general/src/codec/DnsCodec.ts:20 at db91886c) — PTR, SRV,
 	// TXT, A and AAAA alike, the TXT record included where chip keeps 4500 s
 	// (concept v12 §D.2: matter.js before chip). A node that vanishes without
 	// its goodbyes leaves a commissioner's cache within two minutes.
@@ -118,7 +118,7 @@ func recordSet(svc Service, names serviceNames, txt []string, addrs []net.IP) []
 	if len(txt) == 0 {
 		// RFC 6763 §6.1: an empty TXT record is a single zero byte
 		// (matter.js DnsCodec.ts:477-483 encodeTxtRecord and
-		// DnsCodecTest.ts:347 at b25ed960).
+		// DnsCodecTest.ts:347 at db91886c).
 		txt = []string{""}
 	}
 	out = append(out, &dns.TXT{Hdr: unique(names.instance, dns.TypeTXT), Txt: txt})

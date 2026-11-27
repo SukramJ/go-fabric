@@ -598,7 +598,7 @@ func (c *ICDClient) flushAnnouncements() {
 // stored registration (IcdClient.ts:444-456). The caller holds commitMu.
 // The registration in memory takes reg either way; a store error is logged
 // and returned — a commit that fails in its second phase, whose state
-// stays committed in memory (IcdClientTest.ts:806-824 at b25ed960).
+// stays committed in memory (IcdClientTest.ts:806-824 at db91886c).
 func (c *ICDClient) persist(reg *ICDRegistration) error {
 	var before bool
 	c.mu.Lock()
@@ -1246,7 +1246,7 @@ func (c *ICDClient) onSubscriptionActive(active bool) {
 // (SetOperatingMode): matter.js runs them with no await between, so a
 // sustained subscription's recreate, woken by the flip, finds the peer
 // awake and keeps the subscription live (F-b25ed960-C6).
-// Mirrors matter.js packages/node/src/behavior/system/icd/IcdClient.ts:166-178 at b25ed960 (#onOperatingModeChanged).
+// Mirrors matter.js packages/node/src/behavior/system/icd/IcdClient.ts:166-178 at db91886c (#onOperatingModeChanged).
 func (c *ICDClient) onOperatingModeChanged() {
 	if w := c.Wakefulness(); w != nil {
 		lit := c.litOperating()

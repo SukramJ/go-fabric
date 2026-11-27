@@ -22,7 +22,7 @@ type listReq struct {
 // TestCheckRequestShapes: the payloads CheckRequest does not judge (a nil
 // pointer, no struct, a type without the definition's fields, a command
 // the definition does not state), a nil payload judged as a request
-// without fields (ProtocolService.ts:624-625 at b25ed960), a pointer
+// without fields (ProtocolService.ts:624-625 at db91886c), a pointer
 // payload, an absent
 // optional field, the enum-member-list constraint, and the gate of
 // InvokeHeld refusing before the host's handler.

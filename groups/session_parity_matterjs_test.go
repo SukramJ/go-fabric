@@ -282,7 +282,7 @@ func secureSessionKeyMap(t *testing.T, m *Manager, st *memStore, idx uint8, pair
 }
 
 // secureSessionDatagram is groupDatagram(fabric, { keySetId: 1, groupId })
-// of packages/protocol/test/session/group-datagrams.ts:37-89 at b25ed960:
+// of packages/protocol/test/session/group-datagrams.ts:37-89 at db91886c:
 // the current key of key set 1 (epoch key 000102…0f), node 1, counter
 // 0x1234567b, privacy, an initiator payload header for exchange 0x1234,
 // protocol 1, opcode 5 and the payload 00112233.

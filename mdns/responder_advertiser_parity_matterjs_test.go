@@ -273,7 +273,7 @@ func TestMdnsAdvertisementParity(t *testing.T) {
 				}
 				// Expiry for all: one publication with each shared record
 				// once, split into datagrams by size
-				// (InterfaceResponder.ts:445-490 at b25ed960).
+				// (InterfaceResponder.ts:445-490 at db91886c).
 				if err := r.Close(); err != nil {
 					t.Fatal(err)
 				}

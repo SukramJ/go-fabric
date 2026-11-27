@@ -55,7 +55,7 @@ type RetrySchedule struct {
 //
 // Mirrors matter.js
 // packages/protocol/src/action/client/subscription/SustainedSubscription.ts:614-630
-// (SustainedSubscription.DefaultRetrySchedule) at b25ed960.
+// (SustainedSubscription.DefaultRetrySchedule) at db91886c.
 var DefaultSustainRetries = RetrySchedule{
 	InitialInterval: 15 * time.Second,
 	BackoffFactor:   2,
@@ -205,7 +205,7 @@ func (st *sustainedState) releaseHold() {
 // event; it never decreases. A plain subscription reports none. Mirrors
 // matter.js SustainedSubscription.maxEventNumber
 // (packages/protocol/src/action/client/subscription/SustainedSubscription.ts:105-114)
-// at b25ed960.
+// at db91886c.
 func (s *Subscription) MaxEventNumber() (uint64, bool) {
 	if s.sustained == nil {
 		return 0, false
@@ -248,7 +248,7 @@ func (st *sustainedState) deliver(r *Report, consumer func(*Report) error) error
 // first as a warning, later ones at debug, since a peer can trigger one with
 // every report. Mirrors matter.js SustainedSubscription.#logLocalFailure
 // (packages/protocol/src/action/client/subscription/SustainedSubscription.ts:366-377)
-// at b25ed960.
+// at db91886c.
 func (st *sustainedState) logLocalFailure(what string, err error) {
 	if st.log == nil {
 		return
@@ -265,7 +265,7 @@ func (st *sustainedState) logLocalFailure(what string, err error) {
 }
 
 // delivering is the consumer reached through deliver, nil without one
-// (SustainedSubscription.ts:120-121 at b25ed960).
+// (SustainedSubscription.ts:120-121 at db91886c).
 func (st *sustainedState) delivering(consumer func(*Report) error) func(*Report) error {
 	if consumer == nil {
 		return nil
@@ -277,7 +277,7 @@ func (st *sustainedState) delivering(consumer func(*Report) error) func(*Report)
 // the request's filters kept until then. Mirrors matter.js
 // SustainedSubscription.#requestNewEvents
 // (packages/protocol/src/action/client/subscription/SustainedSubscription.ts:379-384)
-// at b25ed960. After an event numbered 2^64-1 the bound is held at
+// at db91886c. After an event numbered 2^64-1 the bound is held at
 // 2^64-1 rather than wrapping to 0, which would ask the peer for every
 // event it still holds again: this module's own choice, as the
 // controller's nextEventMin (review II, R2-C2-wire-2351).
@@ -740,7 +740,7 @@ func (c *Interaction) nextWake(ctx context.Context, w *icd.PeerWakefulness) bool
 // bootstrap read while it has not succeeded and the request refreshed
 // after it (:187-204), then the subscription. Each refresh asks for the
 // events above the highest one delivered (SustainedSubscription.ts:125-126
-// at b25ed960).
+// at db91886c).
 func (c *Interaction) sustainAttempt(ctx context.Context, st *sustainedState, peer exchange.PeerAddress, req *SubscribeRequest, floor, ceiling time.Duration, bootstrap *func(ctx context.Context) error, needRefresh *bool) (*Subscription, error) {
 	if *needRefresh {
 		*req = st.requestNewEvents(refreshed(*req))

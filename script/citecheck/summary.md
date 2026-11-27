@@ -1,6 +1,6 @@
 # matter.js citation check
 
-Pin: `b25ed9604f2825857b8de28a3c29cae8124a7e49` (parity/schema.json matter.sourceCommit). Regenerate with `make cite-report`; `make cite-check` fails when this file or drift.json moves.
+Pin: `db91886cbe742f28d2d6ae513dfc33988436bf02` (parity/schema.json matter.sourceCommit). Regenerate with `make cite-report`; `make cite-check` fails when this file or drift.json moves.
 
 Second tree: a sentence naming matterjs-server is checked against `MATTERJS_SERVER_DIR` (default `../matterjs-server`) at its own `at <sha>`; it has no pin.
 
@@ -11,13 +11,13 @@ Second tree: a sentence naming matterjs-server is checked against `MATTERJS_SERV
 | Resolved: exact path from a tree root (packages/, support/, examples/) | 3417 |
 | Resolved: unique suffix | 249 |
 | Resolved: unique basename | 8185 |
-| Checked at their own `at <sha>`, the pin | 2692 |
-| **Checked at another matter.js commit** (their own `at <sha>`, not the pin) | 2638 |
+| Checked at their own `at <sha>`, the pin | 1958 |
+| **Checked at another matter.js commit** (their own `at <sha>`, not the pin) | 3372 |
 | Checked against matterjs-server (`MATTERJS_SERVER_DIR`) at their `at <sha>` | 678 |
 | Drift-checked (the sentence names a name the file contains) | 5338 |
 | Hard-checked only | 6513 |
 | **Hard errors** | 0 |
-| **Drift** | 410 |
+| **Drift** | 416 |
 
 ## Off the pin, by commit
 
@@ -28,6 +28,7 @@ Line citations whose sentence names a matter.js commit other than the pin are ch
 | `0ceb202d` | 114 | 7 |
 | `862ad75f` | 3 | 121 |
 | `9892fa39` | 2 | 0 |
+| `b25ed960` | 734 | 16 |
 | `d87d1de4` | 2 | 0 |
 | `db021da0` | 2516 | 180 |
 | `e812bd07` | 1 | 0 |
@@ -37,9 +38,9 @@ Line citations whose sentence names a matter.js commit other than the pin are ch
 | Reference | Count |
 |---|---|
 | A .ts file named without a line part | 2760 |
-| … whose sentence names another matter.js commit | 594 |
+| … whose sentence names another matter.js commit | 623 |
 | A bare line part bound to the .ts file named before it (checked; not a citation, drift or hard error of the run) | 589 |
-| … checked at another matter.js commit | 308 |
+| … checked at another matter.js commit | 324 |
 | … with a hard error at the commit it was checked at | 3 |
 | A bare line part after a .ts citation or after no file (not checked) | 3057 |
 | A chip citation (a chip source in a sentence naming chip or connectedhomeip) | 1825 |

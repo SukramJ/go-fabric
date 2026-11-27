@@ -32,7 +32,7 @@ import (
 // records NotifyUpdateApplied.
 //
 // Mirrors matter.js packages/node/src/behaviors/ota-software-update-provider/
-// OtaSoftwareUpdateProviderServer.ts at b25ed960 (OP below). What matter.js
+// OtaSoftwareUpdateProviderServer.ts at db91886c (OP below). What matter.js
 // decides in its SoftwareUpdateManager — which query is admitted, whether
 // an apply proceeds, what a status moves — is the [OTAUpdateManager]'s
 // ([OTAProviderConfig].Manager, by default [NewOTAStandaloneManager]); the
@@ -151,7 +151,7 @@ type OTAApplyPolicy interface {
 }
 
 // OTAUpdateStatus is matter.js OtaUpdateStatus (OtaProgress.ts:16-25 at
-// b25ed960): where a requestor's update stands.
+// db91886c): where a requestor's update stands.
 type OTAUpdateStatus uint8
 
 // The update states.
@@ -223,7 +223,7 @@ type OTAProviderConfig struct {
 	// decides the delegation itself: [NewOTAProvider] refuses the two
 	// together.
 	//
-	// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:2158-2171 at b25ed960
+	// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:2158-2171 at db91886c
 	// (State.delegateConsentToRequestor, default false).
 	DelegateConsentToRequestor bool
 	// BDX is the node's BDX responder the images are served through
@@ -231,7 +231,7 @@ type OTAProviderConfig struct {
 	BDX *bdx.Responder
 	// BDXMaxBlockSize, when set, caps the block size of the image
 	// transfers the default manager offers (bdxTransferOptionsFor
-	// maxBlockSize, SoftwareUpdateManager.ts:1530-1536 at b25ed960).
+	// maxBlockSize, SoftwareUpdateManager.ts:1530-1536 at db91886c).
 	BDXMaxBlockSize uint16
 	// NodeID returns this node's id on a fabric, which the BDX URI names
 	// (OP:300: the session's associatedFabric.rootNodeId); mandatory with
@@ -264,7 +264,7 @@ type OTAProviderConfig struct {
 	// it admitted for the requestor's restart — another session than the
 	// transfer's, which it cancelled — with the query's session: a queue
 	// suppresses the StartUp event that follows on that session
-	// (SoftwareUpdateManager.ts:1873-1879 at b25ed960, which suppresses it
+	// (SoftwareUpdateManager.ts:1873-1879 at db91886c, which suppresses it
 	// only while the peer has a queued update).
 	//
 	// Deprecated: the restart is the Manager's to judge (AdmitQuery);
@@ -279,7 +279,7 @@ type OTAProviderConfig struct {
 	// SessionActivity, when set, reports when the peer last sent on the
 	// secure session of the id, false for a session it does not know. The
 	// default manager's admission compares a running transfer's session
-	// with the query's by it (SoftwareUpdateManager.ts:1852 at b25ed960
+	// with the query's by it (SoftwareUpdateManager.ts:1852 at db91886c
 	// compares their activeTimestamp); without it, or when it knows either
 	// session not, the transfer's last block stands in for its session's
 	// activity and the query's session is active now.
@@ -313,7 +313,7 @@ const (
 	// (OP:205: Seconds(120)).
 	otaConsentRetry = 120 * time.Second
 	// otaProgressTimeout makes an update attempt stale: matter.js
-	// OTA_PROGRESS_TIMEOUT (OtaProgress.ts:14 at b25ed960, Minutes(15),
+	// OTA_PROGRESS_TIMEOUT (OtaProgress.ts:14 at db91886c, Minutes(15),
 	// read at OtaUpdateAttempts.ts:109).
 	otaProgressTimeout = 15 * time.Minute
 	// otaBdxMessageTimeout is the image transfer's idle timeout (OP:259:
@@ -445,7 +445,7 @@ func seconds(d time.Duration) *uint32 {
 // attempt for the query, which ends with it unless the provider answers
 // with an offer.
 //
-// Mirrors matter.js packages/node/src/behaviors/ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts:143-159 at b25ed960
+// Mirrors matter.js packages/node/src/behaviors/ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts:143-159 at db91886c
 // (queryImage).
 func (p *OTAProvider) QueryImage(ctx context.Context, req provdef.QueryImageRequest) (provdef.QueryImageResponse, error) {
 	peer, sessionID, err := remotePeer(ctx)
@@ -460,7 +460,7 @@ func (p *OTAProvider) QueryImage(ctx context.Context, req provdef.QueryImageRequ
 // answerQuery answers the query; the offer is recorded after the last wait
 // on a host port, so nothing changes the decision before the answer goes.
 //
-// Mirrors matter.js packages/node/src/behaviors/ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts:161-315 at b25ed960
+// Mirrors matter.js packages/node/src/behaviors/ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts:161-315 at db91886c
 // (#answerQuery).
 func (p *OTAProvider) answerQuery(ctx context.Context, req provdef.QueryImageRequest, peer OTAPeer, sessionID uint16, attempt *OTAUpdateAttempt) (provdef.QueryImageResponse, error) {
 	img, ok, err := p.cfg.ImageSource.QueryImage(ctx, peer, req)
@@ -548,7 +548,7 @@ func (p *OTAProvider) answerQuery(ctx context.Context, req provdef.QueryImageReq
 // obtained, NotAvailable when it is not granted — and nothing when it is
 // granted, which lets the offer go on.
 //
-// Mirrors matter.js packages/node/src/behaviors/ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts:202-231 at b25ed960
+// Mirrors matter.js packages/node/src/behaviors/ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts:202-231 at db91886c
 // (the consent of the query's answer).
 func (p *OTAProvider) askConsent(ctx context.Context, req provdef.QueryImageRequest, peer OTAPeer, img OTAImage, token []byte, attempt *OTAUpdateAttempt) (provdef.QueryImageResponse, bool, error) {
 	p.reportStatus(attempt, OTAUpdateWaitForConsent)
@@ -580,7 +580,7 @@ func (p *OTAProvider) askConsent(ctx context.Context, req provdef.QueryImageRequ
 // as the attempt's statuses until the attempt ends. It reports busy when
 // the scope is held with other details.
 //
-// Mirrors matter.js packages/node/src/behaviors/ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts:251-300 at b25ed960
+// Mirrors matter.js packages/node/src/behaviors/ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts:251-300 at db91886c
 // (the BDX offer of the query's answer).
 func (p *OTAProvider) offerBDX(peer OTAPeer, img OTAImage, attempt *OTAUpdateAttempt) (string, bool) {
 	responder := p.cfg.BDX
@@ -692,7 +692,7 @@ func (p *OTAProvider) withdrawScopes(fabricIndex uint8) {
 // waits for its apply — and the manager's apply table decides, Proceed
 // after the apply delay or Discontinue for two minutes.
 //
-// Mirrors matter.js packages/node/src/behaviors/ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts:317-363 at b25ed960
+// Mirrors matter.js packages/node/src/behaviors/ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts:317-363 at db91886c
 // (applyUpdateRequest).
 func (p *OTAProvider) ApplyUpdateRequest(ctx context.Context, req provdef.ApplyUpdateRequestRequest) (provdef.ApplyUpdateResponse, error) {
 	peer, _, err := remotePeer(ctx)
@@ -764,7 +764,7 @@ func (p *OTAProvider) applyPolicy(ctx context.Context, peer OTAPeer, req provdef
 // NotifyUpdateApplied hands the requestor's NotifyUpdateApplied to the
 // manager.
 //
-// Mirrors matter.js packages/node/src/behaviors/ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts:365-380 at b25ed960
+// Mirrors matter.js packages/node/src/behaviors/ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts:365-380 at db91886c
 // (notifyUpdateApplied).
 func (p *OTAProvider) NotifyUpdateApplied(ctx context.Context, req provdef.NotifyUpdateAppliedRequest) error {
 	peer, _, err := remotePeer(ctx)

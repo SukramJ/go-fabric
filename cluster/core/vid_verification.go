@@ -69,7 +69,7 @@ func (o *OperationalCredentials) handleSetVidVerificationStatement(ctx context.C
 	o.dataVersion.Bump()
 	// The fabric changed: matter.js Fabric.updateVendorVerificationData
 	// persists it and the node reports an "updated" fabric (Fabric.ts:210-246
-	// and OperationalCredentialsServer.ts:523 at b25ed960;
+	// and OperationalCredentialsServer.ts:523 at db91886c;
 	// FabricManager.ts:265-275 at b25ed960). The hook runs after nocMu is
 	// released.
 	o.fabricChanged(ctx, fabricIndex)
@@ -83,7 +83,7 @@ func (o *OperationalCredentials) handleSetVidVerificationStatement(ctx context.C
 // with the value the other read before it (review II, R3-conc-3056), and
 // an UpdateNOC that replaces the ICAC does not land between the check and
 // the write. matter.js runs the handler on one thread
-// (OperationalCredentialsServer.ts:505-524 at b25ed960).
+// (OperationalCredentialsServer.ts:505-524 at db91886c).
 func (o *OperationalCredentials) storeVIDData(ctx context.Context, fabricIndex uint8, req *SetVidVerificationStatementRequest) error {
 	o.nocMu.Lock()
 	defer o.nocMu.Unlock()
@@ -153,7 +153,7 @@ func (o *OperationalCredentials) handleSignVidVerificationRequest(ctx context.Co
 	switch {
 	case errors.Is(err, store.ErrFabricNotFound):
 		// ConstraintError only for a fabric that does not exist: matter.js
-		// OperationalCredentialsServer.ts:485-488 at b25ed960
+		// OperationalCredentialsServer.ts:485-488 at db91886c
 		// (!fabrics.has(fabricIndex)); chip FabricTable.cpp:2228-2229 and
 		// OperationalCredentialsCluster.cpp:922-925 at 6170af84.
 		return nil, opcredsConstraintErr{msg: fmt.Sprintf("core: SignVIDVerificationRequest: fabric %d does not exist", req.FabricIndex)}

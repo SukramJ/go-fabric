@@ -148,7 +148,7 @@ type Registry struct {
 	closed bool
 	// removeFabric, when set, stands between a decommission and its
 	// RemoveFabric invoke: the test seam of matter.js's patchRemoveFabric
-	// (DecommissionTest.ts:48-58 at b25ed960), set only by
+	// (DecommissionTest.ts:48-58 at db91886c), set only by
 	// export_test.go's PatchRemoveFabric. Nil invokes directly.
 	removeFabric func(fabricIndex uint8, invoke func(fabricIndex uint8) (Result, error)) (Result, error)
 
@@ -293,7 +293,7 @@ func (r *Registry) restore(id string) (n *Node, addr *PeerAddress, err error) {
 
 // storedPeerAddress is the peer address field of a stored record decoded
 // on its own, nil when it is absent or does not decode. Mirrors matter.js
-// packages/node/src/node/ClientNode.ts:408-418 at b25ed960
+// packages/node/src/node/ClientNode.ts:408-418 at db91886c
 // (ClientNode.peerAddress): with the commissioning state not loaded, the
 // address is read from storage, whatever else the state holds.
 func storedPeerAddress(values map[uint32][]byte) *PeerAddress {
@@ -452,7 +452,7 @@ func (r *Registry) bindPeer(n *Node, p *peer.Peer) {
 	// The peer's medium selects its network profile: matter.js sets the
 	// peer's physicalProperties from the client node at startup
 	// (packages/node/src/behavior/system/network/NetworkClient.ts:71 at
-	// b25ed960).
+	// db91886c).
 	p.SetMedium(func() peer.Medium { return n.Properties().Medium() })
 	follow := func() {
 		d := p.Descriptor()
@@ -687,7 +687,7 @@ func (r *Registry) Nodes() []*Node {
 // Commissioned are the commissioned operational nodes ([Node.IsCommissioned])
 // — a group address names no commissioned node, and a node that failed to
 // load is none — Peers.commissioned (packages/node/src/node/client/
-// Peers.ts:416-419 at b25ed960: nodeType "client" and
+// Peers.ts:416-419 at db91886c: nodeType "client" and
 // lifecycle.isCommissioned).
 func (r *Registry) Commissioned() []*Node {
 	var out []*Node
@@ -724,7 +724,7 @@ func (r *Registry) Get(id string) *Node {
 // GetByAddress is the node with peer address addr ([Node.PeerAddress]),
 // nil when there is none: a commissioned node, or a node that failed to
 // load whose stored record names addr. Mirrors matter.js
-// packages/node/src/node/client/Peers.ts:421-445 at b25ed960 (Peers.get by
+// packages/node/src/node/client/Peers.ts:421-445 at db91886c (Peers.get by
 // address, through ClientNode.peerAddress).
 func (r *Registry) GetByAddress(addr PeerAddress) *Node {
 	for _, n := range r.Nodes() {

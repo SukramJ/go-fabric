@@ -60,7 +60,7 @@ func TestGKM_NewGroupKeyManagement_NilStore(t *testing.T) {
 func TestGKM_MaxGroupsPerFabric_Default(t *testing.T) {
 	t.Parallel()
 	// cfg value 0 → matter.js default 22
-	// (GroupKeyManagementServer.ts:614 at b25ed960, override maxGroupsPerFabric = 22).
+	// (GroupKeyManagementServer.ts:614 at db91886c, override maxGroupsPerFabric = 22).
 	gkm, err := core.NewGroupKeyManagement(newFakeStore(), core.GroupKeyMgmtConfig{MaxGroupsPerFabric: 0})
 	if err != nil {
 		t.Fatalf("NewGroupKeyManagement: %v", err)
@@ -212,7 +212,7 @@ func TestGKM_KeySetRead_Miss(t *testing.T) {
 	t.Parallel()
 	gkm := newGKM(t)
 	_, err := gkm.MatterInvoke(fabricCtx(1), 0x01, core.KeySetReadRequest{GroupKeySetID: 9999})
-	// matter.js GroupKeyManagementServer.ts:388-398 (b25ed960): NotFound
+	// matter.js GroupKeyManagementServer.ts:388-398 (db91886c): NotFound
 	// (review II, W6-test-17).
 	if got := statusOf(err); got != im.StatusNotFound {
 		t.Fatalf("KeySetRead miss: %v (status 0x%02X), want NOT_FOUND", err, got)

@@ -54,5 +54,5 @@ var OpenEstablishing func(m, stake any, fabricIndex uint8, localNodeID, peerNode
 // [OpenEstablishing] installed) in m: the pickers return it from now on
 // and the per-peer cap counts it and runs. Reports true when e is
 // established — also when it already was — and false when it was closed
-// while establishing (matter.js NodeSession.ts:241-251 at b25ed960).
+// while establishing (matter.js NodeSession.ts:241-251 at db91886c).
 var CompleteEstablishment func(m, e any) bool

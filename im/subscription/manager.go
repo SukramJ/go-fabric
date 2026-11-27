@@ -671,7 +671,7 @@ func (m *Manager) CloseSession(sessionID uint16) {
 // moved, outside the manager's lock.
 //
 // Mirrors matter.js packages/node/src/node/server/ServerSubscription.ts
-// :819-834 at b25ed960 (#follow: the subscription leaves the former
+// :819-834 at db91886c (#follow: the subscription leaves the former
 // session's set and joins the newer one's, no new SubscribeRequest) and
 // packages/protocol/src/session/NodeSession.ts:258-268 (each subscription
 // continues on the newer session, which stays open). The failure count
@@ -805,12 +805,12 @@ func (m *Manager) CloseFabric(fabricIndex uint8) {
 // none — what the bridge passes, the session carrying RemoveFabric
 // included, R2-P1-req2-04). It is
 // the flush of matter.js's Fabric.leave before the fabric goes
-// (packages/protocol/src/fabric/Fabric.ts:456-466 at b25ed960): every
+// (packages/protocol/src/fabric/Fabric.ts:456-466 at db91886c): every
 // session of the fabric runs `closeSubscriptions(true)`
-// (packages/protocol/src/session/NodeSession.ts:383-395 at b25ed960),
+// (packages/protocol/src/session/NodeSession.ts:383-395 at db91886c),
 // each subscription closing with a flush through its own session
 // (packages/node/src/node/server/ServerSubscription.ts:773-783 at
-// b25ed960, #flush: one #triggerSendUpdate), so the Leave event the node emitted a moment
+// db91886c, #flush: one #triggerSendUpdate), so the Leave event the node emitted a moment
 // before reaches the subscribers while the fabric still admits them. A
 // subscription whose report is in flight is waited for, not skipped
 // ([Manager.claimReport]): the flush takes it once that report ended —
@@ -846,7 +846,7 @@ func (m *Manager) FlushFabric(ctx context.Context, fabricIndex uint8, exceptSess
 // session ([Subscription.CurrentSessionID]): a subscription moved to a
 // newer session is flushed with that one, as matter.js's #follow moves
 // it into the newer session's set (ServerSubscription.ts:820-834 at
-// b25ed960).
+// db91886c).
 func (m *Manager) FlushSession(ctx context.Context, sessionID uint16) {
 	m.flush(ctx, func(sub *Subscription) bool { return sub.CurrentSessionID() == sessionID })
 }

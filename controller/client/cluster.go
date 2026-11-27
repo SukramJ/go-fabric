@@ -229,7 +229,7 @@ func (c *Cluster) Ready() bool { return c.exposed() != nil }
 // Revision is the peer's ClusterRevision; when it reported none or one
 // below 1 the model's — the snapshot's revision of the cluster, 1 for a
 // cluster the snapshot does not know (PeerBehavior.ts:426-434 at
-// b25ed960: the revision override only for a valid, differing one;
+// db91886c: the revision override only for a valid, differing one;
 // PeerBehaviorTest "tolerates a peer that does not report a revision").
 // 0 while the cluster has no shape.
 func (c *Cluster) Revision() uint16 {

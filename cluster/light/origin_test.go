@@ -61,7 +61,7 @@ func TestColorControlOrigins(t *testing.T) {
 // listeners each at once, while the wire (contract.AttributeReportNotifier)
 // reports the first at once and the last after the interval — matter.js's
 // QuietEvent throttles only its `online` view
-// (packages/node/src/behavior/Events.ts:269-296 at b25ed960).
+// (packages/node/src/behavior/Events.ts:269-296 at db91886c).
 func TestColorControlHostSeesEveryChangeTheWireThrottles(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {

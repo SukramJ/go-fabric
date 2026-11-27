@@ -14,7 +14,7 @@ import (
 // TestAccessControlSetLimits: the capacity attributes report what SetLimits
 // set, a zero field keeps the default, and an ACL write is held to the set
 // limit — ResourceExhausted one past it, as matter.js
-// AccessControlServer.ts:179-198 at b25ed960 throws.
+// AccessControlServer.ts:179-198 at db91886c throws.
 func TestAccessControlSetLimits(t *testing.T) {
 	t.Parallel()
 	ac := newAccessControl(t)
@@ -51,7 +51,7 @@ func TestAccessControlSetLimits(t *testing.T) {
 
 // TestLimitDefaults: the exported defaults are matter.js's
 // (AccessControlServer.ts:58-66, GroupKeyManagementServer.ts:613-614 at
-// b25ed960).
+// db91886c).
 func TestLimitDefaults(t *testing.T) {
 	t.Parallel()
 	for name, tc := range map[string]struct{ got, want uint16 }{

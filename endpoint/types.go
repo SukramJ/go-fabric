@@ -598,7 +598,7 @@ func newEndpointState(clk clock.Clock) *endpointState {
 
 // renewed returns a state for a new instance behind s's key: new
 // DataVersion trackers, first read at a new random value (as matter.js
-// samples a new version per Datasource, Datasource.ts:763 at b25ed960),
+// samples a new version per Datasource, Datasource.ts:763 at db91886c),
 // no kept servers, and s's key state.
 func (s *endpointState) renewed(instance any) *endpointState {
 	return &endpointState{keyState: s.keyState, instance: instance, assembled: true, trackers: make(map[uint32]*contract.DataVersionTracker)}

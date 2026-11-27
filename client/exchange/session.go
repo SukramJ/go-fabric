@@ -56,7 +56,7 @@ type Session struct {
 	// manager ([Manager].registrations), fixed at registration and kept
 	// after the session leaves — matter.js
 	// RegisteredSessions.positionOf (SessionManager.ts:1290-1293 at
-	// b25ed960).
+	// db91886c).
 	position uint64
 
 	// Unsecured session state: the initiator's ephemeral node id — ours,
@@ -132,7 +132,7 @@ func (s *Session) Addr() *net.UDPAddr {
 //
 // A session bound to a TCP connection stays on it: its address names the
 // connection (matter.js probes and migrates UDP sessions only,
-// PeerAddressMonitor.ts:138-139 at b25ed960).
+// PeerAddressMonitor.ts:138-139 at db91886c).
 //
 // A move to a different address notifies the observer OnAddressChanged
 // installed — matter.js MessageChannel's networkAddressChanged, which the
@@ -291,7 +291,7 @@ func (s *Session) Resumed() bool { return s.resumed }
 // CreatedAt is when the session was registered — matter.js
 // Session.createdAt, the cutoff the deprecated asOf of
 // SessionManager.#handlePeerLoss compares (SessionManager.ts:832-834 at
-// b25ed960); peer loss otherwise cuts by registration order
+// db91886c); peer loss otherwise cuts by registration order
 // ([Manager.HandlePeerLossBefore]).
 func (s *Session) CreatedAt() time.Time { return s.createdAt }
 
@@ -435,7 +435,7 @@ func (s *Session) Closing() <-chan struct{} { return s.closing }
 // or wound down at counter rollover until its last exchange ends. A
 // closing session takes no new exchange. Mirrors matter.js
 // Session.isClosing (packages/protocol/src/session/Session.ts:190-192 at
-// b25ed960, closing or deferredClose), which ExchangeManager.ts:441-444
+// db91886c, closing or deferredClose), which ExchangeManager.ts:441-444
 // consults to decline an exchange the peer opens and Peer.ts:572-573 and
 // :587-590 to choose a session (those three at db021da0).
 func (s *Session) IsClosing() bool {
@@ -684,7 +684,7 @@ func (s *Session) holdWhileEstablishing(duplicate bool, deliver func()) bool {
 // and so stays establishing — a session closed during its handshake is
 // never established. Once established, the per-peer cap counts it and
 // may evict another session of the peer for it. Mirrors matter.js
-// NodeSession.ts:233-251 at b25ed960 (completeEstablishment) and
+// NodeSession.ts:233-251 at db91886c (completeEstablishment) and
 // SessionManager.ts:757-769 (#sessionEstablished, its eviction).
 func (s *Session) completeEstablishment() bool {
 	return s.completeEstablishmentWith(nil)

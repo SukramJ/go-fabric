@@ -77,7 +77,7 @@ type outboundReliableTracker struct {
 	rtt mrpRTTWindow
 	// baseIntervalFor resolves the peer-appropriate MRP base interval
 	// for the session (peer-advertised active/idle interval selected
-	// by peer activity — matter.js MRP.ts:181 at b25ed960). nil, or a
+	// by peer activity — matter.js MRP.ts:181 at db91886c). nil, or a
 	// session the resolver does not know, falls back to the spec idle
 	// default.
 	// Set once at construction; read without the mutex.
@@ -206,7 +206,7 @@ type exchangeKick struct {
 // for the next message before it abandons the transfer: the budget over
 // the four waits between five transmissions, less 100 ms for the last one
 // to arrive — 7.4 s.
-// Mirrors matter.js packages/protocol/src/protocol/MessageExchange.ts:62-78 at b25ed960
+// Mirrors matter.js packages/protocol/src/protocol/MessageExchange.ts:62-78 at db91886c
 // (BDX_PEER_RESPONSE_BUDGET, BDX_RESPONSE_BUDGET_MARGIN, BDX_MAX_RETRANSMISSION_INTERVAL).
 const bdxMaxRetransmissionInterval = 30*time.Second/mrp.MaxRetransmissions - 100*time.Millisecond
 
@@ -214,7 +214,7 @@ const bdxMaxRetransmissionInterval = 30*time.Second/mrp.MaxRetransmissions - 100
 // [bdxMaxRetransmissionInterval] for a message of a BDX exchange — every
 // wait, the first and each retransmission's, in either role, below the
 // peer's idle interval too; any other message's wait is d.
-// Mirrors matter.js packages/protocol/src/protocol/MessageExchange.ts:1296-1319 at b25ed960
+// Mirrors matter.js packages/protocol/src/protocol/MessageExchange.ts:1296-1319 at db91886c
 // (#backOffFor: the BDX cap is taken after the fixed backoff is added).
 func capBDXWait(kick *exchangeKick, d time.Duration) time.Duration {
 	if kick != nil && kick.bdx {
@@ -360,7 +360,7 @@ func (t *outboundReliableTracker) trackKickable(counter uint32, sessionID, excha
 // markSent records the first transmission of the kickable message counter
 // of sessionID as gone out at at, the instant its schedule was armed from:
 // from now on a liveness kick may retransmit it. Mirrors matter.js
-// packages/protocol/src/protocol/MessageExchange.ts:840-842 at b25ed960
+// packages/protocol/src/protocol/MessageExchange.ts:840-842 at db91886c
 // (#lastTransmissionAt once the first send resolved).
 func (t *outboundReliableTracker) markSent(sessionID uint16, counter uint32, at time.Time) {
 	t.mu.Lock()
@@ -380,9 +380,9 @@ func (t *outboundReliableTracker) markSent(sessionID uint16, counter uint32, at 
 // reports whether it retransmitted; a send that failed counts too, as
 // matter.js's kick has replaced the standalone acknowledgement once it
 // started the retransmission.
-// Mirrors matter.js packages/protocol/src/protocol/MessageExchange.ts:593-646 at b25ed960
+// Mirrors matter.js packages/protocol/src/protocol/MessageExchange.ts:593-646 at db91886c
 // (#kickRetransmissionForLiveness),
-// packages/protocol/src/protocol/MessageExchange.ts:956-1040 at b25ed960
+// packages/protocol/src/protocol/MessageExchange.ts:956-1040 at db91886c
 // (#retransmitMessage: counted, stamped, re-armed after the send).
 func (t *outboundReliableTracker) kickForLiveness(sessionID, exchangeID uint16, initiator bool, dupCounter uint32, now time.Time, active, threshold time.Duration, send func(net.Addr, []byte) error) bool {
 	if t == nil || sessionID == 0 {
@@ -520,7 +520,7 @@ func (t *outboundReliableTracker) forgetInstalled(sessionID uint16) {
 // having authenticated: every PBKDFParamResponse, Pake2, Sigma2 and
 // StatusReport of a handshake is one, paced by the intervals that peer
 // stated, which neither reference clamps (matter.js
-// packages/protocol/src/session/SessionIntervals.ts:52-53 at b25ed960; chip
+// packages/protocol/src/session/SessionIntervals.ts:52-53 at db91886c; chip
 // src/protocols/secure_channel/PairingSession.cpp:175-189 at 6170af84).
 //
 // The rule is this module's own (review II, owner decision 23): a message
@@ -675,7 +675,7 @@ func (t *outboundReliableTracker) track(counter uint32, sessionID, exchangeID ui
 	cp := make([]byte, len(datagram))
 	copy(cp, datagram)
 	// The initial wait before the first retransmit uses the full spec
-	// formula at transmission 0 — matter.js MRP.ts:181 (at b25ed960)
+	// formula at transmission 0 — matter.js MRP.ts:181 (at db91886c)
 	// evaluates the peer-appropriate base interval for every
 	// transmission including the first.
 	delay := capBDXWait(kick, mrp.BackoffDuration(t.entryBase(sessionID, peer, now)+margin, 0, rand.Float64)+time.Duration(t.fixedBackoff.Load()))

@@ -11,7 +11,7 @@ import "fmt"
 // receives Status — and ClusterStatus when set — in place of FAILURE,
 // which any other error answers. matter.js's StatusResponseError, which a
 // behaviour throws to answer with a status of its own choice
-// (packages/types/src/common/StatusResponseError.ts:18-25 at b25ed960,
+// (packages/types/src/common/StatusResponseError.ts:18-25 at db91886c,
 // code and clusterCode).
 //
 // Status is the IM status code (Matter Core §8.10.1; the module's

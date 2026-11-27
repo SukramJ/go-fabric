@@ -161,7 +161,7 @@ func TestRequestDecodersRefuseWrongTypes(t *testing.T) {
 			t.Errorf("%s as a list: err = %v, want %v", m.name, err, m.sentinel)
 		}
 		// A member without a context tag refuses the structure, as
-		// matter.js TlvObject (TlvObject.ts:212-213 at b25ed960; review
+		// matter.js TlvObject (TlvObject.ts:212-213 at db91886c; review
 		// II, R2-P6-wire-0504) — it is never read as the field of its
 		// number.
 		if err := m.decode(encodeWithProfileShadows(t, m.fields)); !errors.Is(err, m.sentinel) || !errors.Is(err, errNonContextMember) {

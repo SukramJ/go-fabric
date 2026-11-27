@@ -4,7 +4,7 @@
 package attestation
 
 // A port of matter.js packages/protocol/test/certificate/CertificationDeclarationTest.ts at
-// b25ed960: CertificationDeclaration.generate (secure/attestation's
+// db91886c: CertificationDeclaration.generate (secure/attestation's
 // BuildTestCertificationDeclaration) parsed back by CertificationDeclaration.parse
 // (parseDeclaration here).
 
@@ -110,7 +110,7 @@ func TestCertificationDeclarationParse(t *testing.T) {
 }
 
 // cdEnvelope is signedData (CertificationDeclarationTest.ts:158-196 at
-// b25ed960): a CMS SignedData for a valid CD content with the stated parts
+// db91886c): a CMS SignedData for a valid CD content with the stated parts
 // replaced; nil keeps the valid part.
 type cdEnvelope struct {
 	digestAlgorithms      [][]byte
@@ -161,7 +161,7 @@ func cdFormatRefused(t *testing.T, cd []byte, want string) {
 }
 
 // TestCertificationDeclarationEnvelope: the CMS envelope rules of
-// CertificationDeclarationTest.ts:116-231 at b25ed960.
+// CertificationDeclarationTest.ts:116-231 at db91886c.
 func TestCertificationDeclarationEnvelope(t *testing.T) {
 	t.Parallel()
 	generated, err := secattestation.BuildTestCertificationDeclaration(0xFFF1, 0x8000)

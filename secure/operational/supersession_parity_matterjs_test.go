@@ -4,7 +4,7 @@
 package operational
 
 // A port of matter.js packages/protocol/test/session/SessionManagerTest.ts at
-// b25ed960, describe "session supersession" (:435-660): which established
+// db91886c, describe "session supersession" (:435-660): which established
 // sessions a newly established one supersedes, and that supersession comes
 // before the per-peer eviction. The establishing rows without supersession
 // are in establishing_parity_matterjs_test.go.
@@ -133,7 +133,7 @@ func TestSessionManagerSupersession(t *testing.T) {
 	t.Run("does not supersede a session with the same peer on another fabric", func(t *testing.T) {
 		t.Parallel()
 		// Not a matter.js row: peerIs compares the PeerAddress, fabric
-		// index and node id (SessionManager.ts:1242-1244 at b25ed960); the
+		// index and node id (SessionManager.ts:1242-1244 at db91886c); the
 		// test above varies only the node id.
 		m, log, _ := setup(t)
 		older, err := m.openFromSigma(0x0100, nil, sessionManagerFabric, sessionManagerLocal, establishingPeer, 1, nil, closeParityKeys(1), false, false)

@@ -172,7 +172,7 @@ type Config struct {
 // New returns the interaction over session s of mgr — matter.js
 // DedicatedChannelExchangeProvider
 // (packages/protocol/src/protocol/ExchangeProvider.ts:123-165 at
-// b25ed960). A nil
+// db91886c). A nil
 // logger is slog.Default().
 func New(mgr *exchange.Manager, s *exchange.Session, log *slog.Logger) *Interaction {
 	return Bind(SessionProvider(mgr, s), Config{Logger: log})
@@ -362,7 +362,7 @@ const (
 
 // isAckMissing reports a send the peer never acknowledged within its MRP
 // budget — matter.js PeerAckMissingError (PeerCommunicationError.ts:63-67
-// at b25ed960), which the Go exchange raises as the exact
+// at db91886c), which the Go exchange raises as the exact
 // [*exchange.PeerUnresponsiveError] (a [*exchange.PeerMessageMissingError]
 // is no match: errors.As takes the type, not its Is).
 func isAckMissing(err error) bool {

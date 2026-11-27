@@ -68,7 +68,7 @@ type Resolution struct {
 	Interaction *interaction.Interaction
 	// Endpoint is the target endpoint: the bound node's (KindClient), ours
 	// (KindServer), or — as matter.js materialises a group's endpoint under
-	// the source endpoint's number (BindingManager.ts:455 at b25ed960) — the source
+	// the source endpoint's number (BindingManager.ts:455 at db91886c) — the source
 	// endpoint (KindGroup).
 	Endpoint uint16
 	// Group sends to the bound group (KindGroup).
@@ -97,7 +97,7 @@ type peerSet interface {
 
 // GroupTarget sends to one group — the IM face of a group peer, matter.js
 // ClientGroupInteraction (packages/node/src/node/client/
-// ClientGroupInteraction.ts:33-82): invoke only, group-addressed, no
+// ClientGroupInteraction.ts:33-81): invoke only, group-addressed, no
 // answer. The group sender of package groups provides it.
 type GroupTarget interface {
 	Invoke(ctx context.Context, path im.ConcreteCommandPath, fields spec.Encodable) error

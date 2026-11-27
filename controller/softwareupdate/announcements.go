@@ -19,12 +19,12 @@ import (
 
 // The announcements: matter.js OtaAnnouncements
 // (packages/node/src/behavior/system/software-update/OtaAnnouncements.ts at
-// b25ed960) — the daily write of our provider as each node's default
+// db91886c) — the daily write of our provider as each node's default
 // provider, one node at a time, and the AnnounceOTAProvider command of an
 // update.
 
 // announcementDelay is the pause between two nodes' announcements: at
-// least 1 s, matter.js takes 10 s (OtaAnnouncements.ts:41-44 at b25ed960).
+// least 1 s, matter.js takes 10 s (OtaAnnouncements.ts:41-44 at db91886c).
 const announcementDelay = 10 * time.Second
 
 const (
@@ -53,7 +53,7 @@ func newAnnouncements(m *Manager) *announcements {
 
 // setInterval turns the daily default-provider write on with interval (at
 // least 24 h, with 60–180 s of jitter), first after 10–15 minutes, or off
-// with 0 — the interval setter (OtaAnnouncements.ts:47-75 at b25ed960).
+// with 0 — the interval setter (OtaAnnouncements.ts:47-75 at db91886c).
 func (a *announcements) setInterval(interval time.Duration) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -78,7 +78,7 @@ func (a *announcements) setInterval(interval time.Duration) {
 }
 
 // initialize is #initializeAnnouncements (OtaAnnouncements.ts:77-86 at
-// b25ed960).
+// db91886c).
 func (a *announcements) initialize() {
 	a.mu.Lock()
 	if a.interval == 0 || a.closed {
@@ -89,7 +89,7 @@ func (a *announcements) initialize() {
 	a.queueAllPeers()
 }
 
-// queueAllPeers is #queueAllPeers (OtaAnnouncements.ts:88-104 at b25ed960):
+// queueAllPeers is #queueAllPeers (OtaAnnouncements.ts:88-104 at db91886c):
 // every commissioned node
 // online goes into the queue once, and the all-nodes timer restarts.
 func (a *announcements) queueAllPeers() {
@@ -120,7 +120,7 @@ func (a *announcements) queueAllPeers() {
 	a.mu.Unlock()
 }
 
-// queuePeerLocked is #queuePeer (OtaAnnouncements.ts:106-116 at b25ed960).
+// queuePeerLocked is #queuePeer (OtaAnnouncements.ts:106-116 at db91886c).
 func (a *announcements) queuePeerLocked(p Peer) {
 	a.queue = append(a.queue, p)
 	a.log.Debug("ota.announcements.queued", slog.String("node", peerString(p)), slog.Int("queued", len(a.queue)))
@@ -130,7 +130,7 @@ func (a *announcements) queuePeerLocked(p Peer) {
 }
 
 // processQueueEntry is #processQueueEntry (OtaAnnouncements.ts:118-144 at
-// b25ed960).
+// db91886c).
 func (a *announcements) processQueueEntry() {
 	a.mu.Lock()
 	a.delay = nil
@@ -162,12 +162,12 @@ func (a *announcements) processQueueEntry() {
 }
 
 // announceDefaultProvider is #announceOtaProvider (OtaAnnouncements.ts:146-200
-// at b25ed960): an
+// at db91886c): an
 // applicable node gets our DefaultOTAProviders record unless it holds the
 // same one; a failed write waits for the next day. matter.js deliberately
 // sends no Simple Announcement after it (OtaAnnouncements.ts:192-194 at
-// b25ed960).
-func (a *announcements) announceDefaultProvider(ctx context.Context, p Peer) error { //nolint:unparam // the callers keep matter.js's catch (OtaAnnouncements.ts:130-137 at b25ed960)
+// db91886c).
+func (a *announcements) announceDefaultProvider(ctx context.Context, p Peer) error { //nolint:unparam // the callers keep matter.js's catch (OtaAnnouncements.ts:130-137 at db91886c)
 	n := a.m.nodeAt(p)
 	if n == nil || !n.IsCommissioned() {
 		return nil
@@ -199,7 +199,7 @@ func (a *announcements) announceDefaultProvider(ctx context.Context, p Peer) err
 		return nil
 	}
 	// Fabric-scoped: the write replaces our entry (OtaAnnouncements.ts:171-184
-	// at b25ed960).
+	// at db91886c).
 	value := spec.List[otareq.ProviderLocation]{record}
 	statuses, err := n.Write(ctx, []client.WriteRequest{{Path: client.AttributeAt(ota.endpoint, otareq.ClusterID, otareq.AttrDefaultOtaProviders), Value: value}}, client.WriteOptions{})
 	if err == nil {
@@ -219,7 +219,7 @@ func (a *announcements) announceDefaultProvider(ctx context.Context, p Peer) err
 // decides what a failed announcement means for its update
 // (SoftwareUpdateManager's #announce).
 //
-// Mirrors matter.js packages/node/src/behavior/system/software-update/OtaAnnouncements.ts:252-272 at b25ed960
+// Mirrors matter.js packages/node/src/behavior/system/software-update/OtaAnnouncements.ts:252-272 at db91886c
 // (announceOtaProvider).
 func (a *announcements) announceOtaProvider(ctx context.Context, n *client.Node, endpoint uint16, reason otareq.AnnouncementReasonEnum) error {
 	providerNodeID, providerEndpoint := a.m.provider()
@@ -249,10 +249,10 @@ type otaTarget struct {
 }
 
 // peerApplicableForUpdate is peerApplicableForUpdate
-// (OtaAnnouncements.ts:202-241 at b25ed960): a node
+// (OtaAnnouncements.ts:202-241 at db91886c): a node
 // with BasicInformation, commissioned, enabled and subscribed — so the
 // manager works on current data — with an OTA requestor endpoint
-// (#findOtaRequestorEndpointOn, OtaAnnouncements.ts:243-250 at b25ed960).
+// (#findOtaRequestorEndpointOn, OtaAnnouncements.ts:243-250 at db91886c).
 func peerApplicableForUpdate(n *client.Node, log *slog.Logger) (otaTarget, bool) {
 	if _, ok := basicInformation(n); !ok {
 		return otaTarget{}, false

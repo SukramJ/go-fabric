@@ -99,7 +99,7 @@ func DeviceTypeRequiresServerCluster(deviceType DeviceTypeID, clusterID uint32) 
 // conformance D), AttributeList (attribute-list.element.ts:13), FeatureMap
 // (feature-map.element.ts:13) and ClusterRevision
 // (cluster-revision.element.ts:13), all under
-// packages/model/src/standard/elements/ at b25ed960.
+// packages/model/src/standard/elements/ at db91886c.
 var globalAttributeNames = map[uint32]string{
 	0xFFF8: "GeneratedCommandList",
 	0xFFF9: "AcceptedCommandList",

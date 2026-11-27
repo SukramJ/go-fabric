@@ -5,7 +5,7 @@ package attestation
 
 // The X.509 side of the attestation certificates: what matter.js
 // Certificate.parseAsn1Certificate (packages/protocol/src/certificate/
-// kinds/Certificate.ts at b25ed960) reads of a DAC, PAI or PAA that the
+// kinds/Certificate.ts at db91886c) reads of a DAC, PAI or PAA that the
 // validator uses, on top of crypto/x509's parser; the profile is
 // profile.go.
 
@@ -154,7 +154,7 @@ func MatterIDs(c *x509.Certificate) (vid, pid *uint16, err error) {
 
 // IssuerMatterIDs reads the vendor and product id of the issuer DN the
 // same way — matter.js parses the issuer with parseSubjectOrIssuer too
-// (Certificate.ts:729 at b25ed960), so a DAC whose PAI carries its vendor
+// (Certificate.ts:729 at db91886c), so a DAC whose PAI carries its vendor
 // id only in a `Mvid:` commonName still names its issuer's vendor
 // (CertificatesTest.ts:319-324, the Nuki DAC).
 func IssuerMatterIDs(c *x509.Certificate) (vid, pid *uint16, err error) {

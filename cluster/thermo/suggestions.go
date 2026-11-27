@@ -56,7 +56,7 @@ type Suggestion = tdef.ThermostatSuggestionStruct
 
 // SuggestionStore persists one thermostat endpoint's suggestions —
 // matter.js's ThermostatSuggestions, quality N
-// (thermostat-cluster.element.ts:271-272 at b25ed960), as the TLV
+// (thermostat-cluster.element.ts:271-272 at db91886c), as the TLV
 // encoding of the list — and the entry a manual override holds
 // (overridden, nil for none): matter.js's OverriddenSuggestionId, a
 // stored field of the server's own state ("Stored, so the override stays

@@ -24,7 +24,7 @@ const (
 	// a recoverable error finding for the BasicInformation VendorID and
 	// ProductID, which the device reports about itself, also when it did
 	// not report them; a hard failure for a mismatch with the DAC or PAI
-	// (DeviceAttestationValidator.ts:41-48 at b25ed960).
+	// (DeviceAttestationValidator.ts:41-48 at db91886c).
 	CertificationDeclarationFieldMismatch Check = "CertificationDeclarationFieldMismatch"
 	CertificateRevoked                    Check = "CertificateRevoked"
 	FirmwareInfoMismatch                  Check = "FirmwareInfoMismatch"
@@ -43,7 +43,7 @@ const (
 	AttestationElementsUnparseable Check = "AttestationElementsUnparseable"
 	// AttestationElementsTooLong: AttestationElements is longer than
 	// RESP_MAX, Matter Core §11.18.4.1 (DeviceAttestationValidator.ts:71-77
-	// at b25ed960).
+	// at db91886c).
 	AttestationElementsTooLong          Check = "AttestationElementsTooLong"
 	CertificationDeclarationUnparseable Check = "CertificationDeclarationUnparseable"
 	// CertificationDeclarationFormatInvalid: the CD breaks an encoding rule
@@ -92,7 +92,7 @@ type Finding struct {
 
 // Error is a hard failure of the validation — matter.js
 // DeviceAttestationError (DeviceAttestationValidator.ts:121-136 at
-// b25ed960), a CommissioningError there.
+// db91886c), a CommissioningError there.
 type Error struct {
 	Check   Check
 	Message string
@@ -101,7 +101,7 @@ type Error struct {
 	// PrecedingFindings are the findings [Validate] collected before this
 	// failure stopped it, in the order they arose, so a policy can see
 	// them next to the failure — matter.js precedingFindings
-	// (DeviceAttestationValidator.ts:123-127 at b25ed960).
+	// (DeviceAttestationValidator.ts:123-127 at db91886c).
 	PrecedingFindings []Finding
 }
 

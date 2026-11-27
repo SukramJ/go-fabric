@@ -18,9 +18,9 @@ import (
 
 // The update attempts as the manager owns them, driven through the OTA
 // provider the controller builds over it — matter.js's OtaTest
-// (packages/node/test/behaviors/ota/OtaTest.ts at b25ed960), whose
+// (packages/node/test/behaviors/ota/OtaTest.ts at db91886c), whose
 // provider reports every QueryImage flow to its SoftwareUpdateManager as
-// an attempt (SoftwareUpdateManager.ts:1739-2089 at b25ed960). The
+// an attempt (SoftwareUpdateManager.ts:1739-2089 at db91886c). The
 // requests arrive as the requestor sends them; the queue is the rig's.
 
 // attemptSource offers version 2 of the test product, without a consent
@@ -240,7 +240,7 @@ func TestManagerAdmissionFailsAnAppliedUpdateParity(t *testing.T) {
 // admitted for the requestor's restart — its transfer on an older session
 // cancelled — suppresses the node's next start-up report on the query's
 // session only while the peer has a queued update (SoftwareUpdateManager.ts:1873-1879
-// at b25ed960).
+// at db91886c).
 func TestManagerRestartQuerySuppressesOnlyAQueuedUpdateParity(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
@@ -427,7 +427,7 @@ func otaPeerOfTest() mattercore.OTAPeer {
 
 // TestManagerStartUpBelowTargetFailsTheAppliedAttemptParity ports "Apply
 // failure detected when startUp fires after Applying state" (OtaTest.ts:2147
-// at b25ed960) on the attempt: the startUp below the target fails the
+// at db91886c) on the attempt: the startUp below the target fails the
 // update before anything resets it, so #failUpdate reaches the attempt it
 // follows — Cancelled, as it applied, and ended (SoftwareUpdateManager.ts:1063-1069,
 // :1152-1157 at b25ed960).
@@ -489,7 +489,7 @@ func TestManagerStartUpBelowTargetFailsTheAppliedAttemptParity(t *testing.T) {
 // an update the deprecated [Manager.OnStatusChange] moved to Applying, which
 // follows no attempt, is as far as an attempt that applies — the removal
 // of its consent no longer cancels it (SoftwareUpdateManager.ts:1700 at
-// b25ed960 reads the status the entry shows).
+// db91886c reads the status the entry shows).
 func TestManagerConsentRemovalKeepsALegacyApplyingUpdate(t *testing.T) {
 	t.Parallel()
 	r := newManagerRig(t, nil)

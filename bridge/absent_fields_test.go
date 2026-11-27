@@ -17,7 +17,7 @@ import (
 // a hand-read cluster), a command whose fields are all optional gets its
 // decoded empty request, and a command without fields — by definition or
 // by hand reader — hands no payload on (matter.js TlvNoArguments decodes to
-// nothing, packages/types/src/tlv/TlvVoid.ts:20-22 at b25ed960).
+// nothing, packages/types/src/tlv/TlvVoid.ts:20-22 at db91886c).
 func TestAbsentCommandFieldsDecodeAsEmpty(t *testing.T) {
 	t.Parallel()
 	for _, c := range []struct {

@@ -19,7 +19,7 @@ import (
 // the assembly, naming the attribute; a value within it — counted in
 // UTF-8 bytes, as matter.js's string constraint counts it since #4995
 // (packages/node/src/behavior/state/validation/constraint.ts:203-206 at
-// b25ed960) — is served as stated. 32 × "ü" (64 bytes, 32 UTF-16 code
+// db91886c) — is served as stated. 32 × "ü" (64 bytes, 32 UTF-16 code
 // units) was within it while the bound counted code units.
 func TestAssemblyRefusesBridgedInfoBeyondItsConstraint(t *testing.T) {
 	t.Parallel()

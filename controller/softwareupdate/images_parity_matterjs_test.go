@@ -50,7 +50,7 @@ func TestImagesStoredUpdatesParity(t *testing.T) {
 		return imgs.CheckForUpdate(ctx, 0xfff1, 0x8000, 2, softwareupdate.CheckOptions{IncludeStored: true, IsProduction: &production})
 	}
 
-	// DclOtaUpdateServiceTest.ts:420-469 at b25ed960
+	// DclOtaUpdateServiceTest.ts:420-469 at db91886c
 	t.Run("skips stored test-mode files when isProduction is true", func(t *testing.T) {
 		t.Parallel()
 		imgs := softwareupdate.NewImages(softwareupdate.ImagesConfig{})
@@ -63,7 +63,7 @@ func TestImagesStoredUpdatesParity(t *testing.T) {
 		}
 	})
 
-	// DclOtaUpdateServiceTest.ts:471-522 at b25ed960
+	// DclOtaUpdateServiceTest.ts:471-522 at db91886c
 	t.Run("skips stored local-mode files when isProduction is true", func(t *testing.T) {
 		t.Parallel()
 		imgs := softwareupdate.NewImages(softwareupdate.ImagesConfig{})
@@ -76,7 +76,7 @@ func TestImagesStoredUpdatesParity(t *testing.T) {
 		}
 	})
 
-	// DclOtaUpdateServiceTest.ts:524-563 at b25ed960
+	// DclOtaUpdateServiceTest.ts:524-563 at db91886c
 	t.Run("surfaces stored prod-mode files when isProduction is false", func(t *testing.T) {
 		t.Parallel()
 		imgs := softwareupdate.NewImages(softwareupdate.ImagesConfig{})
@@ -87,10 +87,10 @@ func TestImagesStoredUpdatesParity(t *testing.T) {
 	})
 
 	// Go-only: the equal-version order of findApplicable
-	// (DclOtaUpdateService.ts:394-407 at b25ed960; STORED_MODE_PRECEDENCE,
-	// DclOtaUpdateService.ts:59 at b25ed960) through checkForUpdate, which
+	// (DclOtaUpdateService.ts:394-407 at db91886c; STORED_MODE_PRECEDENCE,
+	// DclOtaUpdateService.ts:59 at db91886c) through checkForUpdate, which
 	// keeps the stored images' order on equal versions
-	// (DclOtaUpdateService.ts:379-380 at b25ed960).
+	// (DclOtaUpdateService.ts:379-380 at db91886c).
 	t.Run("prefers a stored local, then a stored test image over a stored prod image of the same version", func(t *testing.T) {
 		t.Parallel()
 		for _, tc := range []struct {

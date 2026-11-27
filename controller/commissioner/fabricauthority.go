@@ -19,7 +19,7 @@ import (
 
 // FabricAuthority is the authority over the fabrics one CA controls —
 // matter.js FabricAuthority (packages/protocol/src/fabric/FabricAuthority.ts:49-207
-// at b25ed960): it creates a fabric ([FabricAuthority.CreateFabric]),
+// at db91886c): it creates a fabric ([FabricAuthority.CreateFabric]),
 // returns the default one ([FabricAuthority.DefaultFabric]), which rotates
 // a stored fabric's operational key once per authority — once per runtime
 // — and reports every fabric it creates ([FabricAuthority.OnFabricAdded]).

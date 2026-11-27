@@ -618,12 +618,12 @@ func (m *demoElectricalMeter) testEventTrigger(trigger uint64) bool {
 // fakeReadingsEndpointMask is the bits of a test event trigger that carry
 // the endpoint; endpoint bits of 0 address every endpoint.
 // Mirrors matter.js support/chip-testing/src/cluster/
-// FakeElectricalReadingsHandler.ts:13-14 at b25ed960 (TRIGGER_ENDPOINT_MASK).
+// FakeElectricalReadingsHandler.ts:13-14 at db91886c (TRIGGER_ENDPOINT_MASK).
 const fakeReadingsEndpointMask uint64 = 0x0000_ffff_0000_0000
 
 // The two fake loads of the start triggers: a 1 kW load read every 2 s and
 // a 3 kW generator read every 5 s. Mirrors matter.js
-// FakeElectricalReadingsHandler.ts:35-53 at b25ed960 (LOAD_1KW,
+// FakeElectricalReadingsHandler.ts:35-53 at db91886c (LOAD_1KW,
 // GENERATOR_3KW).
 var (
 	fakeLoad1kW = fakeLoad{
@@ -659,7 +659,7 @@ func (m *demoElectricalMeter) fakeReadingsTrigger(trigger uint64) bool {
 		// part's) takes the trigger. matter.js's dispatcher stops at the
 		// first endpoint whose handler accepts
 		// (support/chip-testing/src/cluster/TestGeneralDiagnosticsServer.ts:28
-		// at b25ed960, !handled), chip's delegate at the first handler
+		// at db91886c, !handled), chip's delegate at the first handler
 		// (src/app/TestEventTriggerDelegate.h:78-85 at 6170af84), whose
 		// energy-management app reads on the fixed endpoint 1
 		// (EnergyReportingEventTriggers.cpp:38, :52). The two endpoints are
@@ -717,14 +717,14 @@ func (m *demoElectricalMeter) device(opts device.Options) (*device.ElectricalMet
 
 // fakeLoadSteps is how many values a reading steps through, from the base
 // minus the randomness to the base plus it. Mirrors matter.js
-// FakeElectricalReadingsHandler.ts:21-22 at b25ed960 (STEP_COUNT).
+// FakeElectricalReadingsHandler.ts:21-22 at db91886c (STEP_COUNT).
 const fakeLoadSteps = 9
 
 // fakeLoad is one start trigger's load: the base power, voltage and
 // current with their randomness, and the reading interval. A positive
 // power is a load (imported energy), a negative one a generator (exported
 // energy). Mirrors matter.js FakeElectricalReadingsHandler.ts:24-33 at
-// b25ed960 (FakeLoad).
+// db91886c (FakeLoad).
 type fakeLoad struct {
 	power, voltage, current                               int64 // mW, mV, mA
 	powerRandomness, voltageRandomness, currentRandomness int64 // mW, mV, mA
@@ -742,7 +742,7 @@ type measurementTarget struct {
 
 // fakeReadings is matter.js's FakeElectricalReadingsHandler on one
 // endpoint (support/chip-testing/src/cluster/
-// FakeElectricalReadingsHandler.ts:55-165 at b25ed960): start stops a
+// FakeElectricalReadingsHandler.ts:55-165 at db91886c): start stops a
 // running load, resets the energy totals and reads at once, then every
 // interval; stop ends the readings and the last ones stay. Instead of
 // random values each reading takes the next of nine steps around the
@@ -779,7 +779,7 @@ func (r *fakeReadings) at(n uint16) bool {
 	return ok && got == n
 }
 
-// start is #start (FakeElectricalReadingsHandler.ts:89-100 at b25ed960):
+// start is #start (FakeElectricalReadingsHandler.ts:89-100 at db91886c):
 // stop, take the load, reset the totals, read at once and then every
 // interval.
 func (r *fakeReadings) start(load fakeLoad) {
@@ -867,7 +867,7 @@ func (r *fakeReadings) readLocked() {
 // attribute. As matter.js's setMeasurement, every reading sets it with its
 // end timestamp and emits a CumulativeEnergyMeasured event with it
 // (packages/node/src/behaviors/electrical-energy-measurement/
-// ElectricalEnergyMeasurementServer.ts:44-63 at b25ed960), a generator's
+// ElectricalEnergyMeasurementServer.ts:44-63 at db91886c), a generator's
 // reading included, whose imported total stays 0. The end timestamp is
 // Matter epoch seconds, the attribute's epoch-s type.
 func (r *fakeReadings) snapshot(now uint32) {

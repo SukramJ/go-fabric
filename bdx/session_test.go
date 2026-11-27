@@ -533,7 +533,7 @@ func TestFileSink(t *testing.T) {
 
 // TestReceive_BlockSizeAtMost16Bit ports "Proposes at most a 16-bit
 // maxBlockSize on a channel with a larger payload size" (BdxTest.ts:337-358
-// at b25ed960, matter.js #4793): an exchange carrying more than 65539
+// at db91886c, matter.js #4793): an exchange carrying more than 65539
 // bytes offers 0xFFFF, where the offer failed before
 // (bdx-session-initiator.ts:155). matter.js sends; the receiving side is
 // the same computation.

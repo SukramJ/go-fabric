@@ -107,7 +107,7 @@ func hostStatus(err error) (contract.StatusError, bool) {
 // names ("minMeasuredValue to maxMeasuredValue", "max numberOfPositions -
 // 1"); nil resolves none. A bound computed from a name that does not
 // resolve admits every value, as matter.js's does (Constraint.ts:193-205
-// at b25ed960); one computed from literals alone ("max 2^62 - 1") always
+// at db91886c); one computed from literals alone ("max 2^62 - 1") always
 // holds.
 type Peers func(attrID uint32) (any, bool)
 
@@ -155,7 +155,7 @@ func (i *Instance) ValidateWrite(attrID uint32, value any, peers Peers) (any, er
 // "in" validator throws ConstraintError) and
 // packages/model/src/aspects/Constraint.ts:164-170 (test: a non-array
 // operand is a one-entry set, an undefined one an empty set, membership by
-// identity) at b25ed960.
+// identity) at db91886c.
 func (i *Instance) inPeer(in string, v any, peers Peers) bool {
 	if peers == nil {
 		return false
@@ -233,7 +233,7 @@ func (i *Instance) checkValueIn(name string, t Type, nullable bool, c Constraint
 		if n, ok := asUint(value); ok && why != "" && t.Kind == KindEnum && n <= UintMax(t.Bits, nullable) && enumUndefined(t.Enum, n) {
 			// Mirrors matter.js
 			// packages/node/src/behavior/state/validation/ValueValidator.ts:162-185
-			// at b25ed960 (createEnumValidator: UnknownEnumValueError, the
+			// at db91886c (createEnumValidator: UnknownEnumValueError, the
 			// only check for a value the enum does not define).
 			return nil, Errorf(im.StatusConstraintError, "%s: %s: Matter does not define the enum value %d for %s: %w", i.def.Name, name, n, t.Enum.Name, ErrUnknownEnumValue)
 		}
@@ -278,7 +278,7 @@ func (i *Instance) checkValueIn(name string, t Type, nullable bool, c Constraint
 // enum without members accepts every value of its width: its values are
 // defined outside it (matter.js
 // packages/node/src/behavior/state/validation/ValueValidator.ts:171-172 at
-// b25ed960, definesValues).
+// db91886c, definesValues).
 func (i *Instance) checkUnsigned(t Type, nullable bool, c Constraint, value any, peers Peers) (v any, why string) {
 	limit := UintMax(t.Bits, nullable)
 	n, ok := asUint(value)
@@ -290,9 +290,9 @@ func (i *Instance) checkUnsigned(t Type, nullable bool, c Constraint, value any,
 	case t.Kind == KindBitmap && nullable && n>>(bitWidth(t.Bits)-1) != 0:
 		// A nullable bitmap reserves its most-significant bit for null
 		// (Core § 7.19.1.2). Mirrors matter.js
-		// packages/types/src/tlv/TlvNullable.ts:53-56 at b25ed960, which
+		// packages/types/src/tlv/TlvNullable.ts:53-56 at db91886c, which
 		// wraps a nullable BitmapWrapper in withReservedMsb, and
-		// packages/types/src/tlv/TlvNumber.ts:327-330 at b25ed960, whose
+		// packages/types/src/tlv/TlvNumber.ts:327-330 at db91886c, whose
 		// withReservedMsb bounds the value by half the base type's maximum.
 		return nil, fmt.Sprintf("0x%X sets the most-significant bit a nullable bitmap reserves", n)
 	case t.Kind == KindBitmap && t.Bitmap != nil && n&^t.Bitmap.Defined() != 0:
@@ -415,7 +415,7 @@ func (i *Instance) checkLength(t Type, c Constraint, value any, peers Peers) (v 
 	// After the length in bytes, a string's codepoints against cpMax: the
 	// second unit stays the codepoint. Mirrors matter.js
 	// packages/node/src/behavior/state/validation/constraint.ts:217-235
-	// at b25ed960 ([...value].length > cpMax is a ConstraintError;
+	// at db91886c ([...value].length > cpMax is a ConstraintError;
 	// W3-clugen-02).
 	if s, ok := value.(string); ok && c.CpMax > 0 {
 		if cp := utf8.RuneCountInString(s); cp > c.CpMax {
@@ -484,7 +484,7 @@ func (i *Instance) checkList(name string, t Type, c Constraint, value any, peers
 // packages/node/src/behavior/state/validation/ValueValidator.ts:375-453
 // (createStructValidator) over conformance.ts:20-58
 // (createConformanceValidator) and conformance-compiler.ts:86-863
-// (astToFunction) at b25ed960; each field's conformance, then its value
+// (astToFunction) at db91886c; each field's conformance, then its value
 // ([Instance.checkFields]).
 func (i *Instance) checkStruct(name string, s *Struct, value any, scope nameScope) error {
 	if d, ok := value.(DefinitionFormer); ok {
@@ -825,7 +825,7 @@ func IntRange(bits int, nullable bool) (lo, hi int64) {
 // number of bytes of its UTF-8 encoding as it goes on the wire, ill-formed
 // UTF-8 counted as the U+FFFD the encoder writes in its place
 // ([tlv.Encoder.PutUTF8]). Mirrors matter.js
-// packages/general/src/util/Bytes.ts:133-153 at b25ed960 (utf8Length, the
+// packages/general/src/util/Bytes.ts:133-153 at db91886c (utf8Length, the
 // length of TextEncoder's output, a lone surrogate counted as its U+FFFD),
 // which the string constraint (packages/node/src/behavior/state/validation/constraint.ts:203-206)
 // and TlvString (packages/types/src/tlv/TlvString.ts:29-31) bound a string

@@ -105,7 +105,7 @@ func TestSessionSupersededGuards(t *testing.T) {
 	// F-b25ed960-42: a newer session the lookup still holds is judged, not
 	// waved through. matter.js supersedes only with a CASE session of the
 	// same peer (packages/protocol/src/session/SessionManager.ts:1242-1250
-	// at b25ed960: !newer.isPase && newer.peerIs(older.peerAddress)), so a
+	// at db91886c: !newer.isPase && newer.peerIs(older.peerAddress)), so a
 	// held newer session that resolves to no fabric, to node 0 or to PASE
 	// takes nothing.
 	for _, tc := range []struct {

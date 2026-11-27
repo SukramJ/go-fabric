@@ -35,7 +35,7 @@ var ErrInvalidAdvertisement = errors.New("btp: Invalid BLE advertisement data") 
 
 // Header bits of a data packet and the handshake's management opcode.
 // Mirrors matter.js BtpCodec.ts:53-69 (BtpHeaderBits, BtpOpcode,
-// HANDSHAKE_HEADER, HANDSHAKE_RESPONSE_LENGTH) at b25ed960.
+// HANDSHAKE_HEADER, HANDSHAKE_RESPONSE_LENGTH) at db91886c.
 const (
 	headerHandshakeBit         = 0b01000000
 	headerManagementMsg        = 0b00100000

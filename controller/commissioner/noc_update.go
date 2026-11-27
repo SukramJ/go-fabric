@@ -57,7 +57,7 @@ var forgetDisconnectBound = 5 * time.Second
 // CertificateUpdateOptions configures
 // [Commissioner.UpdateOperationalCertificate] — matter.js
 // OperationalCertificateUpdate.Options (OperationalCertificateUpdate.ts:121-138
-// at b25ed960); the abort signal is the call's context.
+// at db91886c); the abort signal is the call's context.
 type CertificateUpdateOptions struct {
 	// Address is the peer whose certificate to replace. Required.
 	Address handshake.PeerAddress
@@ -76,7 +76,7 @@ type CertificateUpdateOptions struct {
 // CertificateUpdateResult is the result of a successful
 // [Commissioner.UpdateOperationalCertificate] — matter.js
 // OperationalCertificateUpdate.Result (OperationalCertificateUpdate.ts:145-154
-// at b25ed960).
+// at db91886c).
 type CertificateUpdateResult struct {
 	// FabricIndexOnPeer is the CurrentFabricIndex the peer reported for
 	// our fabric before the update. An OK NOCResponse carries the same
@@ -138,7 +138,7 @@ var (
 	// ArmFailSafe answered BusyWithOtherAdmin, or Breadcrumb was not 0
 	// before arming. The caller may retry later. matter.js
 	// OperationalCertificateUpdateBusyError (OperationalCertificateUpdate.ts:89-93
-	// at b25ed960).
+	// at db91886c).
 	ErrCertificateUpdateBusy = errors.New("commissioner: the fail-safe of the peer may be in use")
 	// ErrCertificateUpdateRefused: the peer refused ArmFailSafe with an
 	// error code other than BusyWithOtherAdmin, or the certificate it
@@ -152,7 +152,7 @@ var (
 // [Commissioner.UpdateOperationalCertificate] once the update reached the
 // peer over CASE — matter.js OperationalCertificateUpdateError with its
 // Busy and Refused subclasses (OperationalCertificateUpdate.ts:64-100 at
-// b25ed960), the subclass an errors.Is kind ([ErrCertificateUpdateBusy],
+// db91886c), the subclass an errors.Is kind ([ErrCertificateUpdateBusy],
 // [ErrCertificateUpdateRefused]).
 type CertificateUpdateError struct {
 	// Outcome is which certificate the peer holds afterwards; zero on an
@@ -193,7 +193,7 @@ func (e *CertificateUpdateError) Unwrap() []error {
 
 // armRefusal reports whether err is a Busy or Refused error: the update
 // armed no fail-safe, so nothing on the peer needs to be undone. Mirrors
-// matter.js OperationalCertificateUpdate.ts:842-847 at b25ed960
+// matter.js OperationalCertificateUpdate.ts:842-847 at db91886c
 // (isArmRefusal).
 func armRefusal(err error) bool {
 	var e *CertificateUpdateError
@@ -207,8 +207,8 @@ func armRefusal(err error) bool {
 // text carries the update's reason. It is not transient: it does not match exchange.ErrTransient.
 // Mirrors matter.js FabricChangedError, which extends PeerCommunicationError,
 // not TransientPeerCommunicationError:
-// packages/protocol/src/peer/PeerCommunicationError.ts:105-112 at b25ed960 (FabricChangedError)
-// packages/protocol/src/peer/OperationalCertificateUpdate.ts:790 at b25ed960 (forgetSessions' disconnect cause)
+// packages/protocol/src/peer/PeerCommunicationError.ts:105-112 at db91886c (FabricChangedError)
+// packages/protocol/src/peer/OperationalCertificateUpdate.ts:790 at db91886c (forgetSessions' disconnect cause)
 var ErrFabricChanged = errors.New("commissioner: the fabric associated with this session has changed")
 
 // fabricChangedError is the reason-carrying form of ErrFabricChanged the
@@ -227,7 +227,7 @@ func (fabricChangedError) Is(target error) bool { return target == ErrFabricChan
 // and reads, the CASE connection, the resumption record's delete and the
 // subscriptions' restart. A test replaces them to inject the faults
 // matter.js injects in packages/node/test/node/OperationalCertificateUpdateTest.ts
-// at b25ed960, by replacing
+// at db91886c, by replacing
 // ClientInteraction.prototype.invoke and read (:304-355,
 // :465-498),
 // Peer.prototype.connect (:741-749),
@@ -294,7 +294,7 @@ func (c *Commissioner) nocSeam() nocUpdateSeam {
 // the node id, the fabric, the CASE Authenticated Tags and the
 // fabric-scoped data on the peer stay unchanged. Mirrors matter.js
 // packages/protocol/src/peer/OperationalCertificateUpdate.ts:158-353 at
-// b25ed960 (OperationalCertificateUpdate.update):
+// db91886c (OperationalCertificateUpdate.update):
 //
 //	session 1: [read] ArmFailSafe ─ CertificateChainRequest(DAC) ─ CSRRequest(IsForUpdateNOC) ─ UpdateNOC
 //	session 2: [read] CommissioningComplete
@@ -415,7 +415,7 @@ type nocUpdate struct {
 
 // complete runs the passes after UpdateNOC and turns their completion
 // into the result. Mirrors matter.js OperationalCertificateUpdate.ts:287-352
-// at b25ed960: pass 1 within the fail-safe left after the margin; one
+// at db91886c: pass 1 within the fail-safe left after the margin; one
 // recovery pass unless ctx ended; the final switch.
 func (u *nocUpdate) complete(ctx context.Context, installed installed, failsafeLeft func() time.Duration) (CertificateUpdateResult, error) {
 	address, fabricIndex := u.address, installed.fabricIndex
@@ -499,7 +499,7 @@ func (c *Commissioner) fabricOf(address handshake.PeerAddress, f *Fabric) (*Fabr
 
 // connectionTimeoutOf is the connection timeout of a fail-safe budget d.
 // matter.js connects with max(d, 0) (OperationalCertificateUpdate.ts:292-295
-// at b25ed960), where 0 gives up at once (Peer.ts:461-462); a zero
+// at db91886c), where 0 gives up at once (Peer.ts:461-462); a zero
 // ConnectionTimeout is the peer set's default here, so an exhausted
 // budget is the shortest positive one.
 func connectionTimeoutOf(d time.Duration) time.Duration {
@@ -507,14 +507,14 @@ func connectionTimeoutOf(d time.Duration) time.Duration {
 }
 
 // peerName is matter.js PeerAddress.toString, "@<fabric index>:<node id>"
-// in hex (packages/protocol/src/peer/PeerAddress.ts:59-62 at b25ed960).
+// in hex (packages/protocol/src/peer/PeerAddress.ts:59-62 at db91886c).
 func peerName(a handshake.PeerAddress) string {
 	return fmt.Sprintf("@%x:%x", a.FabricIndex, a.NodeID)
 }
 
 // randomBreadcrumb is a random non-zero uint64, so the Breadcrumb tells
 // this update's fail-safe from any other. Mirrors matter.js
-// OperationalCertificateUpdate.ts:540-544 at b25ed960 (randomBreadcrumb).
+// OperationalCertificateUpdate.ts:540-544 at db91886c (randomBreadcrumb).
 func randomBreadcrumb(r io.Reader) (uint64, error) {
 	var b [8]byte
 	if _, err := io.ReadFull(r, b[:]); err != nil {
@@ -543,7 +543,7 @@ func (e *aggregateError) Unwrap() []error { return e.errs }
 
 // adminSession is a CASE session with the interaction bound to exactly
 // it — matter.js AdministratorSession (OperationalCertificateUpdate.ts:802-805
-// at b25ed960).
+// at db91886c).
 type adminSession struct {
 	session *exchange.Session
 	ia      *interaction.Interaction
@@ -575,7 +575,7 @@ func (u *nocUpdate) connectCase(ctx context.Context, timeout time.Duration) (adm
 
 // withCase runs fn over a session of connectCase and closes its
 // interaction afterwards — OperationalCertificateUpdate.ts:826-839 at
-// b25ed960 (withCase).
+// db91886c (withCase).
 func withCase[T any](ctx context.Context, u *nocUpdate, timeout time.Duration, fn func(adminSession) (T, error)) (T, error) {
 	s, err := u.connectCase(ctx, timeout)
 	if err != nil {
@@ -590,7 +590,7 @@ func withCase[T any](ctx context.Context, u *nocUpdate, timeout time.Duration, f
 // without notice, drops the resumption record of the replaced certificate
 // and restarts the peer's subscriptions instead of waiting for them to
 // time out; a failed step is logged and the next runs. Mirrors matter.js
-// OperationalCertificateUpdate.ts:784-800 at b25ed960 (forgetSessions).
+// OperationalCertificateUpdate.ts:784-800 at db91886c (forgetSessions).
 //
 // The disconnect waits for the peer's connection process to end after
 // its cancel (client/peer stopConnecting) under a context no cancel of
@@ -608,7 +608,7 @@ func (u *nocUpdate) forgetSessions(ctx context.Context, reason string) {
 
 // installKind is the outcome of the steps over the first session —
 // matter.js InstalledCertificate (OperationalCertificateUpdate.ts:356-360
-// at b25ed960).
+// at db91886c).
 type installKind int
 
 const (
@@ -641,7 +641,7 @@ func (u *nocUpdate) invoke(ctx context.Context, ia *interaction.Interaction, clu
 
 // responseOf decodes a command's response fields; a bare success status
 // in its place is unexpected data. Mirrors matter.js
-// OperationalCertificateUpdate.ts:913-922 at b25ed960 (responseOf).
+// OperationalCertificateUpdate.ts:913-922 at db91886c (responseOf).
 func responseOf(res interaction.Result, command string, decode func(spec.Node) error) error {
 	if !res.HasFields {
 		return fmt.Errorf("%w: %s was answered with a status instead of a response", errUnexpectedResponse, command)
@@ -655,7 +655,7 @@ func responseOf(res interaction.Result, command string, decode func(spec.Node) e
 // receivedStatus reports whether err is a status the peer sent in place
 // of the response — matter.js ReceivedStatusResponseError
 // (packages/protocol/src/action/response/ResultStatus.ts:26-35 at
-// b25ed960): the client's *interaction.StatusError, which only a status
+// db91886c): the client's *interaction.StatusError, which only a status
 // decoded from the peer's message produces.
 func receivedStatus(err error) bool {
 	var se *interaction.StatusError
@@ -668,7 +668,7 @@ func receivedStatus(err error) bool {
 // the current one. It does not arm when Breadcrumb is not 0 or the
 // current NOC cannot be read or does not verify; on a failure after
 // arming and before UpdateNOC reached the peer it disarms over s. Mirrors
-// matter.js OperationalCertificateUpdate.ts:382-532 at b25ed960
+// matter.js OperationalCertificateUpdate.ts:382-532 at db91886c
 // (installNewCertificate).
 func (u *nocUpdate) installNewCertificate(ctx context.Context, s adminSession) installed {
 	addr := peerName(u.address)
@@ -822,7 +822,7 @@ func (u *nocUpdate) issueCertificate(ctx context.Context, s adminSession, cats [
 // armFailsafe arms the update's fail-safe with its Breadcrumb; an error
 // code is a Busy (BusyWithOtherAdmin) or Refused error carrying
 // fabricIndex. Mirrors matter.js OperationalCertificateUpdate.ts:849-877
-// at b25ed960 (armFailsafe): the expiry in whole seconds, rounded up, and
+// at db91886c (armFailsafe): the expiry in whole seconds, rounded up, and
 // no extended response timeout.
 func (u *nocUpdate) armFailsafe(ctx context.Context, ia *interaction.Interaction, fabricIndex uint8) error {
 	expiry := uint16((u.failsafe + time.Second - 1) / time.Second) //nolint:gosec // bounded by MaxCertificateUpdateFailsafe
@@ -854,7 +854,7 @@ func (u *nocUpdate) armFailsafe(ctx context.Context, ia *interaction.Interaction
 // ArmFailSafe(0, Breadcrumb 0), no extended response timeout. It reports
 // whether the peer confirmed the disarm; a failure is logged, as it only
 // delays the rollback until the fail-safe expires. Mirrors matter.js
-// OperationalCertificateUpdate.ts:879-907 at b25ed960 (disarmFailsafe).
+// OperationalCertificateUpdate.ts:879-907 at db91886c (disarmFailsafe).
 func (u *nocUpdate) disarmFailsafe(ctx context.Context, ia *interaction.Interaction) bool {
 	res, err := u.invoke(ctx, ia, gencomm.ClusterID, gencomm.CmdArmFailSafe, gencomm.ArmFailSafeRequest{}, false)
 	var resp gencomm.ArmFailSafeResponse
@@ -872,7 +872,7 @@ func (u *nocUpdate) disarmFailsafe(ctx context.Context, ia *interaction.Interact
 }
 
 // commissioningErrorText is "<name> (<code>)[, <debug text>]" —
-// OperationalCertificateUpdate.ts:909-911 at b25ed960.
+// OperationalCertificateUpdate.ts:909-911 at db91886c.
 func commissioningErrorText(code gencomm.CommissioningErrorEnum, debugText string) string {
 	text := fmt.Sprintf("%s (%d)", enumName(gencomm.CommissioningErrorEnumDef, uint64(code)), code)
 	if debugText != "" {
@@ -882,7 +882,7 @@ func commissioningErrorText(code gencomm.CommissioningErrorEnum, debugText strin
 }
 
 // completionKind is matter.js Completion's kind
-// (OperationalCertificateUpdate.ts:547 at b25ed960).
+// (OperationalCertificateUpdate.ts:547 at db91886c).
 type completionKind int
 
 const (
@@ -912,7 +912,7 @@ type disarmed struct {
 // answered; when the read after a refused CommissioningComplete fails it
 // fails with an aggregate of the refusal and the read's error. timeout is
 // the connection timeout, 0 the default. Mirrors matter.js
-// OperationalCertificateUpdate.ts:556-628 at b25ed960 (completeUpdate).
+// OperationalCertificateUpdate.ts:556-628 at db91886c (completeUpdate).
 func (u *nocUpdate) completeUpdate(ctx context.Context, cert installed, timeout time.Duration) (*completion, error) {
 	u.forgetSessions(ctx, "Operational certificate of the peer was updated")
 	type step struct {
@@ -990,7 +990,7 @@ func (u *nocUpdate) completeUpdate(ctx context.Context, cert installed, timeout 
 // response timeout; a status the peer sent in place of the response is
 // returned as refusal, not as error. It fails when no answer arrives, the
 // answer lacks the command's response or is a bare success status.
-// Mirrors matter.js OperationalCertificateUpdate.ts:630-651 at b25ed960
+// Mirrors matter.js OperationalCertificateUpdate.ts:630-651 at db91886c
 // (commissioningComplete).
 func (u *nocUpdate) commissioningComplete(ctx context.Context, ia *interaction.Interaction) (resp gencomm.CommissioningCompleteResponse, refusal, err error) {
 	res, err := u.invoke(ctx, ia, gencomm.ClusterID, gencomm.CmdCommissioningComplete, gencomm.CommissioningCompleteRequest{}, true)
@@ -1006,7 +1006,7 @@ func (u *nocUpdate) commissioningComplete(ctx context.Context, ia *interaction.I
 // certificateState is what the update reads of the accessing fabric:
 // Breadcrumb, the NOCs and CurrentFabricIndex, each nil when the peer
 // reported no value — matter.js CertificateState
-// (OperationalCertificateUpdate.ts:659-668 at b25ed960).
+// (OperationalCertificateUpdate.ts:659-668 at db91886c).
 type certificateState struct {
 	breadcrumb  *uint64
 	nocs        []operationalCertificate
@@ -1025,7 +1025,7 @@ type operationalCertificate struct {
 // the accessing fabric in one fabric-filtered request, under a context no
 // cancel ends. Values of another type count as not reported; a NOCs
 // entry without a NOC octet string is skipped. Mirrors matter.js
-// OperationalCertificateUpdate.ts:736-775 at b25ed960 (certificateState).
+// OperationalCertificateUpdate.ts:736-775 at db91886c (certificateState).
 func (u *nocUpdate) certificateState(ctx context.Context, ia *interaction.Interaction) (certificateState, error) {
 	values, ok, err := u.seam.read(context.WithoutCancel(ctx), ia, []im.ConcreteAttributePath{
 		rootAttr(gencomm.ClusterID, gencomm.AttrBreadcrumb),
@@ -1086,7 +1086,7 @@ func nocEntry(n spec.Node) (operationalCertificate, bool) {
 
 // startState checks the start read: Breadcrumb and the NOCs reported and
 // CurrentFabricIndex a valid fabric index. Mirrors matter.js
-// OperationalCertificateUpdate.ts:688-701 at b25ed960 (readStartState).
+// OperationalCertificateUpdate.ts:688-701 at db91886c (readStartState).
 func (st certificateState) startState(addr string) error {
 	switch {
 	case st.breadcrumb == nil:
@@ -1113,7 +1113,7 @@ const (
 // heldNOC is which of the two certificates st shows as the only NOC of
 // the fabric; heldOther for anything else — no NOCs value, an empty list,
 // a NOC of another rotation. Mirrors matter.js
-// OperationalCertificateUpdate.ts:670-686 at b25ed960 (heldNoc).
+// OperationalCertificateUpdate.ts:670-686 at db91886c (heldNoc).
 func (st certificateState) heldNOC(cert installed) held {
 	if len(st.nocs) != 1 {
 		return heldOther
@@ -1135,7 +1135,7 @@ func (st certificateState) heldNOC(cert installed) held {
 // those of the NOC the peer proved to hold in CASE, because an older NOC
 // our CA issued to the same node verifies too and may carry tags a later
 // rotation removed. Mirrors matter.js OperationalCertificateUpdate.ts:703-734
-// at b25ed960 (verifiedCurrentNoc), with Fabric.verifyCredentials
+// at db91886c (verifiedCurrentNoc), with Fabric.verifyCredentials
 // (packages/protocol/src/fabric/Fabric.ts:359-369) as the fabric's
 // verifier.
 func (u *nocUpdate) verifiedCurrentNOC(nocs []operationalCertificate, sessionCATs []uint32) (noc []byte, cats []uint32, err error) {

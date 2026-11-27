@@ -242,7 +242,7 @@ func (e *invokeStatusError) MatterStatusCode() im.StatusCode { return e.status.S
 // waits for a peer's response ([Bridge.chunkStatusResponseTimeout]); a
 // response missing at that deadline reports the peer lost while it sent
 // nothing on the exchange ([initiatedSecureExchange.Receive]).
-// Mirrors matter.js packages/protocol/src/protocol/MessageExchange.ts:899-908 at b25ed960
+// Mirrors matter.js packages/protocol/src/protocol/MessageExchange.ts:899-908 at db91886c
 // (#nextMessage: the default timeout, calculateMaximumPeerResponseTime).
 // A command answered with data returns its fields; one answered with
 // Success returns nil; any other status is an error carrying it
@@ -382,7 +382,7 @@ type initiatedSecureExchange struct {
 	// established since did not and is not what went unanswered
 	// ([Bridge.closeLostPeer]). counted reports that the registry gave
 	// one ([peerLossOrder]).
-	// Mirrors matter.js packages/protocol/src/protocol/ExchangeManager.ts:623 at b25ed960
+	// Mirrors matter.js packages/protocol/src/protocol/ExchangeManager.ts:623 at db91886c
 	// (registeredBefore = registrationCount at the exchange context's creation).
 	registeredBefore uint64
 	counted          bool
@@ -420,14 +420,14 @@ type initiatedSecureExchange struct {
 	// on an exchange it opened ([initiatedSecureExchange.Send]), the
 	// peer's *Init on one the peer opened (bdx_responder.go). The liveness
 	// kick runs on a BDX exchange only (matter.js #protocolId,
-	// MessageExchange.ts:594 at b25ed960).
+	// MessageExchange.ts:594 at db91886c).
 	protocol atomic.Uint32
 	// received counts the messages the peer sent on the exchange — every
 	// authenticated one, a standalone acknowledgement and a duplicate
 	// included ([Bridge.noteInitiatedReceived]). While it is zero, a
 	// message given up reports the peer lost
 	// ([Bridge.handleInitiatedPeerLoss]). Mirrors matter.js
-	// packages/protocol/src/protocol/MessageExchange.ts:490 at b25ed960
+	// packages/protocol/src/protocol/MessageExchange.ts:490 at db91886c
 	// (onMessageReceived: #messageReceivedCounter++ first).
 	received atomic.Uint64
 }
@@ -475,7 +475,7 @@ func (e *initiatedSecureExchange) enqueue(msg bdx.Message) bool {
 // SetPeerAdditionalMrpDelay sets the margin every later message of the
 // exchange adds to the peer's MRP base interval before the backoff
 // amplifies it. Mirrors matter.js MessageExchange.peerAdditionalMrpDelay
-// (MessageExchange.ts:390-392 at b25ed960), the setter for an exchange the
+// (MessageExchange.ts:390-392 at db91886c), the setter for an exchange the
 // peer initiated, which the BDX responder calls on an inbound init
 // (BdxProtocol.ts:139-142). It implements [bdx.MrpDelayExchange].
 func (e *initiatedSecureExchange) SetPeerAdditionalMrpDelay(d time.Duration) {
@@ -670,11 +670,11 @@ func (b *Bridge) noteInitiatedReceived(hdr *message.Header, proto message.Protoc
 // it; a registry with the deprecated time form only ([peerLossCloser])
 // gets ex's creation on the clock's monotonic reading; one with neither
 // closes ex's session alone. why is the cause, for the log.
-// Mirrors matter.js packages/protocol/src/protocol/ExchangeManager.ts:635-645 at b25ed960
+// Mirrors matter.js packages/protocol/src/protocol/ExchangeManager.ts:635-645 at db91886c
 // (no fabric or node id: the session alone),
-// packages/protocol/src/protocol/ExchangeManager.ts:648-652 at b25ed960
+// packages/protocol/src/protocol/ExchangeManager.ts:648-652 at db91886c
 // (else SessionManager.handlePeerLoss with registeredBefore),
-// packages/protocol/src/session/SessionManager.ts:812-838 at b25ed960
+// packages/protocol/src/session/SessionManager.ts:812-838 at db91886c
 // (#handlePeerLoss: the cutoff, the loop over the registered sessions).
 func (b *Bridge) closeLostPeer(ex *initiatedSecureExchange, why string) {
 	sessionID, exchangeID := ex.sessionID, ex.exchangeID
@@ -930,12 +930,12 @@ func (e *initiatedSecureExchange) isBDX() bool {
 // inherits from further up is not told apart from the receive's own, where
 // matter.js reports only its own timer; and [initiatedSecureExchange.Send]
 // returns before the acknowledgement, where matter.js's send awaits it
-// (MessageExchange.ts:852 at b25ed960), so an inherited deadline shorter
+// (MessageExchange.ts:852 at db91886c), so an inherited deadline shorter
 // than the MRP schedule would report a peer MRP has not given up on. No
 // caller in the module passes one: the deadlines are the receive's own.
-// Mirrors matter.js packages/protocol/src/protocol/MessageExchange.ts:882-892 at b25ed960
+// Mirrors matter.js packages/protocol/src/protocol/MessageExchange.ts:882-892 at db91886c
 // (nextMessage: peerLost on a TransientPeerCommunicationError under #reportsPeerLoss),
-// packages/protocol/src/protocol/MessageExchange.ts:670-681 at b25ed960
+// packages/protocol/src/protocol/MessageExchange.ts:670-681 at db91886c
 // (#reportsPeerLoss: only while #messageReceivedCounter === 0).
 func (e *initiatedSecureExchange) Receive(ctx context.Context) (bdx.Message, error) {
 	e.turn.waiting()

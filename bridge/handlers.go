@@ -1001,7 +1001,7 @@ func (a *CaseAdapter) SnapshotResponder() *sigma.Responder { return a.snapshotRe
 // Sigma1 the adapter's responder processed, or nil when it stated none or
 // no Sigma1 was processed yet. The bridge paces the Sigma2 /
 // Sigma2_Resume retransmissions by them (matter.js CaseServer.ts:122-125
-// at b25ed960 `session.timingParameters = sigma1.initiatorSessionParams`).
+// at db91886c `session.timingParameters = sigma1.initiatorSessionParams`).
 func (a *CaseAdapter) PeerSessionParams() *sessionparams.Parameters {
 	r := a.snapshotResponder()
 	if r == nil {
@@ -1191,7 +1191,7 @@ func (a *CaseAdapter) processSigma1(payload []byte) (opcode uint8, respPayload [
 			// R5-sec-5102). Its PeerSessionID is the PEER's session id
 			// (Sigma1.initiatorSessionID) — the id the initiator expects
 			// stamped into Header.SessionID of every outbound packet.
-			// matter.js CaseServer.ts:182 at b25ed960 `peerSessionId: cx.peerSessionId`.
+			// matter.js CaseServer.ts:182 at db91886c `peerSessionId: cx.peerSessionId`.
 			// Passing our own ResponderSessionID here registered the
 			// resumed session under a peer id the initiator never
 			// allocated, so it dropped every reply.
@@ -1346,7 +1346,7 @@ func (a *CaseAdapter) processSigma3(payload []byte) (opcode uint8, respPayload [
 		// (review II, phase 7, decision 286): matter.js's CASE server reads
 		// one Sigma3 per handshake
 		// (packages/protocol/src/session/case/CaseServer.ts:273-277 at
-		// b25ed960), and a repeat on its exchange is a duplicate that does
+		// db91886c), and a repeat on its exchange is a duplicate that does
 		// not reach it (packages/protocol/src/protocol/MessageExchange.ts:514-524).
 		a.mu.Unlock()
 		return 0, nil, sigma3OfCompleted, taken, nil
@@ -1387,7 +1387,7 @@ func (a *CaseAdapter) processSigma3(payload []byte) (opcode uint8, respPayload [
 	// establishing here, before the Success is sent; it is established at
 	// the Success's first transmission ([Bridge.handleCase],
 	// [CaseAdapter.completeEstablishment]). Mirrors matter.js
-	// packages/protocol/src/session/case/CaseServer.ts:314-331 at b25ed960.
+	// packages/protocol/src/session/case/CaseServer.ts:314-331 at db91886c.
 	//
 	// The session is the value this Sigma3's step built under the
 	// responder's lock, never read back off the responder once a.mu is

@@ -1810,7 +1810,7 @@ func referenceOf(raw json.RawMessage) string {
 // string default on an untyped element is no numeric type and stays as
 // it was: DoorLock SecurityLevel's "0", a string in matter.js
 // packages/model/src/standard/elements/door-lock-cluster.element.ts:123
-// at b25ed960.
+// at db91886c.
 func typedDefault(t typeInfo, v *value) string {
 	if numericKinds[t.kind] && bytes.HasPrefix(bytes.TrimSpace(v.Default), []byte(`"`)) {
 		panic(renderError{fmt.Errorf("default %s on numeric type %q: a string where a number is due, as the extractor writes a bigint", compactJSON(v.Default), t.name)})
@@ -1827,7 +1827,7 @@ var numericKinds = map[kind]bool{
 // spec.NullDefault, and a temperature or percentage stated with its unit
 // ({"type":"celsius","value":26}) in the encoding units of the type that
 // carries it, as matter.js restates it (packages/model/src/logic/
-// DefaultValue.ts:37-59 castValue → EncodedValue.ts:21-43 at b25ed960; the
+// DefaultValue.ts:37-59 castValue → EncodedValue.ts:21-43 at db91886c; the
 // scale per type name is FieldValue.ts:227-256 numericValue); the empty
 // list as spec.EmptyListDefault; a reference, an octet string or a
 // non-empty list as spec.UnresolvedDefault. It returns "" only when no
@@ -1842,7 +1842,7 @@ var numericKinds = map[kind]bool{
 // (R2-P6-par-2703, wizard-6b §2 gen Q1). "none" is matter.js's "no
 // default" — FieldValue.cast answers undefined for it, so an override
 // can remove a default the specification states (FieldValue.ts:458-462 at
-// b25ed960; Fable fable-read-6b-gen) — and its rendering is then no
+// db91886c; Fable fable-read-6b-gen) — and its rendering is then no
 // default (""); none occurs at the pin, so it is refused until one does
 // and that rendering is decided with it.
 func defaultLiteral(raw json.RawMessage, typeName, metatype string) string {
@@ -1897,7 +1897,7 @@ func compactJSON(raw json.RawMessage) string {
 
 // encodedUnit is a celsius or percent field value in the encoding units of
 // typeName — matter.js FieldValue.numericValue (FieldValue.ts:227-256 at
-// b25ed960) — rounded to the unit an integer encoding counts
+// db91886c) — rounded to the unit an integer encoding counts
 // (EncodedValue.ts:27-40).
 func encodedUnit(fv map[string]any, typeName, metatype string) (float64, bool) {
 	value, ok := fv["value"].(float64)

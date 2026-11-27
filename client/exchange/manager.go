@@ -101,7 +101,7 @@ type Config struct {
 	// sender-side axis every exchange's backoff takes the larger of it and
 	// the peer's margin for — matter.js SessionManager.localAdditionalMrpDelay,
 	// set from the node's own network profile ("fast" by default, so 0;
-	// ServerNetworkRuntime.ts:409-410, NetworkServer.ts:248 at b25ed960).
+	// ServerNetworkRuntime.ts:409-410, NetworkServer.ts:248 at db91886c).
 	LocalAdditionalMrpDelay time.Duration
 	// LocalFixedMrpBackoff is the flat pad added after every exchange's
 	// backoff, not amplified by it — matter.js
@@ -270,7 +270,7 @@ func (m *Manager) Reliable() bool { return m.reliable }
 // x acknowledges any message, and not returned by [Exchange.Next], which
 // waits for the message after it. It is matter.js
 // ProtocolHandler.onNewExchange (packages/protocol/src/protocol/ProtocolHandler.ts:22-23
-// at b25ed960). It runs on a goroutine of its own, one per exchange, so
+// at db91886c). It runs on a goroutine of its own, one per exchange, so
 // the receive path never waits for it; the exchange is closed when it
 // returns, if the handler did not close it.
 type ProtocolHandler func(x *Exchange, first *Message)
@@ -511,13 +511,13 @@ const maxHeldWhileEstablishing = 16
 //     [Session.completeEstablishment]: its messages are processed, and
 //     [Manager.SessionsFor] — routing, peer loss and close — sees it; only
 //     the per-peer cap neither counts nor evicts it until it is
-//     established. Mirrors matter.js NodeSession.ts:209-251 at b25ed960
+//     established. Mirrors matter.js NodeSession.ts:209-251 at db91886c
 //     (isEstablishing, its state table, completeEstablishment) and
 //     SessionManager.ts:1266-1284 (RegisteredSessions.add: an establishing
 //     session joins the established view only once established).
 //
 // Each registered session takes the next registration position, which
-// peer loss compares (SessionManager.ts:1271 at b25ed960).
+// peer loss compares (SessionManager.ts:1271 at db91886c).
 func (m *Manager) newSecureSession(cfg SecureSessionConfig, establishing bool) (*Session, error) {
 	if cfg.ID == UnsecuredSessionID {
 		return nil, errors.New("exchange: secure session id 0")
@@ -584,7 +584,7 @@ func (m *Manager) newSecureSession(cfg SecureSessionConfig, establishing bool) (
 
 // sessionEstablished runs what an established session sets off: the
 // per-peer cap for a responder session that was establishing until now.
-// Mirrors matter.js SessionManager.ts:757-769 at b25ed960
+// Mirrors matter.js SessionManager.ts:757-769 at db91886c
 // (#sessionEstablished, the eviction half; supersession is not modelled
 // here). A session that left the table meanwhile is not checked.
 func (m *Manager) sessionEstablished(s *Session) {
@@ -605,7 +605,7 @@ func (m *Manager) evict(victims []*Session) {
 			slog.Uint64("node_id", v.secure.PeerNodeID()), slog.Int("max", maxSessionsPerPeer))
 		// Closed without a CloseSession: the graceful path would wait on a
 		// peer the eviction typically cannot reach (SessionManager.ts:806-808
-		// at b25ed960).
+		// at db91886c).
 		v.Close()
 	}
 }
@@ -702,7 +702,7 @@ func (m *Manager) forgetUnsecuredLocked(s *Session) {
 // under. Mirrors matter.js packages/protocol/src/session/Session.ts:311
 // before :319 at b25ed960 (initiateClose: closing, then the close). Only
 // the close emits the graceful close that sends CloseSession
-// (NodeSession.ts:490-492 at b25ed960). From :311 on the establishment
+// (NodeSession.ts:490-492 at db91886c). From :311 on the establishment
 // is declined (NodeSession.ts:245-247 at b25ed960). [Manager.Initiate]
 // refuses only a closed session, so the CloseSession's own exchange
 // still opens.
@@ -931,7 +931,7 @@ func (m *Manager) HandleDatagram(buf []byte, src *net.UDPAddr) {
 // reports true when the message is to be received again because it found
 // an inbound unsecured session released before an exchange took it — only
 // a message that names no destination node id, an initiating one
-// (ExchangeManager.ts:313-327 at b25ed960: a response without its session
+// (ExchangeManager.ts:313-327 at db91886c: a response without its session
 // is dropped).
 func (m *Manager) receive(hdr *message.Header, body []byte, src *net.UDPAddr) (again bool) {
 	s, duplicate, inbound, ok := m.openSession(hdr, &body, src)
@@ -941,7 +941,7 @@ func (m *Manager) receive(hdr *message.Header, body []byte, src *net.UDPAddr) (a
 	if inbound {
 		// An unsecured session created for this message does not outlive
 		// it unless a handler took an exchange on it (ExchangeManager.ts:244-256
-		// at b25ed960).
+		// at db91886c).
 		defer m.releaseInbound(s)
 	}
 	counter := hdr.MessageCounter
@@ -989,7 +989,7 @@ func (m *Manager) openSession(hdr *message.Header, body *[]byte, src *net.UDPAdd
 	if hdr.SessionID == UnsecuredSessionID {
 		// A response names our ephemeral node id as destination; a
 		// request names the peer's as source (ExchangeManager.ts:305-311
-		// at b25ed960).
+		// at db91886c).
 		var initiator uint64
 		hasDest := hdr.DestSize == message.DestNodeID
 		switch {
@@ -1007,7 +1007,7 @@ func (m *Manager) openSession(hdr *message.Header, body *[]byte, src *net.UDPAdd
 		if s == nil {
 			if hasDest {
 				// A late response to a session that no longer exists
-				// (ExchangeManager.ts:313-323 at b25ed960).
+				// (ExchangeManager.ts:313-323 at db91886c).
 				m.log.Debug("matter.controller.drop", slog.String("reason", "unsecured response for unknown session"))
 				return nil, false, false, false
 			}
@@ -1188,11 +1188,11 @@ func (m *Manager) holdAckWait(x *Exchange, p *pending) (release func()) {
 // and the session stays, or finds no session, or found it before the
 // release and is received again on a new one ([Manager.receive]). Mirrors
 // matter.js packages/protocol/src/protocol/ExchangeManager.ts:249-254 at
-// b25ed960 (#onMessage: the test, detachChannel, initiateClose, with no
+// db91886c (#onMessage: the test, detachChannel, initiateClose, with no
 // await before the table entry is gone; UnsecuredSession.ts:94-97
 // detachChannel deletes the entry first). matter.js releases only from the
 // message that created the session, or from the PASE/CASE handler that
-// adopted it (PaseServer.ts:112-113, CaseServer.ts:99-100 at b25ed960);
+// adopted it (PaseServer.ts:112-113, CaseServer.ts:99-100 at db91886c);
 // Go after every handler on an inbound session too, since a handler runs on
 // a goroutine of its own.
 func (m *Manager) releaseInbound(s *Session) {
@@ -1211,7 +1211,7 @@ func (m *Manager) releaseInbound(s *Session) {
 }
 
 // route hands msg to the exchange it belongs to — its index sets the
-// exchanges we initiated apart (ExchangeManager.ts:397-400 at b25ed960) —
+// exchanges we initiated apart (ExchangeManager.ts:397-400 at db91886c) —
 // or treats it as unsolicited. released reports that msg would open an
 // exchange on an inbound unsecured session released meanwhile
 // ([Manager.releaseInbound]) and was not taken.
@@ -1225,7 +1225,7 @@ func (m *Manager) route(s *Session, msg *Message, duplicate bool, src *net.UDPAd
 	m.mu.Unlock()
 	if x != nil {
 		if x.considerClosed() && !msg.isStandaloneAck() {
-			// ExchangeManager.ts:416-427 at b25ed960: acknowledge, then close.
+			// ExchangeManager.ts:416-427 at db91886c: acknowledge, then close.
 			x.sendStandaloneAckFor(msg)
 			x.Close()
 			return false
@@ -1234,7 +1234,7 @@ func (m *Manager) route(s *Session, msg *Message, duplicate bool, src *net.UDPAd
 		return false
 	}
 	// A new exchange on a closing session is declined
-	// (ExchangeManager.ts:435-438 at b25ed960) — but for an inbound
+	// (ExchangeManager.ts:435-438 at db91886c) — but for an inbound
 	// unsecured session released since the lookup: matter.js takes that
 	// one out of its table before it closes, so the message would have
 	// found none (ExchangeManager.ts:249-254, UnsecuredSession.ts:94-97).
@@ -1329,7 +1329,7 @@ func (m *Manager) handlerFor(s *Session, msg *Message) ProtocolHandler {
 
 // dispatch opens the exchange msg starts, lets it take msg — owing the
 // acknowledgement — and runs h on a goroutine of its own
-// (ExchangeManager.ts:472-486 at b25ed960: fromInitialMessage,
+// (ExchangeManager.ts:472-486 at db91886c: fromInitialMessage,
 // #addExchange, onMessageReceived, then onNewExchange). Once h returns the
 // exchange is closed, and an inbound unsecured session no exchange holds
 // any longer is released ([Manager.releaseInbound], :244-256). The handler
@@ -1385,7 +1385,7 @@ func (m *Manager) dispatch(s *Session, msg *Message, h ProtocolHandler) (release
 
 // Secure Channel status codes of a Busy answer: matter.js
 // GeneralStatusCode.Busy (packages/types/src/protocol/definitions/general.ts:33
-// at b25ed960) and SecureChannelStatusCode.Busy
+// at db91886c) and SecureChannelStatusCode.Busy
 // (packages/types/src/protocol/definitions/secure-channel.ts:65-79), the
 // codes client/peer reads.
 const (
@@ -1603,7 +1603,7 @@ type PeerAddress struct {
 
 // SessionsFor returns the open secure sessions with peer, in the order
 // they registered — matter.js SessionManager.sessionsFor over the
-// registered sessions (SessionManager.ts:702-705 at b25ed960). A CASE
+// registered sessions (SessionManager.ts:702-705 at db91886c). A CASE
 // responder session still establishing is one of them, as in matter.js;
 // a CASE initiator session still establishing is not
 // (BD-Matter-CASEClient-SessionBeforeSigma3, [Manager.newSecureSession]).
@@ -1663,7 +1663,7 @@ func (m *Manager) HandlePeerLossBefore(peer PeerAddress, cause error, keep *Sess
 // [Manager.HandlePeerLossBefore] keeps when it is given session. For a
 // session that never registered with m the result is empty. Mirrors
 // matter.js packages/protocol/src/session/SessionManager.ts:412-424 at
-// b25ed960 (sessionsRegisteredSince: positionOf, else []; sessionsFor
+// db91886c (sessionsRegisteredSince: positionOf, else []; sessionsFor
 // filtered by isRegisteredBefore).
 func (m *Manager) SessionsRegisteredSince(session *Session) []*Session {
 	if session == nil || session.m != m || session.secure == nil {

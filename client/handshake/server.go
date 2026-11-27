@@ -32,7 +32,7 @@ type FabricResolver interface {
 	FabricForDestination(destinationID [32]byte, initiatorRandom [sigma.RandomSize]byte) (Fabric, bool)
 	// FabricByIndex returns the fabric of a resumption record — matter.js
 	// keeps the fabric in the record (SessionManager.ts:837-839,
-	// CaseServer.ts:155 at b25ed960).
+	// CaseServer.ts:155 at db91886c).
 	FabricByIndex(fabricIndex uint8) (Fabric, bool)
 }
 
@@ -97,7 +97,7 @@ type CASEServerConfig struct {
 // CASEServer is the controller's CASE responder: a peer that opens CASE to
 // us — a node re-establishing its subscriptions after a restart — is
 // answered as a device answers a controller. It is the port of matter.js
-// packages/protocol/src/session/case/CaseServer.ts:50-360 at b25ed960
+// packages/protocol/src/session/case/CaseServer.ts:50-360 at db91886c
 // over secure/sigma's Responder, which holds the cryptography; this type
 // holds the exchange loop, the status reports, the session and the
 // record.
@@ -307,7 +307,7 @@ func (c *CASEServer) Serve(x *exchange.Exchange, first *exchange.Message) {
 	}
 }
 
-// causedByPeerStatusOrUnresponsive is CaseServer.ts:94's (at b25ed960)
+// causedByPeerStatusOrUnresponsive is CaseServer.ts:94's (at db91886c)
 // causedBy(error, ChannelStatusResponseError, PeerUnresponsiveError): the
 // peer's own StatusReport, or a peer that did not answer
 // (PeerMessageMissingError extends PeerUnresponsiveError).
@@ -343,7 +343,7 @@ func (r *responderFabrics) ResolveSigma1Destination(destinationID [32]byte, init
 }
 
 // ResolveFabricIndex implements sigma.FabricIndexResolver for the resume
-// path: the record's fabric (CaseServer.ts:155 at b25ed960).
+// path: the record's fabric (CaseServer.ts:155 at db91886c).
 func (r *responderFabrics) ResolveFabricIndex(fabricIndex uint8) (*sigma.Identity, sigma.PeerVerifier, bool) {
 	f, ok := r.fabrics.FabricByIndex(fabricIndex)
 	if !ok || f.Identity == nil || f.Verifier == nil {
@@ -354,7 +354,7 @@ func (r *responderFabrics) ResolveFabricIndex(fabricIndex uint8) (*sigma.Identit
 }
 
 // recordLookup serves sigma's resume probe the one record the Sigma1's
-// resumption id named (CaseServer.ts:115-118 at b25ed960).
+// resumption id named (CaseServer.ts:115-118 at db91886c).
 type recordLookup struct {
 	rec *ResumptionRecord
 }
@@ -373,7 +373,7 @@ func (l recordLookup) GetByID(id []byte) (*sigma.ResumptionRecord, error) {
 	}, nil
 }
 
-// handleSigma1 is CaseServer.#handleSigma1 (CaseServer.ts:104-148 at b25ed960).
+// handleSigma1 is CaseServer.#handleSigma1 (CaseServer.ts:104-148 at db91886c).
 func (c *CASEServer) handleSigma1(ctx context.Context, x *exchange.Exchange, first *exchange.Message) error {
 	// readSigma1 (CaseMessenger.ts:22-25): a malformed Sigma1 is data the
 	// peer sent (SecureChannelMessenger.ts:117-139).
@@ -456,7 +456,7 @@ func (c *CASEServer) handleSigma1(ctx context.Context, x *exchange.Exchange, fir
 //
 // The session is registered before Sigma2_Resume goes out and, while it
 // establishes, processes what the initiator sends on it
-// (NodeSession.ts:223-225 at b25ed960): the initiator holds the session once
+// (NodeSession.ts:223-225 at db91886c): the initiator holds the session once
 // Sigma2_Resume reached it and sends on it at once, its Success first and
 // then its first request, which this manager reads on another goroutine
 // while this one still returns from the send
@@ -589,7 +589,7 @@ func (c *CASEServer) full(ctx context.Context, x *exchange.Exchange, responder *
 // errClosedBeforeEstablished is a responder session closed during its
 // handshake — closed with its peer, its fabric's sessions or the manager —
 // which therefore never becomes established: matter.js's SessionClosedError
-// of completeEstablishmentOf (CaseServer.ts:367-376 at b25ed960). The
+// of completeEstablishmentOf (CaseServer.ts:367-376 at db91886c). The
 // handshake ends without handing the session over or saving a record, and
 // Serve answers it with InvalidParam unless the exchange counts as closed
 // or a message is unacknowledged (:84-96).
@@ -614,7 +614,7 @@ func (c *CASEServer) newEstablishingSession(cfg exchange.SecureSessionConfig) (*
 // establishes it ([CASEServer.handOver]) — before the per-peer cap's
 // eviction the establishment sets off, so the peer holds every established
 // session (F-b25ed960-44); a session established already was handed over
-// then. Mirrors matter.js CaseServer.ts:367-376 at b25ed960
+// then. Mirrors matter.js CaseServer.ts:367-376 at db91886c
 // (completeEstablishmentOf).
 func (c *CASEServer) completeEstablishmentOf(s *exchange.Session, fabric Fabric) error {
 	if !exchangeseam.CompleteSecureSessionEstablishment(s, func() { c.handOver(s, fabric) }) {
@@ -625,7 +625,7 @@ func (c *CASEServer) completeEstablishmentOf(s *exchange.Session, fabric Fabric)
 
 // handOver hands the established session to [CASEServerConfig.OnSession]:
 // matter.js's established event, which adds the session to
-// SessionManager.sessions (SessionManager.ts:1274-1280 at b25ed960) where
+// SessionManager.sessions (SessionManager.ts:1274-1280 at db91886c) where
 // the peer set adopts it (PeerSet.ts:104-110).
 func (c *CASEServer) handOver(s *exchange.Session, fabric Fabric) {
 	if c.cfg.OnSession != nil {

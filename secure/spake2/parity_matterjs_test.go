@@ -8,7 +8,7 @@
 // output to the matter.js HEAD reference values.
 //
 // Test-vector provenance:
-//   - ietf_draft01_*   — Spake2pTest.ts:14-62 at b25ed960 (IETF draft-bar-cfrg-spake2plus-01)
+//   - ietf_draft01_*   — Spake2pTest.ts:14-62 at db91886c (IETF draft-bar-cfrg-spake2plus-01)
 //   - pase_*           — PasePairingTest.ts:205-315 at db021da0 ("test fix
 //     for elliptic library failure" :206-261, "do special successful pase
 //     process" :263-314)

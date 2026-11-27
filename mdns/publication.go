@@ -19,7 +19,7 @@ import (
 // The publication path: what peers on an interface may cache, and the one
 // message that announces services and says goodbye to the records that
 // left. It mirrors matter.js packages/protocol/src/mdns/
-// InterfaceResponder.ts at b25ed960:
+// InterfaceResponder.ts at db91886c:
 //
 //   - every record sent on an interface is noted with the time its TTL
 //     ends, as far as the message reached (#transmit, :723-789);
@@ -45,7 +45,7 @@ const (
 	goodbyeRetryFirst = time.Second
 	// goodbyeRetryMax is the longest wait between two attempts,
 	// GOODBYE_RETRY_MAXIMUM_INTERVAL (InterfaceResponder.ts:46-47 at
-	// b25ed960).
+	// db91886c).
 	goodbyeRetryMax = time.Minute
 )
 
@@ -86,7 +86,7 @@ func reachOf(tried, ok int) reach {
 // one all is all; a datagram that reached some or all beside one that did
 // not makes some — a message that reached some families counts as
 // reaching each of its records (InterfaceResponder.ts:734-737 at
-// b25ed960); and failed beside none is failed, a message no peer got.
+// db91886c); and failed beside none is failed, a message no peer got.
 func (a reach) combine(b reach) reach {
 	switch {
 	case a == b:
@@ -109,7 +109,7 @@ type peerEntry struct {
 	// lastMulticast is when a multicast last carried the record as an
 	// answer to a query or as its goodbye, zero when none did;
 	// lastIsGoodbye says it was the goodbye (InterfaceResponder.ts
-	// PeerCacheEntry lastMulticastAt, lastMulticastIsGoodbye at b25ed960).
+	// PeerCacheEntry lastMulticastAt, lastMulticastIsGoodbye at db91886c).
 	lastMulticast time.Time
 	lastIsGoodbye bool
 }
@@ -132,7 +132,7 @@ type linkState struct {
 	deferSeq      uint64
 	// usedAt is when the interface last answered or published: its state
 	// goes only after recordCacheLifetime unused (InterfaceResponder.ts
-	// #usedAt, :100, :142-160 at b25ed960).
+	// #usedAt, :100, :142-160 at db91886c).
 	usedAt time.Time
 	// outage is set by a multicast that failed or missed an address
 	// family and cleared by one that reached every family: only the first
@@ -141,7 +141,7 @@ type linkState struct {
 }
 
 // goodbyeRetry is one interface's retry schedule (InterfaceResponder.ts
-// #goodbyeRetry, :99 at b25ed960).
+// #goodbyeRetry, :99 at db91886c).
 type goodbyeRetry struct {
 	timer    clock.Timer
 	interval time.Duration
@@ -160,7 +160,7 @@ func (r *Responder) linkStateLocked(ifIndex int) *linkState {
 }
 
 // noteSentLocked records what a message that reached as far as rc carried
-// (InterfaceResponder.ts #transmit, :700-789 at b25ed960): a record with
+// (InterfaceResponder.ts #transmit, :700-789 at db91886c): a record with
 // a TTL is cached by the peers until the TTL ends; a goodbye that reached
 // every family ends the record at once, one that reached only some counts
 // as its last multicast and leaves it to be said again; a send that
@@ -207,7 +207,7 @@ func (r *Responder) noteSentLocked(ifIndex int, msgs []*dns.Msg, rc reach, now t
 // goodbyesLocked returns the goodbyes for the records peers may still cache
 // on the interface that lr no longer holds: TTL 0, the cache-flush bit only
 // on a unique type whose set lr leaves empty (InterfaceResponder.ts
-// #goodbyesFor, :497-510 at b25ed960). Caller holds r.mu.
+// #goodbyesFor, :497-510 at db91886c). Caller holds r.mu.
 func (r *Responder) goodbyesLocked(st *linkState, lr *linkRecords, now time.Time) []dns.RR {
 	keys := make([]string, 0, len(st.peers))
 	for key, p := range st.peers {
@@ -272,7 +272,7 @@ func (r *Responder) publishLocked(l link, services map[string]bool, all bool) {
 	}
 	// RFC 6762 §8.3: every record in the answer section. Goodbyes first,
 	// so a resolver that applies the TXT records of a packet in order ends
-	// on the new one (InterfaceResponder.ts:478-483 at b25ed960).
+	// on the new one (InterfaceResponder.ts:478-483 at db91886c).
 	answers := make([]dns.RR, 0, len(goodbye)+len(announced))
 	answers = append(answers, goodbye...)
 	answers = append(answers, sendable(announced, complete, false)...)
@@ -284,7 +284,7 @@ func (r *Responder) publishLocked(l link, services map[string]bool, all bool) {
 
 // settleGoodbyesLocked retries the goodbyes peers may still need on the
 // interface, or ends the retry when none remain (InterfaceResponder.ts
-// #settleGoodbyes, :534-542 at b25ed960). Caller holds r.mu.
+// #settleGoodbyes, :534-542 at db91886c). Caller holds r.mu.
 func (r *Responder) settleGoodbyesLocked(l link, st *linkState) {
 	if len(r.goodbyesLocked(st, r.recordsForLocked(l.index, l.addrsFunc()), r.clock.Load().Now())) > 0 {
 		r.retryGoodbyesLocked(l.index, st)
@@ -296,7 +296,7 @@ func (r *Responder) settleGoodbyesLocked(l link, st *linkState) {
 // retryGoodbyesLocked arms the next goodbye retry unless one waits: first
 // a second, then twice the last interval up to a minute; a retry sends
 // only the goodbyes and the services that replace them
-// (InterfaceResponder.ts #retryGoodbyes, :512-532 at b25ed960). Caller
+// (InterfaceResponder.ts #retryGoodbyes, :512-532 at db91886c). Caller
 // holds r.mu.
 func (r *Responder) retryGoodbyesLocked(ifIndex int, st *linkState) {
 	if r.closed || (st.retry != nil && st.retry.waiting) {
@@ -331,7 +331,7 @@ func (r *Responder) stopGoodbyeRetryLocked(st *linkState) {
 // publishEverywhereLocked publishes on every listed interface and on every
 // interface peers may still cache records on — matter.js's withdrawal,
 // which publishes nothing but the goodbyes on each responder
-// (MdnsServer.ts #withdraw, :165-178 at b25ed960). Caller holds r.mu.
+// (MdnsServer.ts #withdraw, :165-178 at db91886c). Caller holds r.mu.
 func (r *Responder) publishEverywhereLocked(services map[string]bool, all bool) {
 	if r.wire == nil {
 		return
@@ -345,7 +345,7 @@ func (r *Responder) publishEverywhereLocked(services map[string]bool, all bool) 
 // listLocked lists the interfaces once and prunes the interface states,
 // as matter.js prunes its responders on every interface listing
 // (MdnsServer.ts #listInterfaces and #currentResponders, :405-421 at
-// b25ed960), so a record whose TTL ended without a goodbye leaves the
+// db91886c), so a record whose TTL ended without a goodbye leaves the
 // cache on a long-running node. Caller holds r.mu.
 func (r *Responder) listLocked() []link {
 	ls := r.wire.links()
@@ -422,7 +422,7 @@ func isUniqueType(t uint16) bool {
 
 // setKeyOf identifies the record set rr belongs to: name, type and class,
 // the scope of the cache-flush bit (InterfaceResponder.ts setKeyOf,
-// :964-967 at b25ed960).
+// :964-967 at db91886c).
 func setKeyOf(rr dns.RR) string {
 	hdr := rr.Header()
 	return strconv.Itoa(int(hdr.Rrtype)) + "-" + strconv.Itoa(int(hdr.Class&^classCacheFlush)) + "-" + strings.ToLower(hdr.Name)
@@ -431,7 +431,7 @@ func setKeyOf(rr dns.RR) string {
 // recordIdentity identifies a resource record by name, type, class and
 // rdata — RFC 6762 §10.1's goodbye identity: names, in the record and in
 // PTR and SRV rdata, without case; TTL and the cache-flush bit do not
-// count (InterfaceResponder.ts recordKeyOf, :991-1027 at b25ed960).
+// count (InterfaceResponder.ts recordKeyOf, :991-1027 at db91886c).
 func recordIdentity(rr dns.RR) string {
 	c := dns.Copy(rr)
 	hdr := c.Header()
@@ -448,7 +448,7 @@ func recordIdentity(rr dns.RR) string {
 }
 
 // uniqueRecords returns rrs with each resource record once, in first-seen
-// order (InterfaceResponder.ts uniqueRecords, :979-989 at b25ed960).
+// order (InterfaceResponder.ts uniqueRecords, :979-989 at db91886c).
 func uniqueRecords(rrs []dns.RR) []dns.RR {
 	seen := map[string]bool{}
 	out := make([]dns.RR, 0, len(rrs))

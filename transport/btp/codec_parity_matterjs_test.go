@@ -203,7 +203,7 @@ func TestBtpCodecTruncated(t *testing.T) {
 }
 
 // The service data vectors of matter.js
-// packages/protocol/test/common/BleScannerTest.ts:13-14 at b25ed960, and
+// packages/protocol/test/common/BleScannerTest.ts:13-14 at db91886c, and
 // the advertisement encoder of BtpCodec.ts:296-316 round-tripped.
 func TestBtpCodecAdvertisement(t *testing.T) {
 	cases := []struct {

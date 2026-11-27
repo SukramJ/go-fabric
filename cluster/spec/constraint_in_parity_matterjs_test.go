@@ -27,7 +27,7 @@ func (s *countingSink) MatterWriteAttribute(context.Context, uint32, any) error 
 // value is an entry of the peer attribute's current list — before the sink
 // sees it — and an unresolved peer admits nothing. Mirrors matter.js
 // packages/node/src/behavior/state/validation/constraint.ts:157-168 and
-// packages/model/src/aspects/Constraint.ts:164-170 at b25ed960. The cases are found
+// packages/model/src/aspects/Constraint.ts:164-170 at db91886c. The cases are found
 // from the definitions, not listed: every attribute carrying an "in"
 // constraint in the two generated definitions that state one.
 func TestConstraintInParityMatterJS(t *testing.T) {

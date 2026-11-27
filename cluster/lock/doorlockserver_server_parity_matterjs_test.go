@@ -301,7 +301,7 @@ func TestDoorLockServerParity(t *testing.T) {
 		}
 		// A peer's request is refused by the command's constraint ahead of
 		// the server (decision 339, endpoint.TopologyDispatcher, as matter.js
-		// ProtocolService.ts:347-350 at b25ed960): INVALID_COMMAND, the
+		// ProtocolService.ts:347-350 at db91886c): INVALID_COMMAND, the
 		// command's stated refusal.
 		if se := f.refused(lockdef.CmdSetCredential, req); se.Status != im.StatusInvalidCommand {
 			t.Errorf("over the wire 0x%02X, want INVALID_COMMAND", se.Status)

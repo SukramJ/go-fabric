@@ -150,7 +150,7 @@ func TestGroupKeyManagementParityMatterJS(t *testing.T) {
 // nothing — whatever FabricIndex the entries carry and whatever the legacy
 // SetCurrentFabric hook holds. Parity: chip src/app/WriteHandler.cpp:805-811
 // at 6170af84 and matter.js packages/protocol/src/action/server/
-// AccessControl.ts:358-365 at b25ed960 (authorizeWrite, "No accessing
+// AccessControl.ts:358-365 at db91886c (authorizeWrite, "No accessing
 // fabric", Status.UnsupportedAccess). A local write — no request context —
 // keeps the hook's fabric, and is refused without one.
 func TestGroupKeyMapWriteWithoutAccessingFabricIsUnsupportedAccess(t *testing.T) {

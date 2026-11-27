@@ -4,7 +4,7 @@
 package attestation
 
 // A port of matter.js packages/protocol/test/certificate/
-// DeviceAttestationValidatorChipCdTest.ts at b25ed960: the validator
+// DeviceAttestationValidatorChipCdTest.ts at db91886c: the validator
 // driven with connectedhomeip's commissioner DUT vectors, each an
 // attestation whose CD breaks or keeps one rule. matter.js's offline
 // DclCertificateService seeded with the CHIP test PAAs is TestStore (the

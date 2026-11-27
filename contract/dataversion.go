@@ -60,7 +60,7 @@ const installedVersion = uint64(1) << 32
 
 // initialDataVersion returns a uniformly-random uint32, the first
 // DataVersion of every tracker — 0 included, as matter.js's
-// entropy.randomUint32 (Datasource.ts:763 at b25ed960). Unexported (review 2026-11
+// entropy.randomUint32 (Datasource.ts:763 at db91886c). Unexported (review 2026-11
 // W5-api-12): a host that replaced it changed every server's first
 // DataVersion process-wide.
 func initialDataVersion() uint32 {

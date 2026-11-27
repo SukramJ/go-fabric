@@ -3,7 +3,7 @@
 
 package exchange
 
-// Ports of matter.js at b25ed960 (#4882) against the controller's Manager:
+// Ports of matter.js at db91886c (#4882) against the controller's Manager:
 // the CASE responder session's establishing state and peer loss by
 // registration order (packages/protocol/test/session/SessionManagerTest.ts,
 // describes "session supersession" and "peer loss by registration order"),
@@ -318,7 +318,7 @@ func TestSessionViews(t *testing.T) {
 		m, _, established, establishing, p := sessionViews(t)
 		both(t, established, establishing, []*Session{m.Session(establishing.ID()), m.Session(established.ID())})
 		// The establishing session's messages are processed, not held
-		// (NodeSession.ts:223-225 at b25ed960).
+		// (NodeSession.ts:223-225 at db91886c).
 		served := make(chan uint16, 1)
 		m.SetProtocolHandler(im.InteractionModelProtocolID, func(_ *Exchange, first *Message) { served <- first.ExchangeID })
 		p.send(t, establishing.ID(), message.ProtocolHeader{Initiator: true, ExchangeID: 0x0333, ProtocolID: im.InteractionModelProtocolID, Opcode: im.OpcodeStatusResponse}, []byte{0x15, 0x18})
@@ -386,7 +386,7 @@ func TestFabricSessionsForPeer(t *testing.T) {
 		// SessionsFor of each peer (node.closeClientFabricSessions,
 		// client/peer.Peer.Close); an establishing responder session is
 		// among them, as it is in matter.js's fabric session set
-		// (NodeSession.ts:166, Fabric.ts:493-496 at b25ed960), and it is
+		// (NodeSession.ts:166, Fabric.ts:493-496 at db91886c), and it is
 		// then never established.
 		m, _, _ := newTestManager(t, Config{})
 		establishing, _ := newResponderSession(t, m, 0x0401, true)

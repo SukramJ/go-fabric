@@ -14,7 +14,7 @@ import (
 )
 
 // The node's settings — matter.js NetworkClient.State's persisted fields
-// (behavior/system/network/NetworkClient.ts:497-538 at b25ed960, all
+// (behavior/system/network/NetworkClient.ts:497-538 at db91886c, all
 // quality N) — are stored with the image, under a cluster id no cluster
 // has, on endpoint 0: the place of matter.js's "network" behaviour context
 // in ClientNodeStores.

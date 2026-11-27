@@ -6,7 +6,7 @@ package spake2
 import "testing"
 
 // TestEphemeralScalarBoundParityMatterJS mirrors
-// packages/general/test/crypto/Spake2pTest.ts:65-84 at b25ed960
+// packages/general/test/crypto/Spake2pTest.ts:65-84 at db91886c
 // ("samples bounded by the group order n, not the field prime p"): the
 // ephemeral scalar is drawn below the P-256 group order n
 // (defaultRandomScalar draws rand.Int below curve().Params().N), never

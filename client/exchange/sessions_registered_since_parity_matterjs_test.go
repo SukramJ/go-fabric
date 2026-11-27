@@ -4,7 +4,7 @@
 package exchange
 
 // A port of matter.js packages/protocol/test/session/SessionManagerTest.ts
-// at b25ed960, the sessionsRegisteredSince rows (:1219-1240) of describe
+// at db91886c, the sessionsRegisteredSince rows (:1219-1240) of describe
 // "peer loss by registration order": the sessions RebootResubscribeArmer
 // counts as the peer's return (RebootResubscribeArmer.ts:149).
 

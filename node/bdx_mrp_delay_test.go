@@ -47,7 +47,7 @@ func (f oneFile) Open(_ context.Context, name string) (bdx.Blob, error) {
 // where without the delay it is the bare base. Mirrors matter.js
 // BdxProtocol.ts:139-142 (the exchange's peerAdditionalMrpDelay), the BDX
 // margin of NetworkProfile.ts:156-159 and MRP.ts retransmissionIntervalOf
-// at b25ed960.
+// at db91886c.
 func TestBDXAdditionalMrpDelayOnTheWire(t *testing.T) {
 	t.Parallel()
 	const delay = 2 * time.Second

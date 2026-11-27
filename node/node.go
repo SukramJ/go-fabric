@@ -851,7 +851,7 @@ func (n *Node) fabricRemoved(ctx context.Context, fabricIndex uint8) {
 	}
 	n.br.EmitFabricRemovedContext(ctx, fabricIndex)
 	// The removed fabric's fabric-sensitive events leave the log
-	// (FabricScopedDataHandler.ts:114-170 at b25ed960).
+	// (FabricScopedDataHandler.ts:114-170 at db91886c).
 	if log := n.br.EventLog(); log != nil {
 		log.DropFabric(fabricIndex)
 	}
@@ -1362,7 +1362,7 @@ func (n *Node) notifyFabricUpdated(ctx context.Context, fabricIndex uint8) {
 // The node counts as started once Start completed. A Start that fails
 // leaves the node startable, as matter.js's Node.start does — it sets the
 // target state back to "offline" and rethrows (Node.ts:124-126 at
-// b25ed960): the node is not started, a later Start runs the whole start
+// db91886c): the node is not started, a later Start runs the whole start
 // path again, and what New opened (the store file of Store.Path) stays
 // open until Stop.
 // Every step that can fail — the DataModelTest check, the PartsList

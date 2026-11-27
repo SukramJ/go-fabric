@@ -245,7 +245,7 @@ var fixtures = map[string]fixture{
 	"OccupancySensor": {with: opts(feat(0x0406, occdef.FeaturePassiveInfrared))},
 	// The composites' components are parts (brief 27-B §4): matter.js
 	// counts a simple component only on an endpoint below the composite
-	// (DeviceTypeConformance.ts:596-613 at b25ed960).
+	// (DeviceTypeConformance.ts:596-613 at db91886c).
 	"FloodlightCamera": {parts: func(t *testing.T, d *Device) {
 		t.Helper()
 		part(t, d, "OnOffLight", nil)

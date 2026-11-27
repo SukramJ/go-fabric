@@ -28,7 +28,7 @@ import (
 // manages. Both clusters then reflect one network, as the border router's
 // device type demands of an endpoint that also supports the secondary
 // network interface device type (matter.js
-// packages/node/src/devices/thread-border-router.ts:34-39 at b25ed960;
+// packages/node/src/devices/thread-border-router.ts:34-39 at db91886c;
 // ADR 0027 decision 3). MaxNetworks is 1.
 //
 // matter.js's server is a generated stub with no Thread branch

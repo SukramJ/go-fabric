@@ -271,7 +271,7 @@ func (a *Aggregator) findLocked(key string) (part *partition, idx int) {
 // next assembly first erases every endpoint number stored for scope name
 // and their reservations — matter.js erasing each endpoint's store
 // (packages/node/src/node/server/ServerEndpointInitializer.ts:59-65
-// eraseDescendant at b25ed960) — and the name is then forgotten. A running node reassembles at once; before [Node.Start]
+// eraseDescendant at db91886c) — and the name is then forgotten. A running node reassembles at once; before [Node.Start]
 // the retirement rides on Start's assembly. The default partition is
 // refused ([ErrRetireDefault]), and so is a partition that still holds
 // endpoints ([ErrPartitionNotEmpty]): Remove them first, or in a
@@ -354,7 +354,7 @@ func (a *Aggregator) Add(ctx context.Context, ep Endpoint) error {
 // attribute but the changes-omitted ones is reported to the running
 // subscriptions, as matter.js
 // announces a re-added endpoint (Datasource.ts:763, ProtocolService.ts:
-// 290-296 at b25ed960; issue #589, decision 592). What a controller wrote
+// 290-296 at db91886c; issue #589, decision 592). What a controller wrote
 // under the key — the NodeLabel, the scene table, the Binding, a running
 // Identify — and the ConfigurationVersion stay with the key, and ep
 // serves them (decision 594); raising the ConfigurationVersion stays the
@@ -364,7 +364,7 @@ func (a *Aggregator) Add(ctx context.Context, ep Endpoint) error {
 // a part: `close()` keeps the endpoint's number reservation
 // (endpoint/Endpoint.ts:998-1007, ServerEndpointInitializer.ts:67-69,
 // where `delete()` would erase it, endpoint/Endpoint.ts:961-966, at
-// b25ed960) and the new endpoint with the same id is assigned it
+// db91886c) and the new endpoint with the same id is assigned it
 // (ServerEndpointInitializer.ts:34-42).
 // A replacement that fails validation ([ErrKeyMismatch],
 // [ErrPolicyMismatch], a part key another endpoint serves:
@@ -385,7 +385,7 @@ func (a *Aggregator) Replace(ctx context.Context, key device.SourceKey, ep Endpo
 // no other device is given them. [Aggregator.Forget] frees them. It
 // mirrors matter.js closing an endpoint, which keeps its number
 // reservation (packages/node/src/node/server/ServerEndpointInitializer.ts:
-// 67-69 at b25ed960) and hands it back to the endpoint that returns
+// 67-69 at db91886c) and hands it back to the endpoint that returns
 // (packages/node/src/storage/server/ServerEndpointStores.ts:117-123). It
 // acts on the default partition.
 func (a *Aggregator) Remove(ctx context.Context, key device.SourceKey) error {

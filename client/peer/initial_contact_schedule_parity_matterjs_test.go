@@ -4,7 +4,7 @@
 package peer
 
 // A port of matter.js packages/protocol/test/peer/InitialContactScheduleTest.ts
-// at b25ed960 (matter.js #4794): the Sigma1 transmission schedule of one
+// at db91886c (matter.js #4794): the Sigma1 transmission schedule of one
 // address. matter.js sends a never-acknowledged Sigma1 on a MessageExchange
 // over a mock channel with MockTime; here an unsecured session of an
 // exchange.Manager on the harness's fake clock and silent socket carries

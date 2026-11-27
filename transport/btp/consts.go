@@ -10,7 +10,7 @@ import (
 
 // The Matter BLE service and its characteristics. Mirrors matter.js
 // packages/protocol/src/ble/BleConsts.ts:12-30 (MatterBle.SERVICE_UUID_SHORT,
-// SERVICE_UUID, isServiceUuid, C1/C2/C3_CHARACTERISTIC_UUID) at b25ed960.
+// SERVICE_UUID, isServiceUuid, C1/C2/C3_CHARACTERISTIC_UUID) at db91886c.
 const (
 	// ServiceUUIDShort is the 16-bit form of the Matter BLE service UUID.
 	ServiceUUIDShort = "fff6"
@@ -32,7 +32,7 @@ func IsServiceUUID(uuid string) bool {
 }
 
 // Segment sizes, window sizes and timers. Mirrors matter.js
-// BleConsts.ts:32-79 at b25ed960, verbatim.
+// BleConsts.ts:32-79 at db91886c, verbatim.
 const (
 	// MinimumATTMTU is the 23-byte minimum ATT_MTU less the 3-byte ATT
 	// operation header (:32), the smallest BTP segment.

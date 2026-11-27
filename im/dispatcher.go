@@ -43,7 +43,7 @@ type DataVersionReader interface {
 // matter.js judges every peer's request by an access control that grants
 // nothing without an entry (packages/node/src/behavior/context/server/
 // RemoteActorContext.ts:86-87, packages/protocol/src/interaction/
-// FabricAccessControl.ts:186-205 at b25ed960). A node that means to run
+// FabricAccessControl.ts:186-205 at db91886c). A node that means to run
 // without access control says so with a checker that grants —
 // endpoint.UnenforcedACL. Review II, R2-P6-sec-0560, owner decision 136;
 // it was permissive.

@@ -37,8 +37,8 @@ func (c frozenClock) Monotonic() time.Duration { return time.Hour }
 // creation instant. The loss closes the own session, registered before the
 // exchange took its count, and keeps the later one — the creation time
 // decides nothing. Mirrors matter.js
-// packages/protocol/src/protocol/ExchangeManager.ts:623 at b25ed960 and
-// packages/protocol/src/session/SessionManager.ts:812-838 at b25ed960.
+// packages/protocol/src/protocol/ExchangeManager.ts:623 at db91886c and
+// packages/protocol/src/session/SessionManager.ts:812-838 at db91886c.
 func TestInitiatedPeerLossCutsByRegistrationOrder(t *testing.T) {
 	t.Parallel()
 	frozen := frozenClock{at: time.UnixMilli(1_700_000_000_000)}
@@ -171,7 +171,7 @@ func TestPeerLossCapabilityOrder(t *testing.T) {
 
 // TestInitiatedExchangeReceivePeerLoss ports matter.js
 // packages/protocol/test/protocol/MessageExchangeTest.ts:126-149 at
-// b25ed960 (describe "peer loss declaration" / "nextMessage()") onto
+// db91886c (describe "peer loss declaration" / "nextMessage()") onto
 // initiatedSecureExchange.Receive: a receive whose deadline passed reports
 // the peer lost only while the peer sent nothing on the exchange. The
 // suppressing-session cases (:151-170) are not ported: no session of the

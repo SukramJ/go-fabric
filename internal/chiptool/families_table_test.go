@@ -1177,7 +1177,7 @@ var chipFamilies = []family{
 	{
 		name: "PAVST", deviceType: dtCamera, variant: variantCamera,
 		exclude: map[string]gap{
-			"2.15": {classNotSupported, "TC-PAVST-2.15 drives UpdateMotionZoneOptions (command 0x08), which the matter.js snapshot does not carry (push-av-stream-transport.element.ts at b25ed960 lists commands 0x00-0x07); the module's server answers UNSUPPORTED_COMMAND", false},
+			"2.15": {classNotSupported, "TC-PAVST-2.15 drives UpdateMotionZoneOptions (command 0x08), which the matter.js snapshot does not carry (push-av-stream-transport.element.ts at db91886c lists commands 0x00-0x07); the module's server answers UNSUPPORTED_COMMAND", false},
 			"2.8":  {classHarness, "TC-PAVST-2.8 step 4 has TH2, a second controller on a fresh fabric commissioned on-network, send FindTransport — a Large Message (\"L\") command, push-av-stream-transport.element.ts:130 at db021da0 — with MRP_PAYLOAD and expects NOT_FOUND (TC_PAVST_2_8.py:179-189, TC_PAVSTTestBase.py:352-368, matter_testing.py:3105 at 6170af84); the module answers INVALID_TRANSPORT_TYPE (0xD1) on a UDP session, as matter.js does (CommandInvokeResponse.ts:281-285). chip's engine carries the same gate (InteractionModelEngine.cpp:1875-1884), inert for its code-driven clusters because its generator drops kLargeMessage (sdk_generator.py:62; PushAvStreamTransport Metadata.h:79-81): chip's camera-app answers NOT_FOUND there (PushAVStreamTransportLogic.cpp:1576-1585) only because that gate is inert. Kept by owner decision 183, notes/parity/by_design.md BD-chip-LargeMessageGateEnforced", false},
 		},
 		// Measured in run 44018148063 (certification families,
