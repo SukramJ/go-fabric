@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.28.0] — 2026-11-27
+
+Review II, after the release of v0.27.0 (decisions 695–729): the follow-up issues #625, #628, #629, #630, #632 and #634 (#636), and #633, #616 and #635 (#637). A value encoder that fails costs its own attribute, event or command, not the interaction; a failed reassembly after `Partition.Batch` is redone by the next batch and its unbinding and erasures wait for it, recorded as a forget in progress; `Partition.Batch` names each refused or failed call in a `*BatchError`; the camera kit can evict an idle WebRTC session at its bounds, within a fabric and, opt-in, across fabrics by fair share; a Leave, ShutDown or StartUp in a subscription's priming report no longer acts once the subscription is live; the report chunker reuses one encoder (`tlv.Encoder.Reset`). No source change required: `make apidiff` reports no incompatible change against `v0.27.0`, here or in the nested modules. The nested modules `ble/bluez`, `ble/esphome` and `wifi/wpasupplicant` did not change and keep `v0.27.0`.
+
 ### Added
 
 - `cluster/camera`, `device`: eviction at the WebRTC session bounds, opt-in (#634, decisions 702–711). `ProviderConfig.EvictIdle` (`webrtctransportproviderdef.Declare.EvictIdle` through the facade): a new session at a bound — ProvideOffer or SolicitOffer — takes the place of the accessing fabric's entry whose accepted signalling (either direction) is oldest, once that is at least `EvictIdle` old; the entry leaves CurrentSessions, the port's `EndSession` and the requestor's `End` both carry OutOfResources, and the offer goes on to the port; the eviction stands whatever the port then answers, and the slot is then free. Only one eviction per offer and only when it makes room; without a `PeerConnector` or with the End queue full the entry goes without an End. Idle is signalling-idle: a fabric at its bound loses its oldest established view to its own next offer. `ProviderConfig.EvictAcrossFabrics` (`Declare.EvictAcrossFabrics`) adds a fair share: at `MaxSessions`, a fabric under its share (`MaxSessions` over the fabrics holding an entry, at most `MaxSessionsPerFabric`) takes the longest-idle entry of a fabric over its share first; an entry within its fabric's share is never ended by another fabric, and a fabric whose offer fails after it took another fabric's entry takes only its own for `EvictIdle` or until an offer of it succeeds (decision 713). Both default off — 0 and false keep the previous behaviour; a negative `EvictIdle` is `camera.ErrNegativeEvictIdle`. connectedhomeip's camera app and matter.js evict nothing (`notes/parity/by_design.md`).
@@ -7126,7 +7130,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/thingfabric/go-fabric/compare/v0.27.0...HEAD
+[Unreleased]: https://github.com/thingfabric/go-fabric/compare/v0.28.0...HEAD
+[0.28.0]: https://github.com/thingfabric/go-fabric/compare/v0.27.0...v0.28.0
 [0.27.0]: https://github.com/thingfabric/go-fabric/compare/v0.26.0...v0.27.0
 [0.26.0]: https://github.com/thingfabric/go-fabric/compare/v0.25.0...v0.26.0
 [0.25.0]: https://github.com/thingfabric/go-fabric/compare/v0.24.1...v0.25.0
