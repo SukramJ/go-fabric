@@ -1547,7 +1547,7 @@ func (c *connection) waitOutBusy(att *attempt) bool {
 }
 
 // jitterOf is Math.round(Math.random() * delayAfterNetworkError) in
-// milliseconds (PeerConnection.ts:530, :749 at db91886c).
+// milliseconds (PeerConnection.ts:530, :748 at db91886c).
 func jitterOf(timing Timing, rand func() float64) time.Duration {
 	return time.Duration(math.Round(rand()*float64(timing.DelayAfterNetworkError.Milliseconds()))) * time.Millisecond
 }
@@ -1666,7 +1666,7 @@ func (c *connection) restartAllowedLocked(origin kickOrigin) bool {
 }
 
 // handleConnectionError picks the pause after a failed attempt and sleeps
-// it (PeerConnection.ts:653-752): a Busy status
+// it (PeerConnection.ts:724-821 at db91886c): a Busy status
 // waits the peer's delay plus up to DelayAfterNetworkError of jitter (the
 // minimum wait it holds was recorded before, holdBusyAt); a
 // NoSharedTrustRoots status whose resumption record could be deleted
@@ -1785,7 +1785,7 @@ func classifyError(err error, timing Timing, rand func() float64, deleteRecord f
 		switch {
 		case isBusy(r):
 			// busyDelay plus Math.round(Math.random() *
-			// delayAfterNetworkError) (PeerConnection.ts:749 at db91886c).
+			// delayAfterNetworkError) (PeerConnection.ts:748 at db91886c).
 			busy, _ := busyDelayOf(err)
 			return busy + jitterOf(timing, rand), true, "busy"
 		case r.ProtocolCode == mrp.SCStatusProtocolNoSharedTrustRoots && deleteRecord():

@@ -9,10 +9,9 @@ package peer
 // :580, :683).
 //
 // matter.js's fixture starts two addresses one second apart with no
-// jitter (delayBeforeNextAddress 1 s, delayAfterNetworkError 0); the Go
-// timing cannot switch the jitter off, so the rig runs with
-// DelayAfterNetworkError 4 s and the harness's random 0.5 — every wait
-// ends 2 s (busyJitter) after matter.js's. A Busy holds every address
+// jitter (delayBeforeNextAddress 1 s, delayAfterNetworkError 0); the rig
+// runs with DelayAfterNetworkError 4 s and keeps the harness's random 0.5,
+// so every wait ends 2 s (busyJitter) after matter.js's. A Busy holds every address
 // here only when it came from the address a session proved to be the
 // node's (BD-Matter-PeerBusyDeadline), so the cases whose BUSY holds
 // another address take it from the operational address fd00::1; one from
@@ -262,6 +261,15 @@ func TestPeerConnectionBusyParity(t *testing.T) {
 				r.advance(2 * time.Second)
 				firstEnd := r.now() + c.first
 				r.busy(held.of(t, addr1), addr1, c.first)
+				if c.first > c.second {
+					// A later Busy with an earlier end does not move the
+					// deadline (PeerConnection.ts:542).
+					before := p.busyRemaining()
+					p.holdBusy(c.second)
+					if got := p.busyRemaining(); got != before {
+						t.Fatalf("a %v hold moved the %v deadline: %v remaining, want %v", c.second, c.first, got, before)
+					}
+				}
 				r.advance(2 * time.Second)
 				secondEnd := r.now() + c.second
 				r.busy(held.of(t, addr2), addr2, c.second)
@@ -368,7 +376,12 @@ func TestPeerConnectionBusyParity(t *testing.T) {
 	}
 
 	// :414 — fd00::2's BUSY holds its attempt (in Go only its own); the
-	// session fd00::1 establishes ends it.
+	// session fd00::1 establishes ends it. The session is handed to the set
+	// with r.set.Adopt, not by completing the CASE in flight at fd00::1:
+	// the harness answers Sigma1 with status reports only and has no CASE
+	// responder (no client/peer test completes a handshake), and adopting a
+	// session is what ends the process either way (as in
+	// TestIssue507_BusyDeadline's "a session clears it").
 	t.Run("ends waiting attempts when the attempt in progress establishes a session", func(t *testing.T) {
 		t.Parallel()
 		synctest.Test(t, func(t *testing.T) {
