@@ -130,6 +130,18 @@ type Aggregator struct {
 	// reassemblies counts the successful reassemblies (tests; the
 	// aggregator.reassemblies metric counts beside it).
 	reassemblies atomic.Int64
+	// behind records that the last reassembly failed: the node serves a
+	// topology older than the set (issue #633, decision 718). Written
+	// under reassembleMu — set by a failure, cleared by a success, whose
+	// snapshot is taken after every change before it — and read by the
+	// next Batch, which reassembles while it is set (reassembleIfBehind).
+	behind atomic.Bool
+	// leftDetach and leftErase are the unbinding and the erasures of the
+	// batches whose reassembly failed: their devices are still served,
+	// so they wait for a reassembly that succeeds, the next Batch's
+	// (decision 722). a.mu guards both.
+	leftDetach []func()
+	leftErase  []reservationOp
 	// forgetMu serialises the record of the forgets in progress
 	// (markForget).
 	forgetMu sync.Mutex
@@ -258,7 +270,10 @@ func (a *Aggregator) findLocked(key string) (part *partition, idx int) {
 // the retirement rides on Start's assembly. The default partition is
 // refused ([ErrRetireDefault]), and so is a partition that still holds
 // endpoints ([ErrPartitionNotEmpty]): Remove them first, or in a
-// [Partition.Batch].
+// [Partition.Batch]. Its reassembly redoes one a batch failed, and the
+// unbinding and erasures that batch left then run as an empty
+// [Partition.Batch] of the default partition does, whose [*BatchError]
+// it returns (decisions 718, 722).
 func (a *Aggregator) RetirePartition(ctx context.Context, name string) error {
 	scope := scopeOf(name)
 	if scope == Scope {
@@ -288,7 +303,19 @@ func (a *Aggregator) RetirePartition(ctx context.Context, name string) error {
 	if !started {
 		return nil
 	}
-	return a.reassemble(ctx)
+	if err := a.reassemble(ctx); err != nil {
+		return err
+	}
+	// The work a batch whose reassembly failed left runs now that one
+	// succeeded (decision 722), through a batch, so an erasure holds back
+	// what it reaches as the batch that made the Forget would have.
+	a.mu.Lock()
+	left := len(a.leftDetach) > 0 || len(a.leftErase) > 0
+	a.mu.Unlock()
+	if !left {
+		return nil
+	}
+	return a.Partition(Scope).Batch(ctx, func(*Batch) error { return nil })
 }
 
 // Add adds ep under the Aggregator — matter.js `aggregator.add(endpoint)`
@@ -436,8 +463,8 @@ func (p *Partition) Endpoints() []Endpoint {
 // endpoint serves is refused with [ErrDuplicateKey] and undone — an Add
 // leaves the set, a Replace puts the replaced endpoint back — so the
 // batch never assembles two Specs under one key (decision 585). Every
-// error of a held call arrives in the result of [Partition.Batch]: those
-// refusals, and what the applied call itself returns ([ErrReservedKey],
+// error of a held call arrives in the result of [Partition.Batch], in
+// [BatchError.Calls] under the call: those refusals, and what the applied call itself returns ([ErrReservedKey],
 // [ErrPolicyMismatch], the refusal of a server that needs the node's
 // Matter time, a *surface.WithheldError, a device's attach error). So a batch that takes a key — or forgets a part key — and
 // removes or forgets the endpoint serving it gives the same outcome in
@@ -479,6 +506,11 @@ type Batch struct {
 	// order, so a call judged after fn still knows which calls came
 	// before it.
 	seq int
+	// order numbers every call the batch took — Remove too — for the
+	// call order of [BatchError.Calls] (nextOrigin); calls collects
+	// those errors once fn returned.
+	order int
+	calls callErrors
 	// done is set once fn returned: every later call is [ErrBatchDone].
 	// a.mu guards it.
 	done bool
@@ -502,6 +534,7 @@ const (
 type pendingCall struct {
 	kind     pendingKind
 	seq      int
+	origins  []callOrigin
 	key      string
 	ep       Endpoint
 	entries  []surfaceEntry
@@ -511,9 +544,10 @@ type pendingCall struct {
 // takenCall is an Add or a Replace a [Batch] applied: ep under key in the
 // partition; for a Replace, old is the endpoint it replaced, oldDetach
 // that endpoint's detach and oldAt its index in the batch's detach list
-// (-1: none).
+// (-1: none). origins are the calls it comes from.
 type takenCall struct {
 	seq       int
+	origins   []callOrigin
 	key       string
 	ep        Endpoint
 	old       Endpoint
@@ -532,17 +566,35 @@ type takenCall struct {
 // served at the call; see [Batch]) are judged against the set fn left:
 // each one is applied, or refused — an Add or a Replace with
 // [ErrDuplicateKey] when another endpoint still serves one of its keys,
-// a Forget with [ErrUnknownKey] (decisions 582, 585). The result is
-// errors.Join of fn's error, every error of a held call — those
-// refusals, [ErrUnknownKey] for a held Replace whose key left the
-// partition, [ErrReservedKey], [ErrPolicyMismatch] or the refusal of a
-// server that needs the node's Matter time of a device changed during
-// fn, the *surface.WithheldError of an applied declaration the
-// specification level withholds, a device's attach error —, then the
-// [ErrDuplicateKey] of each device the batch added or replaced at the
-// call that gained during fn a part key another endpoint serves (the
-// take undone, see [Batch]), and the store's and the reassembly's errors. Before [Node.Start] a batch only changes the set.
-// The [Batch] is valid only during fn ([ErrBatchDone]).
+// a Forget with [ErrUnknownKey] (decisions 582, 585). Before [Node.Start]
+// a batch only changes the set. The [Batch] is valid only during fn
+// ([ErrBatchDone]).
+//
+// The result is nil, fn's error as it is when nothing failed after fn,
+// [ErrStopped] on a stopped node, or a [*BatchError]: fn's error, the
+// calls that failed after fn, the store errors of no call and the
+// reassembly's error. A call that returned nil succeeded unless
+// [BatchError.Calls] names it — by its kind and its own key, in call
+// order ([BatchCallError]): a held call refused or failed at its
+// judgement ([ErrDuplicateKey], [ErrUnknownKey] for a held Replace whose
+// key left the partition, [ErrReservedKey], [ErrPolicyMismatch] or the
+// refusal of a server that needs the node's Matter time of a device
+// changed during fn, the *surface.WithheldError of a declaration the
+// specification level withholds, a device's attach error), a device
+// added or replaced at the call that gained during fn a part key another
+// endpoint serves ([ErrDuplicateKey], the take undone, see [Batch]) —
+// none of them applied — and the store work of an applied call (an Add's
+// release, a Remove's reservation, a Forget's erasure). errors.Is finds
+// every sentinel through it (issue #616, decisions 719-721).
+//
+// A reassembly that fails leaves the topology before served
+// ([BatchError.Reassembly]): the devices the batch removed or replaced
+// stay bound and its erasures wait, since controllers still reach them
+// (decision 722). The next batch reassembles, an empty one too, then
+// unbinds and erases what the failed one left; a repeated failure is that
+// batch's error. So a batch that starts after a failed reassembly
+// returned serves the whole set, or returns why not (issue #633, decision
+// 718).
 //
 // A batch is not a transaction: an Add or Remove from another goroutine
 // during fn reassembles on its own, and that assembly shows the changes
@@ -562,9 +614,7 @@ func (p *Partition) Batch(ctx context.Context, fn func(b *Batch) error) error {
 	// The held calls are judged against the set fn left, before the
 	// reservations, so an applied one's ops are among them; the batch
 	// takes no call from here on.
-	if takeErr := b.commitPending(); takeErr != nil {
-		fnErr = errors.Join(fnErr, takeErr)
-	}
+	storeErr := b.commitPending()
 	// The reservations first, so the reassembly keeps a removed key's
 	// number — but a forgotten key's erasure last: the reassembly takes
 	// its endpoint off the wire and the device is unbound before what is
@@ -580,41 +630,86 @@ func (p *Partition) Batch(ctx context.Context, fn func(b *Batch) error) error {
 	// (decision 560) — only a key the batch forgot and serves anew starts
 	// with a fresh one.
 	pre, erase := splitErasures(b.ops)
-	resErr := p.a.applyReservations(ctx, pre, nil)
-	erase, served, cancel, keep, findErr := p.a.servedInErasure(ctx, erase)
-	resErr = errors.Join(resErr, findErr)
-	p.a.mu.Lock()
-	started := p.a.started
-	p.a.mu.Unlock()
-	var err error
+	// The unbinding and the erasures a batch whose reassembly failed left
+	// run with this batch's, before them (decision 722); their errors are
+	// no call's of this batch.
+	a := p.a
+	a.mu.Lock()
+	detach := slices.Concat(a.leftDetach, b.detach)
+	left := a.leftErase
+	a.leftDetach, a.leftErase = nil, nil
+	started := a.started
+	a.mu.Unlock()
+	for i := range left {
+		left[i].origins = nil
+	}
+	erase = append(left, erase...)
+	storeErr = errors.Join(storeErr, a.applyReservations(ctx, pre, nil, &b.calls))
+	erase, served, cancel, keep, findErr := a.servedInErasure(ctx, erase, &b.calls)
+	storeErr = errors.Join(storeErr, findErr)
+	var reErr error
 	var restore func() bool
-	if (b.changed || len(served) > 0) && started {
-		restore = p.a.holdBack(served)
-		err = p.a.reassemble(ctx)
+	switch {
+	case !started:
+	case b.changed || len(served) > 0:
+		restore = a.holdBack(served)
+		reErr = a.reassemble(ctx)
+	default:
+		// No change, but the topology served may be behind the set: a
+		// failed reassembly is redone by the next batch, an empty one
+		// too (issue #633, decision 718).
+		reErr = a.reassembleIfBehind(ctx)
+	}
+	if reErr != nil && a.leave(detach, erase) {
+		// The topology before stays served, with the endpoints the set
+		// no longer holds: their devices stay bound and the erasures
+		// wait for a reassembly that succeeds (decision 722). The held
+		// endpoints go back into the set unserved; the record of the
+		// failure makes the next batch reassemble.
+		if restore != nil {
+			restore()
+		}
+		return batchResult(fnErr, &b.calls, storeErr, reErr)
 	}
 	// Unbound after the reassembly: no controller reaches them any more.
-	for _, d := range b.detach {
+	for _, d := range detach {
 		d()
 	}
-	resErr = errors.Join(resErr, p.a.applyReservations(ctx, erase, keep))
+	storeErr = errors.Join(storeErr, a.applyReservations(ctx, erase, keep, &b.calls))
 	// A key forgotten and added again in this batch is the new device's
 	// once served: an erasure that did not finish must not take it at the
 	// next New.
 	for _, k := range cancel {
-		resErr = errors.Join(resErr, p.a.cancelForget(ctx, k))
+		storeErr = errors.Join(storeErr, a.cancelForget(ctx, k))
 	}
 	if restore != nil && restore() {
-		err = errors.Join(err, p.a.reassemble(ctx))
+		reErr = errors.Join(reErr, a.reassemble(ctx))
 	}
-	err = errors.Join(resErr, err)
-	switch {
-	case fnErr == nil:
-		return err
-	case err == nil:
+	return batchResult(fnErr, &b.calls, storeErr, reErr)
+}
+
+// leave keeps detach and erase for the next batch after a failed
+// reassembly and reports whether it did: on a stopped node nothing is
+// served any more, so they run at once.
+func (a *Aggregator) leave(detach []func(), erase []reservationOp) bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.closed {
+		return false
+	}
+	a.leftDetach = append(a.leftDetach, detach...)
+	a.leftErase = append(a.leftErase, erase...)
+	return true
+}
+
+// batchResult is [Partition.Batch]'s result: nil, fn's error alone as it
+// is, or a [*BatchError].
+func batchResult(fnErr error, calls *callErrors, storeErr, reErr error) error {
+	list := calls.list()
+	if list == nil && storeErr == nil && reErr == nil {
 		return fnErr
-	default:
-		return errors.Join(fnErr, err)
 	}
+	return &BatchError{Fn: fnErr, Calls: list, Store: storeErr, Reassembly: reErr}
 }
 
 // Add adds ep to the batch's partition; see [Aggregator.Add]. An Add of
@@ -626,7 +721,8 @@ func (b *Batch) Add(ep Endpoint) error {
 	if b.isDone() {
 		return ErrBatchDone
 	}
-	key, err := keyOf(ep.Spec())
+	spec := ep.Spec()
+	key, err := keyOf(spec)
 	if err != nil {
 		return err
 	}
@@ -643,6 +739,7 @@ func (b *Batch) Add(ep Endpoint) error {
 	if b.done {
 		return ErrBatchDone
 	}
+	origins := b.nextOrigin(BatchAdd, spec.StableKey)
 	if b.pendingIndex(key, heldAdd) >= 0 {
 		return fmt.Errorf("%w: %s", ErrDuplicateKey, key)
 	}
@@ -650,16 +747,16 @@ func (b *Batch) Add(ep Endpoint) error {
 	// endpoint serves: a Remove or Forget of it in the batch, before or
 	// after, lets the device in (decision 585).
 	if p, _ := a.findLocked(key); p != nil || b.collidesLocked(entries, nil, -1) {
-		b.pending = append(b.pending, pendingCall{kind: heldAdd, seq: b.nextSeq(), key: key, ep: ep, entries: entries})
+		b.pending = append(b.pending, pendingCall{kind: heldAdd, seq: b.nextSeq(), origins: origins, key: key, ep: ep, entries: entries})
 		return nil
 	}
-	return b.addLocked(b.nextSeq(), key, ep, entries)
+	return b.addLocked(b.nextSeq(), origins, key, ep, entries)
 }
 
 // addLocked puts ep under key into the batch's partition: entries are
 // its surface, checked; a.mu is held.
-// seq is the Add's place in call order.
-func (b *Batch) addLocked(seq int, key string, ep Endpoint, entries []surfaceEntry) error {
+// seq is the Add's place in call order, origins the calls it comes from.
+func (b *Batch) addLocked(seq int, origins []callOrigin, key string, ep Endpoint, entries []surfaceEntry) error {
 	a := b.a
 	// Withheld only once the set takes the key, and never for a key it
 	// serves (review II, R2-P6-store-2414).
@@ -677,8 +774,8 @@ func (b *Batch) addLocked(seq int, key string, ep Endpoint, entries []surfaceEnt
 	b.changed = true
 	// A returning key takes its reserved number back; the reservation is
 	// done with.
-	b.ops = append(b.ops, reservationOp{kind: opRelease, key: key})
-	b.taken = append(b.taken, takenCall{seq: seq, key: key, ep: ep, oldAt: -1})
+	b.ops = append(b.ops, reservationOp{kind: opRelease, key: key, origins: origins})
+	b.taken = append(b.taken, takenCall{seq: seq, origins: origins, key: key, ep: ep, oldAt: -1})
 	return nil
 }
 
@@ -723,12 +820,15 @@ func (b *Batch) Replace(key device.SourceKey, ep Endpoint) error {
 	if b.done {
 		return ErrBatchDone
 	}
+	origins := b.nextOrigin(BatchReplace, key)
 	part, i := a.findLocked(newKey)
 	inSet := part != nil && part.scope == b.scope
 	if j := b.pendingIndex(newKey, heldAdd); j >= 0 && part == nil {
 		// The batch's held Add of a key the set does not hold: the
-		// replacement is held in its place.
+		// replacement is held in its place, and its judgement is the
+		// Replace's too.
 		b.pending[j].ep, b.pending[j].entries = ep, entries
+		b.pending[j].origins = append(slices.Clone(b.pending[j].origins), origins...)
 		return nil
 	}
 	if j := b.pendingIndex(newKey, heldReplace); j >= 0 {
@@ -742,19 +842,20 @@ func (b *Batch) Replace(key device.SourceKey, ep Endpoint) error {
 		return nil
 	}
 	if b.collidesLocked(entries, part, i) {
-		b.pending = append(b.pending, pendingCall{kind: heldReplace, seq: b.nextSeq(), key: newKey, ep: ep, entries: entries})
+		b.pending = append(b.pending, pendingCall{kind: heldReplace, seq: b.nextSeq(), origins: origins, key: newKey, ep: ep, entries: entries})
 		return nil
 	}
-	return b.replaceLocked(b.nextSeq(), part, i, newKey, ep, entries)
+	return b.replaceLocked(b.nextSeq(), origins, part, i, newKey, ep, entries)
 }
 
 // replaceLocked puts ep in the place of the endpoint at i of part, under
 // key: entries are its surface, checked; a.mu is held.
-// seq is the Replace's place in call order.
-func (b *Batch) replaceLocked(seq int, part *partition, i int, newKey string, ep Endpoint, entries []surfaceEntry) error {
+// seq is the Replace's place in call order, origins the calls it comes
+// from.
+func (b *Batch) replaceLocked(seq int, origins []callOrigin, part *partition, i int, newKey string, ep Endpoint, entries []surfaceEntry) error {
 	a := b.a
 	if len(withheldKeys(entries)) > 0 {
-		return b.replaceWithheldLocked(part, i, newKey, entries)
+		return b.replaceWithheldLocked(origins, part, i, newKey, entries)
 	}
 	if err := a.n.recordWithheld(b.ctx, entries, a.servesLocked); err != nil {
 		return err
@@ -764,7 +865,7 @@ func (b *Batch) replaceLocked(seq int, part *partition, i int, newKey string, ep
 	if err != nil {
 		return err
 	}
-	t := takenCall{seq: seq, key: newKey, ep: ep, old: part.eps[i], oldDetach: old, oldAt: -1}
+	t := takenCall{seq: seq, origins: origins, key: newKey, ep: ep, old: part.eps[i], oldDetach: old, oldAt: -1}
 	part.eps[i] = ep
 	a.touchLocked(newKey)
 	a.detachSetLocked(newKey, detach)
@@ -786,12 +887,12 @@ func (b *Batch) replaceLocked(seq int, part *partition, i int, newKey string, ep
 // refuses it with [ErrDuplicateKey] while another endpoint serves the key
 // (decisions 580, 582; before, a withheld one refused here, review II,
 // R2-P6-store-2414). It returns the *surface.WithheldError; a.mu is held.
-func (b *Batch) replaceWithheldLocked(part *partition, i int, key string, entries []surfaceEntry) error {
+func (b *Batch) replaceWithheldLocked(origins []callOrigin, part *partition, i int, key string, entries []surfaceEntry) error {
 	a := b.a
 	old := part.eps[i]
 	err := a.n.recordWithheld(b.ctx, entries, func(k string) bool { return a.servesExceptAtLocked(k, part, i) })
 	b.dropLocked(part, i, key)
-	b.ops = append(b.ops, reservationOp{kind: opReserve, key: key, tree: reservationTree(old.Spec()), join: true})
+	b.ops = append(b.ops, reservationOp{kind: opReserve, key: key, tree: reservationTree(old.Spec()), join: true, origins: origins})
 	return err
 }
 
@@ -825,6 +926,7 @@ func (b *Batch) Remove(key device.SourceKey) error {
 		a.mu.Unlock()
 		return ErrBatchDone
 	}
+	origins := b.nextOrigin(BatchRemove, key)
 	part, i := a.findLocked(key.String())
 	if part == nil && b.dropPendingLocked(key.String(), heldAdd) {
 		// The batch's own held Add: dropped, the set never held it; a
@@ -853,7 +955,7 @@ func (b *Batch) Remove(key device.SourceKey) error {
 	// parts of an undone Replace (refuseLateCollisionsLocked) — so its
 	// Forget still reaches them; a key served holds none otherwise (its
 	// Add released it).
-	b.ops = append(b.ops, reservationOp{kind: opReserve, key: key.String(), tree: reservationTree(removed.Spec()), join: true})
+	b.ops = append(b.ops, reservationOp{kind: opReserve, key: key.String(), tree: reservationTree(removed.Spec()), join: true, origins: origins})
 	a.mu.Unlock()
 	return nil
 }
@@ -901,6 +1003,14 @@ func (b *Batch) dropPendingBeforeLocked(key string, kind pendingKind, seq int) b
 func (b *Batch) nextSeq() int {
 	b.seq++
 	return b.seq
+}
+
+// nextOrigin numbers a call of op on key among all the batch's calls and
+// returns it as the origin of what the call holds or applies; a.mu is
+// held.
+func (b *Batch) nextOrigin(op BatchOp, key device.SourceKey) []callOrigin {
+	b.order++
+	return []callOrigin{{op: op, key: key, order: b.order}}
 }
 
 // isDone reports whether fn returned ([ErrBatchDone]).
@@ -982,7 +1092,7 @@ func (b *Batch) commitPending() error {
 					refused[t.seq] = err
 					continue
 				}
-				errs = append(errs, err)
+				errs = append(errs, b.calls.add(t.origins, false, err))
 				applied = true
 			}
 			if applied {
@@ -996,7 +1106,7 @@ func (b *Batch) commitPending() error {
 	// The last round applied nothing: each held call was judged in it
 	// once, against the set as it is now, and blocked.
 	for _, t := range b.pending {
-		errs = append(errs, refused[t.seq])
+		errs = append(errs, b.calls.add(t.origins, false, refused[t.seq]))
 	}
 	b.pending = nil
 	errs = append(errs, b.refuseLateCollisionsLocked()...)
@@ -1024,7 +1134,7 @@ func (b *Batch) judgeLocked(t pendingCall) (blocked bool, err error) {
 		if k, ok := a.servedOfLocked(entries, nil, -1); ok {
 			return true, fmt.Errorf("%w: %s", ErrDuplicateKey, k)
 		}
-		return false, b.addLocked(t.seq, t.key, t.ep, entries)
+		return false, b.addLocked(t.seq, t.origins, t.key, t.ep, entries)
 	case heldReplace:
 		part, i := a.findLocked(t.key)
 		if part == nil || part.scope != b.scope {
@@ -1040,7 +1150,7 @@ func (b *Batch) judgeLocked(t pendingCall) (blocked bool, err error) {
 		if k, ok := a.servedOfLocked(entries, part, i); ok {
 			return true, fmt.Errorf("%w: %s", ErrDuplicateKey, k)
 		}
-		return false, b.replaceLocked(t.seq, part, i, t.key, t.ep, entries)
+		return false, b.replaceLocked(t.seq, t.origins, part, i, t.key, t.ep, entries)
 	}
 	return false, nil
 }
@@ -1096,7 +1206,7 @@ func (b *Batch) refuseLateCollisionsLocked() []error {
 		if !ok {
 			continue
 		}
-		errs = append(errs, fmt.Errorf("%w: %s", ErrDuplicateKey, k))
+		errs = append(errs, b.calls.add(t.origins, false, fmt.Errorf("%w: %s", ErrDuplicateKey, k)))
 		if d := a.detach[t.key]; d != nil {
 			b.detach = append(b.detach, d)
 		}
@@ -1118,7 +1228,7 @@ func (b *Batch) refuseLateCollisionsLocked() []error {
 			// the reservation the key held before (review II,
 			// R4-store-4702).
 			tree := slices.DeleteFunc(reservationTree(t.ep.Spec()), a.servesLocked)
-			b.ops = append(b.ops, reservationOp{kind: opReserve, key: t.key, tree: tree, join: true})
+			b.ops = append(b.ops, reservationOp{kind: opReserve, key: t.key, tree: tree, join: true, origins: t.origins})
 			continue
 		}
 		part.eps[i] = t.old
@@ -1136,7 +1246,7 @@ func (b *Batch) refuseLateCollisionsLocked() []error {
 		// of such a part by name does not reach the served key's values
 		// (review II, R5-store-5205).
 		if extra := slices.DeleteFunc(reservationTree(t.ep.Spec()), a.servesLocked); len(extra) > 0 {
-			b.ops = append(b.ops, reservationOp{kind: opReserve, key: t.key, tree: append([]string{t.key}, extra...), join: true, keyOnly: true})
+			b.ops = append(b.ops, reservationOp{kind: opReserve, key: t.key, tree: append([]string{t.key}, extra...), join: true, keyOnly: true, origins: t.origins})
 		}
 		// The endpoint put back serves its keys again: the takes judged
 		// while it was out are judged once more against it
@@ -1309,8 +1419,15 @@ func (a *Aggregator) detachAll() {
 	a.mu.Lock()
 	detach := a.detach
 	a.detach = nil
+	left := a.leftDetach
+	a.leftDetach = nil
 	a.closed = true
 	a.mu.Unlock()
+	// The devices a batch whose reassembly failed removed first: nothing
+	// is served any more.
+	for _, d := range left {
+		d()
+	}
 	for _, key := range slices.Sorted(maps.Keys(detach)) {
 		detach[key]()
 	}
@@ -1376,9 +1493,32 @@ func (a *Aggregator) setStarted() {
 func (a *Aggregator) reassemble(ctx context.Context) error {
 	a.reassembleMu.Lock()
 	defer a.reassembleMu.Unlock()
+	return a.reassembleLocked(ctx)
+}
+
+// reassembleIfBehind reassembles if the last reassembly failed
+// ([Aggregator.behind]): judged again under reassembleMu, so of two
+// batches that saw it set only the first reassembles — the second finds
+// the topology the first installed, which serves the whole set.
+func (a *Aggregator) reassembleIfBehind(ctx context.Context) error {
+	if !a.behind.Load() {
+		return nil
+	}
+	a.reassembleMu.Lock()
+	defer a.reassembleMu.Unlock()
+	if !a.behind.Load() {
+		return nil
+	}
+	return a.reassembleLocked(ctx)
+}
+
+// reassembleLocked installs a new topology; reassembleMu is held.
+func (a *Aggregator) reassembleLocked(ctx context.Context) error {
 	if err := a.n.br.Reassemble(ctx); err != nil {
+		a.behind.Store(true)
 		return fmt.Errorf("node: reassemble: %w", err)
 	}
+	a.behind.Store(false)
 	a.n.attachCameraPeers()
 	a.n.announceSurface(ctx)
 	a.reassemblies.Add(1)

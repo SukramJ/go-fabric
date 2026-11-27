@@ -264,7 +264,19 @@ and is held until `fn` returns; then it applies if the collision is gone
 `fn`, gives the same outcome — or is refused. Those refusals and the
 errors of a held change arrive in `Batch`'s result, not from the call
 (`ErrDuplicateKey`, `ErrUnknownKey` and the others its doc names); a
-call after `fn` returned is `ErrBatchDone`. A `Replace` by a
+call after `fn` returned is `ErrBatchDone`. Anything that fails after
+`fn` makes the result a `*node.BatchError`: a call that returned nil
+succeeded unless its `Calls` names it — one `*node.BatchCallError` per
+call, in call order, with the call's kind (`BatchAdd`, `BatchReplace`,
+`BatchRemove`, `BatchForget`), its own key and `Applied`, which says
+whether the set took the change and only the store work after it failed
+(an `Add` then stays added, a `Forget` can be made again). `Store`
+holds the store errors of no call, `Reassembly` the reassembly's: the
+set holds the batch's changes but the node still serves the topology
+before, keeps the removed devices bound and defers the erasures. The
+next `Batch` — an empty one too — reassembles and catches up, or
+returns why not; `fn`'s error alone is returned as it is, and
+`errors.Is` finds every sentinel through the result. A `Replace` by a
 declaration the specification level withholds takes the device off the
 wire as `Remove` does — the key keeps its number — and records it as
 withheld in `Node.Surface`; a replacement that fails validation changes

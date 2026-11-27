@@ -123,6 +123,10 @@ type reservationOp struct {
 	// the set serves (refuseLateCollisionsLocked), whose Forget by name
 	// must not reach the served endpoint's tree.
 	keyOnly bool
+	// origins are the [Batch] calls the op comes from: its store errors
+	// are theirs ([BatchCallError]); none for an erasure a batch whose
+	// reassembly failed left to a later one.
+	origins []callOrigin
 }
 
 type reservationKind uint8
@@ -134,43 +138,50 @@ const (
 )
 
 // applyReservations runs ops in order. keep are the keys an erasure leaves
-// the endpoint record of ([Aggregator.erase]).
-func (a *Aggregator) applyReservations(ctx context.Context, ops []reservationOp, keep []string) error {
-	p := a.n.persisted
-	var errs []error
+// the endpoint record of ([Aggregator.erase]). An op's errors are its
+// calls', recorded in calls as of an applied change; it returns the
+// errors of the ops of no call.
+func (a *Aggregator) applyReservations(ctx context.Context, ops []reservationOp, keep []string, calls *callErrors) error {
+	var unowned []error
 	for _, op := range ops {
-		switch op.kind {
-		case opReserve:
-			tree := slices.Clone(op.tree)
-			if op.join {
-				// A prior reservation that cannot be read is not joined,
-				// but the op's own tree is still reserved and the error
-				// returned: a failed read must not lose the reservation
-				// the op exists to write, or a later Forget of the key
-				// reaches the key alone (gate c-B1 of R5-store-5205).
-				prior, err := p.reservedTree(ctx, op.key)
-				errs = append(errs, err)
-				for _, k := range prior {
-					if !slices.Contains(tree, k) {
-						tree = append(tree, k)
-					}
-				}
-			}
-			if op.keyOnly {
-				errs = append(errs, p.reserveUnder(ctx, op.key, tree))
-				continue
-			}
-			errs = append(errs, p.reserve(ctx, tree))
-		case opRelease:
-			// A returning key is no longer forgotten: a forget left half
-			// done for it must not erase it at the next New.
-			errs = append(errs, p.release(ctx, op.key), a.cancelForget(ctx, op.key))
-		case opErase:
-			errs = append(errs, a.erase(ctx, op, keep))
+		if err := a.applyReservation(ctx, op, keep); err != nil {
+			unowned = append(unowned, calls.add(op.origins, true, fmt.Errorf("node: endpoint number reservation: %w", err)))
 		}
 	}
-	if err := errors.Join(errs...); err != nil {
-		return fmt.Errorf("node: endpoint number reservation: %w", err)
+	return errors.Join(unowned...)
+}
+
+// applyReservation runs op; see [Aggregator.applyReservations].
+func (a *Aggregator) applyReservation(ctx context.Context, op reservationOp, keep []string) error {
+	p := a.n.persisted
+	switch op.kind {
+	case opReserve:
+		tree := slices.Clone(op.tree)
+		var readErr error
+		if op.join {
+			// A prior reservation that cannot be read is not joined,
+			// but the op's own tree is still reserved and the error
+			// returned: a failed read must not lose the reservation
+			// the op exists to write, or a later Forget of the key
+			// reaches the key alone (gate c-B1 of R5-store-5205).
+			var prior []string
+			prior, readErr = p.reservedTree(ctx, op.key)
+			for _, k := range prior {
+				if !slices.Contains(tree, k) {
+					tree = append(tree, k)
+				}
+			}
+		}
+		if op.keyOnly {
+			return errors.Join(readErr, p.reserveUnder(ctx, op.key, tree))
+		}
+		return errors.Join(readErr, p.reserve(ctx, tree))
+	case opRelease:
+		// A returning key is no longer forgotten: a forget left half
+		// done for it must not erase it at the next New.
+		return errors.Join(p.release(ctx, op.key), a.cancelForget(ctx, op.key))
+	case opErase:
+		return a.erase(ctx, op, keep)
 	}
 	return nil
 }
@@ -461,6 +472,7 @@ func (b *Batch) Forget(key device.SourceKey) error {
 	if b.done {
 		return ErrBatchDone
 	}
+	origins := b.nextOrigin(BatchForget, key)
 	part, i := a.findLocked(k)
 	if part != nil && part.scope != b.scope {
 		return fmt.Errorf("%w: %s", ErrUnknownKey, key)
@@ -475,10 +487,10 @@ func (b *Batch) Forget(key device.SourceKey) error {
 	// serves it (decision 585), so a Remove or Forget of the owner before
 	// or after gives the same outcome.
 	if b.servesOtherLocked(k, removed) {
-		b.pending = append(b.pending, pendingCall{kind: heldForget, seq: b.nextSeq(), key: k, reserved: reserved})
+		b.pending = append(b.pending, pendingCall{kind: heldForget, seq: b.nextSeq(), origins: origins, key: k, reserved: reserved})
 		return nil
 	}
-	b.forgetLocked(b.nextSeq(), k, reserved, part, i)
+	b.forgetLocked(b.nextSeq(), origins, k, reserved, part, i)
 	return nil
 }
 
@@ -499,7 +511,7 @@ func (b *Batch) commitForgetLocked(t pendingCall) (blocked bool, err error) {
 	if b.servesOtherLocked(t.key, removed) {
 		return true, fmt.Errorf("%w: %s", ErrUnknownKey, t.key)
 	}
-	b.forgetLocked(t.seq, t.key, t.reserved, part, i)
+	b.forgetLocked(t.seq, t.origins, t.key, t.reserved, part, i)
 	return false, nil
 }
 
@@ -531,11 +543,12 @@ func (b *Batch) servesOtherLocked(key string, removed Endpoint) bool {
 	return false
 }
 
-// forgetLocked forgets k, a Forget made as the call numbered seq: the
+// forgetLocked forgets k, a Forget made as the call numbered seq (from
+// origins): the
 // endpoint at i of part (nil: the set holds no k) is dropped, k's
 // withheld record too, and its erasure is queued with reserved, the tree
 // the store reserved for k; a.mu is held.
-func (b *Batch) forgetLocked(seq int, k string, reserved []string, part *partition, i int) {
+func (b *Batch) forgetLocked(seq int, origins []callOrigin, k string, reserved []string, part *partition, i int) {
 	a := b.a
 	var removed Endpoint
 	if part != nil {
@@ -571,7 +584,7 @@ func (b *Batch) forgetLocked(seq int, k string, reserved []string, part *partiti
 	if removed != nil {
 		tree = append(tree, reservationTree(removed.Spec())...)
 	}
-	op := reservationOp{kind: opErase, key: k}
+	op := reservationOp{kind: opErase, key: k, origins: origins}
 	if len(tree) > 0 {
 		op.tree = slices.Compact(slices.Sorted(slices.Values(tree)))
 	}
@@ -615,8 +628,9 @@ func splitErasures(ops []reservationOp) (pre, erase []reservationOp) {
 // run is the erasures to apply: an op whose reservation cannot be read is
 // left out and its error returned, since the endpoints its erasure would
 // reach cannot be known — its keys are neither held back nor erased, and
-// the Forget can be made again (review II, R3-store-3703).
-func (a *Aggregator) servedInErasure(ctx context.Context, erase []reservationOp) (run []reservationOp, held []heldKey, cancel, keep []string, err error) {
+// the Forget can be made again (review II, R3-store-3703). That error is
+// the Forget's, recorded in calls; err is such an error of no call.
+func (a *Aggregator) servedInErasure(ctx context.Context, erase []reservationOp, calls *callErrors) (run []reservationOp, held []heldKey, cancel, keep []string, err error) {
 	if len(erase) == 0 {
 		return nil, nil, nil, nil, nil
 	}
@@ -626,7 +640,7 @@ func (a *Aggregator) servedInErasure(ctx context.Context, erase []reservationOp)
 	for _, op := range erase {
 		reserved, err := a.n.persisted.reservedTree(ctx, op.key)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("node: the erasure of %q is skipped: %w", op.key, err))
+			errs = append(errs, calls.add(op.origins, true, fmt.Errorf("node: the erasure of %q is skipped: %w", op.key, err)))
 			continue
 		}
 		run = append(run, op)
