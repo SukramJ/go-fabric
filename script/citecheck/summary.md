@@ -37,9 +37,9 @@ Line citations whose sentence names a matter.js commit other than the pin are ch
 
 | Reference | Count |
 |---|---|
-| A .ts file named without a line part | 2760 |
+| A .ts file named without a line part | 2761 |
 | … whose sentence names another matter.js commit | 623 |
-| A bare line part bound to the .ts file named before it (checked; not a citation, drift or hard error of the run) | 589 |
+| A bare line part bound to the .ts file named before it (checked; not a citation, drift or hard error of the run) | 590 |
 | … checked at another matter.js commit | 324 |
 | … with a hard error at the commit it was checked at | 3 |
 | A bare line part after a .ts citation or after no file (not checked) | 3057 |

@@ -19,10 +19,12 @@ import "sync"
 // Feature names a forward feature (Specification.ForwardFeature, :95).
 type Feature string
 
-// The forward features this module guards. matter.js names three more:
+// The forward features this module guards. matter.js names two more:
 // "delay-report-data" is acted on always (BD-Matter-DelayReportData), and
-// "thermostat-msch" and "thermostat-events" are gated here through the
-// Ahead-of-matter.js register instead (cluster/thermo/ahead.go).
+// "thermostat-events" is gated here through the Ahead-of-matter.js
+// register instead (cluster/thermo/ahead.go). "thermostat-msch" is no
+// forward feature since matter.js released MatterScheduleConfiguration
+// (#5044); its register row closes with the lift's thermostat unit.
 const (
 	// PQCPhase1 admits ML-DSA-44 and ML-DSA-65 in attestation
 	// certificates (controller/attestation).

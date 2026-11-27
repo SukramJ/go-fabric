@@ -37,6 +37,114 @@ feature selection the snapshot does not carry. Owner's work (Fable
 row); the reading map behind each section is a Sonnet `read-*.md` under
 `notes/reference/`, verified line by line before anything landed here.
 
+## b25ed960 → db91886c (2026-11-27, review II phase 9)
+
+34 commits; 17 skipped (6 `[CHIP BUILD]` — #5031, #5034, #5037, #5043,
+#5056, #5068, matter.js's own harness; 5 version bumps — #5032, #5035,
+#5055, #5059, #5063; the release #5060; the changelog #5061; 4 dependency
+bumps — #5038, #5041, #5042, #5048, whose formatter also re-indented
+`ClusterEvents.ts` and three validators without a behaviour change), 17
+classified below. The verdicts are five Fable fact notes (the register's
+markers; P1-A and P1-B; P1-C and P1-D; P1-E, P1-G and P1-H; P1-F and
+P1-I), matter.js read at db91886c, the old side with `git show b25ed960:`,
+connectedhomeip at the harness commit 6170af84 where a row names it. Model:
+no change. `make generate-matter-schema` moved only `matter.sourceCommit`,
+`SchemaSnapshotSHA256` and the pin label in the generated files and the
+generator goldens (commit 02e736a48); `Specification.ForwardFeature` lost
+`"thermostat-msch"` (`packages/model/src/common/Specification.ts:95` at
+db91886c), which the extractor does not read. Decisions 730–739
+(review II, phase 9): one combined pull request for the pin and every unit
+(730, against the recommendation of a separate pin PR), and every gap
+closed in its unit P1-A … P1-I before the release (737). Each gap is a
+finding in `matter_behaviour_findings.md`, section "matter.js pin
+db91886c".
+
+The register's markers at db91886c (`make ahead-check`, then the re-read):
+**caught up** — `BD-chip-Thermostat-Schedules` (#5044 released
+MatterScheduleConfiguration: the forward gate and its class-doc paragraph
+are gone; closes in P1-F, decisions 731, 732) and
+`BD-chip-Commissioner-AbortDisarmsFailSafe` (#5049: the cancel after PASE
+and the disarm before an answered ArmFailSafe are matter.js's now, marker 1
+`if (this.#currentFailSafeEndTime === undefined) return;` no longer exists,
+`ControllerCommissioningFlow.ts:1157`; closes in P1-D, decision 736); both
+listed in `script/aheadcheck/caught-up.txt`. **Still holds**, marker text
+unchanged, re-read at db91886c and the lines re-anchored — the other
+fifteen rows whose marker file moved: `BD-chip-Thermostat-Events` (gate
+`ThermostatServer.ts:264`, not flagged: the marker line survives the
+implementation), `BD-Matter-Camera-FabricRemovalEndsStreams` (a false alarm
+of the check: the requestor class was rewritten, `:48-390`, and reacts to
+no fabric's deletion), `BD-Matter-Thermostat-Hold-ReachesHost`,
+`BD-chip-JCM-Commissioner`, `BD-Matter-Commissioner-TermsRequirementRead`,
+`BD-Matter-OnboardingCodeKept`, `BD-Matter-Commissioner-ReconnectProbe`,
+`BD-chip-ChunkedWritesBounded`, `BD-Matter-ChunkWaitsBounded`,
+`BD-Matter-Controller-ReportAssemblyBounded`,
+`BD-Matter-Controller-NodeImageBounded`,
+`BD-Matter-Controller-CommissioningRaceBounded`,
+`BD-chip-Commissioner-PasscodeMismatchEndsTheAddress`,
+`BD-chip-CASE-FabricUpdateEndsHandshakes` and
+`BD-Matter-Commissioner-FailSafeKeptThroughConsent`. None narrowed: the
+changes around their markers (the cancel signal in the flow and the race,
+the BUSY hold in `PeerConnection`, the awaited loser close, the
+requestor's session tracking) each do something other than what the row's
+gap names. The remaining 126 rows' marker files are byte-identical between
+the pins. Outside the *Ahead* rows `BD-Matter-PeerBusyDeadline` (#5050) is
+rewritten in P1-C (decision 734). `BD-chip-Thermostat-Events` points at the
+events paragraph of the closing Schedules entry, which needs a home of its
+own in P1-F.
+
+Found in the pin commits. `make cite-check`: no hard error; 2292 labels
+`at b25ed960` relabelled `at db91886c` by script where every file they bind
+is byte-identical between the pins (decision 309's rule), 734 line
+citations stay at b25ed960; off-pin 2638 → 3372, drift 410 → 416 (commit
+e4229124f). The matter.js test register (`make testparity-snapshot`,
+commit 31e491038): 27 entries name a changed file and three files are new
+(`CommissioningCancelTest.ts` P1-D, `PeerConnectionBusyTest.ts` P1-C,
+`TlvWriteRequestTest.ts` P1-A); each is classified by the unit that ports
+its cases. Certification cases: no `TC-*.test.ts` added or removed under
+`support/chip-testing/test/cert`; `goCertReadAt` moves to db91886c, and
+TC-SC-5.3 stays read at b25ed960 (its lines below `:308` moved by one with
+#5033) until it is re-read.
+
+### Protocol, IM, sessions
+
+| PR | Fix | Verdict | Where |
+| --- | --- | --- | --- |
+| #5047 (02e108186) | Invoke `suppressResponse`/`timedRequest` and Write `timedRequest` become optional (`TlvInvokeRequest.ts:23`, `:30`; `TlvWriteRequest.ts:29`, at db91886c); a missing TimedRequest is false (`InteractionServer.ts:399`, `:976`); a group Write without SuppressResponse counts as true (`:410-413`) | **gap (medium, interop)** — F-db91886c-1; open — closes in P1-A | `im/invoke.go:245-249`, `im/write.go:102-103` refuse the missing fields; the group-write rule is `im/group.go:239-248`, the bridge decides nothing (`bridge/group_messaging.go:350-353`) |
+| #5069 (db91886cb) | sender: a false flag is omitted only with `omitFalseFlags` or when own and unicast peer revision are ≥ 14, a group request keeps both (`InteractionMessenger.ts:1587-1611`, rule `:1594-1598`); `RequestFlagsOptions.omitFalseFlags` (`RequestFlagsOptions.ts:10-22`), a key of `isBatchable` (`ClientInteraction.ts:223`); with #5047's sender half | **gap (low, latent at revision 12)** — F-db91886c-2, decision 733; open — closes in P1-B (encoder in P1-A). The group invoke no longer mutating the caller's request: **not applicable** — `groups.Sender.Invoke` builds a fresh request (`groups/request.go:44-53`) | `im/invoke_client.go:31-32`, `im/client.go:126-129`; `client/interaction/invoke.go:274-276`, `write.go:149`, `invoke_batcher.go:66-73`; group sender `groups/request.go:53`, `:124` |
+| #5046 (1b80b5376) | a missing next report chunk is the interruption `"chunk-missing"` (`InteractionMessenger.ts:991`, `#nextDataReport` `:1064-1073`) and closes the subscription (`ClientSubscriptionHandler.ts:141-145`, `:151-158`; `PeerSubscription.ts:92-126`) | **gap (medium)** — F-db91886c-3; open — closes in P1-B | `client/interaction/interaction.go:346-361`, `report.go:736-738`, `handler.go:144-161`, `subscriptions.go:422-441` |
+| #5050 (66074cc39) | a BUSY on any address holds every new Sigma1 of the connection until the peer's minimum wait passed (`PeerConnection.ts:176`, `:523-545`, `:558`, `:580`, `:683`) | **caught up, partly** — outside the *Ahead* rows, `BD-Matter-PeerBusyDeadline`; the hold value, the per-waiter jitter, the handler independence and the re-check after the socket differ — F-db91886c-4, decision 734; open — closes in P1-C | `client/peer/connection.go:1482-1494`, `:1643-1663`; `client/peer/peer.go:87-131` |
+| #5053 (685006f82) | a PASE session that completes after the race was decided is force-closed and awaited before the attempt settles (`CommissioningConnection.ts:144-157`) | **have it** — the new case is this module's `TestConnectionLosingGiveUpHoldsTheRun`; the port is registered in P1-D | `controller/commissioner/connection.go:287-291`, `:305-318` |
+| #5049 (f4de69a04) | cancel after PASE through `abort` (`ControllerCommissioningFlow.ts:168`, `#requestAbort` `:557-559`), cut off when CommissioningComplete starts (`:2176`), the fail-safe expiry waits at most 2 s after a cancel (`CANCELED_EXPIRY_WAIT` `:323`, `:1166-1173`), the fail-safe counts as armed from PASE (`:355`, `:1157`); the winner of the PASE race gets the cancel (`ParallelPaseDiscovery.ts:102`, `:178-185`) | **caught up** — `BD-chip-Commissioner-AbortDisarmsFailSafe`; the reconcile's differences are F-db91886c-5, decision 736; open — closes in P1-D. The PASE session given up before its flow keeps its ArmFailSafe(0) here (`commissioner.go:419-435`), matter.js only force-closes it (`ControllerCommissioner.ts:305-309`, `:322-337`) — a `by_design` row in P1-D | `controller/commissioner/flow.go`, `commissioner.go`; `client/discovery/session_kinds.go:602-610` |
+| #5051 (a0dce68c6) | `Discovery.settled` resolves also when first read after the end (`Discovery.ts:52-53`, `:62-64`) | **not applicable** — the Go channel is made in the constructor and closed at the end (`client/discovery/session.go:221`, `:259`, `:364`) | four `Discovery.ts` citations move |
+| #5054 (c0fdc71ee) | `import type` in `CommissioningServer.ts` | **not applicable**; one line replaced, nothing shifts | — |
+
+### Device side
+
+| PR | Fix | Verdict | Where |
+| --- | --- | --- | --- |
+| #5044 (0d3b17a72) | MatterScheduleConfiguration released: the forward gate and its class-doc paragraph removed, `"thermostat-msch"` leaves `ForwardFeature` (`Specification.ts:95`); no logic change, −8 lines (−3 from old `:180`, −8 from old `:272`) | **caught up** — `BD-chip-Thermostat-Schedules`; open — closes in P1-F (decisions 731, 732: the retired extension ID accepted as a no-op for the deprecation window; the daemon's `--thermostat-schedules` stays off) | `cluster/thermo/ahead.go:33`; `internal/forward/forward.go` (comment, in the pin PR); daemon `examples/reference-bridge/fleet_climate.go`, `surface.go` |
+| #5045 (56eb706ad) | `WebRtcTransportRequestorServer.holdUnknownSignals` (`:102-116`): a signal for an untracked session of a held peer waits ≤ 5 s (`:24`, `:362-389`); handlers take no lock on invoke (`:57`) | **gap (low)** on the served requestor — F-db91886c-7, decision 735; open — closes in P1-G. The controller registers the session at the response's arrival and takes no hold (`controller/camera/provider_sessions.go:621-663`), recorded in P1-G | `cluster/camera/requestor.go:140-161`, `:365-383` |
+| #5057 (5e9636a55) | a derived behavior drops a schema-selected default of an attribute its derivative makes optional (`ClusterDerivation.ts:61`, `:101-103`, `:167-181`) | **have it** — by construction: an attribute is served when mandatory under the features or declared (`cluster/spec/instance.go:266-275`), ThermostatRunningMode is never declared by `thermo.New`; the cases are ported in P1-I and P1-F | `cluster/thermo/thermostat_server.go:978-980` |
+| #5058 (db7054660) | a nullable struct or bitmap without a stated default is null (`SelectDefaultValue.ts:145-152`) | **have it** — no nullable struct or bitmap attribute of the snapshot carries a generated default (32 measured), the fallback is null for a nullable attribute (`device/defaults_fallback.go:117-120`); the generator's narrowing note shrinks in P1-I | `script/clustergen/gen.go:2346-2359` |
+| #5030 (a16b64dc7) | client: an event is delayed to the end of the interaction also when delayed events already wait or its cluster has no behavior yet (`ClientStructure.ts:639`, `:643`) | **gap (low)** — F-db91886c-6; open — closes in P1-E | `controller/client/structure.go:401` |
+
+### Transport, harness
+
+| PR | Fix | Verdict | Where |
+| --- | --- | --- | --- |
+| #5052 (efe23a8e5) | the Noble central reopens after close (`NobleBleChannel.ts:491-493`); the rest is react-native | **not applicable** — the controller never closes the host's `Central` and dials a new `Channel` each time (`controller/ble/central.go:23-36`, `channel.go:196`, `:224`); whether a host closes and reuses a central is unverified (host side) | `controller/ble` citations ≥ `:491` shift by +2 |
+| #5033 (9390e6608) | chip-testing refactor: a named fault type, one flavor dispatch, file-local exports dropped | **not applicable**; moves lines the Go-TH ports cite | `goCertReadAt` → db91886c; TC-SC-5.3 kept at b25ed960 (above) |
+| #5045 rider | the cert adapter uses the hold (`InProcessControllerAdapter.ts`) | **not applicable** | its citations move with the relabel |
+| #5065 (1239e46b8) | on-off-sensor in matter.js's all-devices test app | **not applicable** (matter.js's harness) | — |
+| #5067 (4df4e1872) | CI: the certification tests on every official release | **not applicable** | — |
+
+Push transport, outside the commit range (P1-H): the reference daemon's
+motion augment and blind period against chip's `pushav-transport.cpp`
+(`:330-342`, `:344-407` at 6170af84) — the certifiability finding "The
+reference daemon's push transport augments a clip on every motion"
+(`matter_behaviour_findings.md`, *Certification harness*); open — closes in
+P1-H.
+
 ## db021da0 → b25ed960 (2026-11-19, review II after phase 7)
 
 118 commits; 37 skipped (10 `[CHIP BUILD]`, 8 version bumps, 15 dependency
