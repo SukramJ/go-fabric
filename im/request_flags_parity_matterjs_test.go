@@ -41,7 +41,7 @@ func TestRequestFlagsForSendingParityMatterJS(t *testing.T) {
 	// get fewer flags — and that the one sender outside the rule must take it.
 	if MatterInteractionModelRevision >= FalseRequestFlagsOmittedFromRevision {
 		t.Error("this module's revision leaves out false flags now: peers get fewer flags; " +
-			"bridge/ota_provider_link.go's QueryImage invoke must take RequestFlagsForSending")
+			"the OTA requestor's invokes (bridge.PeerSession.Invoke, bridge/ota_provider_link.go) must take RequestFlagsForSending")
 	}
 	if got := RequestFlagsForSending(false, false, rev); got.OmitFalseFlags {
 		t.Error("RequestFlagsForSending omits at this module's revision")
