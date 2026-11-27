@@ -2278,10 +2278,9 @@
         "enable retains feature selection",
         "retain features enabled as a matter.js implementation decision",
         "enable only features matter.js implements unconditionally",
-        "drops the default the schema selected",
         "set defaults the model leaves undefined only where pinned"
       ],
-      "reason": "The published-behaviors cases on the device kit (device/cluster_features_parity_matterjs_test.go): LevelControl selects nothing and serves no Lighting element, a PowerSource selection breaking the FeatureMap conformance (none, or Wired and Battery) is refused while Wired builds, a Thermostat serves only the selected feature. Left out: with()/for()/alter()/enable(), TypeScript's behavior-type algebra (the Go form is a declaration's Features), and the walk over matter.js's exported behavior classes. Pin lift db91886c (#5057): Go has no derivation chain — an attribute is served when mandatory under the features or declared, and a stated default is filled only for a served one (cluster/spec instance.go, server.go), so a default for an attribute optional and undeclared in the derivative cannot be exposed; the portable case (Thermostat HEAT|COOL|AUTO|TEVT serves ThermostatRunningMode Off, HEAT|COOL|AUTO does not serve it) is missing until it is ported with the Thermostat work in cluster/thermo or on the device kit; the case of the defaults the model leaves undefined (SERVER_ONLY_DEFAULTS) is missing and unclassified, what the Go servers serve there not read.",
+      "reason": "The published-behaviors cases on the device kit (device/cluster_features_parity_matterjs_test.go): LevelControl selects nothing and serves no Lighting element, a PowerSource selection breaking the FeatureMap conformance (none, or Wired and Battery) is refused while Wired builds, a Thermostat serves only the selected feature. Pin lift db91886c (P1-F, #5057): \"drops the default the schema selected\" is ported (device:TestClusterBehaviorFeaturesParityMatterJS, ThermostatRunningMode served Off with AutoMode and Events, not served with AutoMode alone); Go has no derivation chain — an attribute is served when mandatory under the features or declared, and a stated default is filled only for a served one (cluster/spec instance.go, server.go). Left out: with()/for()/alter()/enable(), TypeScript's behavior-type algebra (the Go form is a declaration's Features), and the walk over matter.js's exported behavior classes. The case of the defaults the model leaves undefined (SERVER_ONLY_DEFAULTS) is missing and unclassified, what the Go servers serve there not read.",
       "snapshotSha": "55983c9e99088a4023faff622031dc74855a4d3a",
       "left": [
         {
@@ -4367,7 +4366,7 @@
         "accepts an attribute whose atomic quality is inherited from the element it overrides"
       ],
       "reason": "BeginWrite's command-level and per-attribute answers, the timeout and the BUSY of a write another peer holds run over the wire on fabrictest (a second peer is a second controller on its own fabric, the PASE peer a PASE session). The five CommitWrite cases of more than one attribute run in the package on a thermostat serving Presets and Schedules (MatterScheduleConfiguration, mirrored from matter.js behind its forward feature, BD-chip-Thermostat-Schedules): the values are staged through the server's write, the Schedules value the write refuses (TransitionTime 1440) on the atomic-write state as matter.js's stageAs does; Missing: the inherited-quality case, js-runtime-only: a TypeScript schema extension of a behavior class (the atomic quality is the generated definition's). Pin lift b25ed960 (P3-A): the Schedules write of another peer answers INVALID_IN_STATE, ported over the wire; \"validates an attribute once the other pending attributes are staged\" is the Presets $AtomicChanged check (atomicChanged) reading the unit's staged Schedules (AtomicWriteHandler.ts:314-320).",
-      "snapshotSha": "8f76d9d476de93a37f2bfe43e6292f345faa3d75"
+      "snapshotSha": "e882508aae38b841836b9613c77edf511dcba27a"
     },
     {
       "path": "packages/node/test/behaviors/thermostat/AtomicWriteStateTest.ts",
@@ -4473,7 +4472,7 @@
         }
       ],
       "reason": "Every other case runs over the wire on fabrictest (BeginWrite, the write as REPLACE-ALL plus ADDs, CommitWrite/RollbackWrite); the write a matter.js client rejects is the WriteStatuses entry with that status; the controller's cache is a subscription; the helpers of schedule-helpers.ts are schedule_helpers_parity_matterjs_test.go (newScheduleTransition, newSchedule, schedulesConfig, heatingOnlySchedulesConfig, recordThermostatChanges). Left, js-runtime-only: an application observer on persistedSchedules$Changing that rewrites the value in flight, matter.js's behavior-state observer; the Go server has no such seam. Pin lift b25ed960, unit P3-A (#4467, decision 291).",
-      "snapshotSha": "d0f0bb2eb0a59fd33d8dcb130cd3d53a51209c8e"
+      "snapshotSha": "659f2c7143dfb65ee702d5fdf47412b872e717dc"
     },
     {
       "path": "packages/node/test/behaviors/thermostat/SchedulesConfigurationTest.ts",
@@ -4487,11 +4486,6 @@
         "starts with more stored schedules and transitions than the limits allow and raises the limits"
       ],
       "left": [
-        {
-          "it": "refuses to start",
-          "class": "by-design",
-          "reason": "the Go gate is the extension BD-chip-Thermostat-Schedules (surface.Policies.Extensions), pinned by device/surface_ahead_test.go and the reference bridge's TestDemoThermostatSchedulesAreGated"
-        },
         {
           "it": "serves schedules a behavior type supplies as its own default",
           "class": "js-runtime-only",
@@ -4508,8 +4502,8 @@
           "reason": "plants a value under the attribute's pre-accessor key of matter.js's behavior storage; the Go server never stored schedules anywhere but behind its SchedulePort"
         }
       ],
-      "reason": "The configured schedules and ScheduleTypes are ThermostatConfig's, held to the write rules at start; the remote case runs over the wire on a commissioned fabrictest pair; the helpers of schedule-helpers.ts are schedule_helpers_parity_matterjs_test.go (newScheduleTransition, newSchedule, schedulesConfig, heatingOnlySchedulesConfig, recordThermostatChanges). \"validates a local write when the application configured no schedules\" is adapted: its first refusal is a content rule (a transition SystemMode equal to the schedule's), not NOT_FOUND, because the host's SetSchedules is not held to the lifecycle rules (BD-Thermostat-HostSchedules); the NOT_FOUND-before-count order (ThermostatServer.ts:2728-2734 before :2793) has no test of its own on the Matter path (a controller's ADDs validate one by one). Missing: the two restarts on stored schedules. Pin lift b25ed960 (P3-A): the Go server keeps schedules in memory or behind the host's SchedulePort; persisting them is a unit of its own (coordinator decision C-7).",
-      "snapshotSha": "5c5cf03cdf5945ded0f988e6f74c24f9f14e0314"
+      "reason": "The configured schedules and ScheduleTypes are ThermostatConfig's, held to the write rules at start; the remote case runs over the wire on a commissioned fabrictest pair; the helpers of schedule-helpers.ts are schedule_helpers_parity_matterjs_test.go (newScheduleTransition, newSchedule, schedulesConfig, heatingOnlySchedulesConfig, recordThermostatChanges). \"validates a local write when the application configured no schedules\" is adapted: its first refusal is a content rule (a transition SystemMode equal to the schedule's), not NOT_FOUND, because the host's SetSchedules is not held to the lifecycle rules (BD-Thermostat-HostSchedules); the NOT_FOUND-before-count order (ThermostatServer.ts:2728-2734 before :2793) has no test of its own on the Matter path (a controller's ADDs validate one by one). Missing: the two restarts on stored schedules. Pin lift b25ed960 (P3-A): the Go server keeps schedules in memory or behind the host's SchedulePort; persisting them is a unit of its own (coordinator decision C-7). Pin lift db91886c (P1-F, #5044): matter.js deleted \"refuses to start\" with the forward gate; the extension BD-chip-Thermostat-Schedules is retired.",
+      "snapshotSha": "7fb1a234546a54cf25d228829c49307532d58d5e"
     },
     {
       "path": "packages/node/test/behaviors/thermostat/SchedulesLocalWriteTest.ts",
@@ -4563,7 +4557,7 @@
         }
       ],
       "reason": "Local writes are the server's SetSchedules (Schedules and persistedSchedules alike), local presets writes SetPresets, a local SetActiveScheduleRequest the command without a peer; the helpers of schedule-helpers.ts are schedule_helpers_parity_matterjs_test.go (newScheduleTransition, newSchedule, schedulesConfig, heatingOnlySchedulesConfig, recordThermostatChanges). \"checks every schedule's own rules before the schedule count limits\" is adapted: the second schedule's own refusal is an unknown preset, a content rule, where matter.js uses an unknown handle (BD-Thermostat-HostSchedules); the NOT_FOUND-before-count order (ThermostatServer.ts:2728-2734 before :2793) has no test of its own on the Matter path (a controller's ADDs validate one by one). Left: five JavaScript state-layer cases and three lifecycle rules the host's replace is not held to (owner decision O-8). Missing: the restart. Pin lift b25ed960 (P3-A): the Go server keeps schedules in memory or behind the host's SchedulePort; persisting them is a unit of its own (coordinator decision C-7).",
-      "snapshotSha": "91c305f9170077193576e820d519632f31b7f413"
+      "snapshotSha": "1eadbbcadfa86f0113f58c4a513fb878c075d364"
     },
     {
       "path": "packages/node/test/behaviors/thermostat/ThermostatBehaviorTest.ts",
@@ -4573,8 +4567,8 @@
         "cluster/thermo:TestParityMatterJS_ThermostatBehaviorTest",
         "cluster/thermo:TestThermostatRequestCheckParityMatterJS"
       ],
-      "reason": "Every case runs on a fabrictest device with matter.js's vectors (cluster/thermo:TestParityMatterJS_ThermostatBehaviorTest): the configured user limits, deadband and presets are ThermostatConfig fields, a local write of a setpoint or a user limit is MatterWrite inside Device.Act and of an absolute limit SetAbsoluteSetpointLimit, the errors carry matter.js's texts. Pin lift b25ed960: the Heat case through the interaction layer (#5012) is ported (cluster/thermo:TestThermostatRequestCheckParityMatterJS); the SetpointRaiseLower case that refuses an undefined mode runs through the request gate spec.AdmitRequest (cluster/thermo:TestThermostatRequestCheckParityMatterJS; P2-H, decision 339). The six ControlSequenceOfOperation cases (#5000) are left by design (BD-Matter-Thermostat-ControlSequenceFromFeatures, coordinator decision C-3).",
-      "snapshotSha": "11e14b7fde55b5074a44d7f08d49e7e0ba1cd3ab",
+      "reason": "Every case runs on a fabrictest device with matter.js's vectors (cluster/thermo:TestParityMatterJS_ThermostatBehaviorTest): the configured user limits, deadband and presets are ThermostatConfig fields, a local write of a setpoint or a user limit is MatterWrite inside Device.Act and of an absolute limit SetAbsoluteSetpointLimit, the errors carry matter.js's texts. Pin lift b25ed960: the Heat case through the interaction layer (#5012) is ported (cluster/thermo:TestThermostatRequestCheckParityMatterJS); the SetpointRaiseLower case that refuses an undefined mode runs through the request gate spec.AdmitRequest (cluster/thermo:TestThermostatRequestCheckParityMatterJS; P2-H, decision 339). The six ControlSequenceOfOperation cases (#5000) are left by design (BD-Matter-Thermostat-ControlSequenceFromFeatures, coordinator decision C-3). Pin lift db91886c (P1-F, #5057): the two ThermostatRunningMode cases are ported (cluster/thermo:TestParityMatterJS_ThermostatBehaviorTest, subtest ThermostatRunningMode); the reheat cases' new thermostatRunningMode Off stays with their by-design entries.",
+      "snapshotSha": "e9bb7fbed934e893515c05ae804cce38dfc59392",
       "left": [
         {
           "it": "refuses heating modes with CoolingWithReheat",
@@ -4615,7 +4609,7 @@
         "cluster/thermo:TestParityMatterJS_ThermostatEventsTest"
       ],
       "reason": "Pin lift b25ed960, unit P4-A: the Thermostat events behind matter.js's forward feature thermostat-events (#4990, decision 291), 44 of 46 cases by meaning on a fake clock (node start = the bridge's SetEndpoint, node close = MatterQuiesce, application writes = the host setters); NaN/Inf thresholds have no int16 form; \"first measurement at startup\" is the host's first SetMeasuredTemperature; \"timer expires early\" by a clock whose next timer fires 1 ms early. Replaces events_chip_test.go.",
-      "snapshotSha": "d0308bd5290ee4b9a9057e628ef8bfb578a609bf",
+      "snapshotSha": "9e8d2ed9c891550c2deb0247b447b4c74a4610f9",
       "left": [
         {
           "it": "generates nothing and does not fail when the events are not enabled",

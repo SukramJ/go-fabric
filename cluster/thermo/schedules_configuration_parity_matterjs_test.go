@@ -2,7 +2,7 @@
 // Copyright (C) 2026 SukramJ.
 
 // A port of matter.js packages/node/test/behaviors/thermostat/SchedulesConfigurationTest.ts
-// at b25ed960: the schedules and ScheduleTypes a thermostat is configured
+// at db91886c: the schedules and ScheduleTypes a thermostat is configured
 // with, and the first writes of a thermostat configured with none.
 //
 // matter.js refuses a configuration when the node starts (an
@@ -10,11 +10,7 @@
 // refuses it in thermo.New with thermo.ErrSchedules. A local write is
 // SetSchedules, a remote one the write of a fabrictest pair.
 //
-// Not ported here: "refuses to start" without the thermostat-msch forward
-// feature — the Go gate is the extension BD-chip-Thermostat-Schedules,
-// which the device layer applies (device/surface_ahead_test.go,
-// examples/reference-bridge TestDemoThermostatSchedulesAreGated), another
-// mechanism with the same effect. js-runtime-only: "serves schedules a
+// Not ported here: js-runtime-only: "serves schedules a
 // behavior type supplies as its own default", "leaves the schedules a
 // behavior type supplies untouched" (a behavior type's defaults) and
 // "seeds from configuration, not from schedules a device stored before

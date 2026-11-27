@@ -363,7 +363,10 @@ const (
 // Pin lift db91886c unit P1-I leaves ClusterBehaviorTest.ts's class mechanism
 // (17 rows) and ClusterBehaviorFeaturesTest.ts's three .with()/.set()
 // default cases (js-runtime-only): 793.
-const testparityLeftRatchet = 793
+// Pin lift db91886c, P1-F: SchedulesConfigurationTest.ts's "refuses to start"
+// (by design, the retired extension) left with the case matter.js deleted
+// (#5044): -1.
+const testparityLeftRatchet = 772
 
 // The matterjs-server register's four ratchets, exact in both directions as
 // the matter.js register's are (the comments above give the rules). Set by

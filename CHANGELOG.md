@@ -10,11 +10,18 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `surface`: `RetiredExtensions` and `ExtensionRetired` — "Ahead of matter.js" register IDs whose row closed because matter.js caught up. A retired ID stays known for the deprecation window (README §The deprecation window): `Policies.Extensions` may name it and `node.AheadRows` lists it, so a host validating against that list keeps starting; it selects nothing and is left out of `Policies.Digest` and `Report.Extensions` (owner decision 740).
+
 ### Changed
 
 - **Breaking:** `parity`, `schema`: the matter.js pin moves b25ed960 → db91886c (`parity/schema.json` `matter.sourceCommit`). No model element changed; the generated cluster definitions change only in their source line. `schema.SchemaSnapshotSHA256` moves from `604da2f2…` to `323bb53a…`: **a host pinning the snapshot's bytes updates its pin** after this release (phase 9; the lift's behaviour follows in the entries below and in `notes/parity/pin-lifts.md`).
 - Dependencies: `golang.org/x/net` v0.62.0 → v0.63.0, `golang.org/x/tools` v0.52.0 → v0.53.0, `modernc.org/sqlite` v1.61.1 → v1.63.0 (with `modernc.org/libc` v1.80.1, `golang.org/x/sys` v0.50.0, `golang.org/x/sync` v0.25.0, `golang.org/x/mod` v0.43.0 and the `golang.org/x/exp` of the `apidiff` tool at `d6646c509b6d`); the nested modules `ble/bluez`, `ble/esphome` and `wifi/wpasupplicant` follow in their `go.sum`. The pinned `golangci-lint` moves to v2.15.0 (`Makefile`, `ci.yml`); `script/ble-virtual` takes `semver` 7.8.6 (supersedes #531 and #541) and moves its `@matter/*` and `@project-chip/matter.js` from the 0.18.0 nightly to the published 0.18.1. No licence changes.
 - `client/peer`: a Busy answer holds the node for the minimum wait it asked for, as matter.js does since #5050: the deadline is the raw Busy delay, recorded before the error handler runs, so a shorter delay from `HandleError` no longer shortens it — also at an address no session proved, where the Busy holds the attempt that received it; every waiting attempt adds its own jitter of up to `DelayAfterNetworkError`, and a TCP attempt checks the hold again after its dial. A Busy from the proven operational address holds every address of the peer as before.
+
+- **Behaviour** `cluster/thermo`, `device`, `surface`: MatterScheduleConfiguration needs no extension any more — matter.js released it (#5044, pin lift `db91886c`). `thermo.Ahead` loses the key `BD-chip-Thermostat-Schedules`, a Thermostat that declares MSCH composes under any policies, and its feature decision names no register row. The ID is retired (removable in `v0.31.0`): still accepted in `surface.Policies.Extensions` and listed by `node.AheadRows`, it selects nothing and no longer reaches `Policies.Digest` or `Report.Extensions` — a host that names it sees its policies digest move once and its surface report lose the ID (owner decisions 731, 740). Migration: [the retired extension](docs/guides/migrating-to-the-facade.md#retired-in-v0290-removable-in-v0310-the-extension-bd-chip-thermostat-schedules).
+- Reference daemon: `--thermostat-schedules` is the demo thermostat's own switch — it serves MSCH as before, off by default (issue #273, owner decision 732), and no longer enables an extension, so the surface report under it names none. `--extensions BD-chip-Thermostat-Schedules` is accepted with a warning (`surface.extension_retired`) and no longer serves MSCH.
 
 ### Fixed
 

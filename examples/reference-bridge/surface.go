@@ -24,11 +24,12 @@ import (
 
 // surfacePolicies are the daemon's surface policies, the node's and every
 // device's (node.Config.Surface, device.Options.Surface): the
-// "Ahead of matter.js" register rows --extensions names,
-// BD-chip-Thermostat-Schedules with --thermostat-schedules and
+// "Ahead of matter.js" register rows --extensions names and
 // BD-chip-GeneralCommissioning-TermsAndConditions with --tc-required; the level
 // --spec-level names; the controller profiles --profile names. Every ID
-// must be one the module declares (node.AheadRows), the
+// must be one the module knows (node.AheadRows: a retired one, such as
+// BD-chip-Thermostat-Schedules, is accepted and selects nothing —
+// --thermostat-schedules is the demo thermostat's own switch), the
 // level one of schema.Levels and every profile one of surface.Profiles; a
 // typo stops the daemon with the list of the known ones.
 func surfacePolicies(f flags) (surface.Policies, error) {
@@ -44,9 +45,6 @@ func surfacePolicies(f flags) (surface.Policies, error) {
 			return surface.Policies{}, fmt.Errorf("--extensions: %q is no extension this module declares; known: %s", id, strings.Join(known, ", "))
 		}
 		ids = append(ids, id)
-	}
-	if f.thermostatSchedules {
-		ids = append(ids, schedulesRow)
 	}
 	if f.tcRequired {
 		ids = append(ids, termsAndConditionsRow)

@@ -21,6 +21,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -129,6 +130,28 @@ func TestParityMatterJS_ThermostatBehaviorTest(t *testing.T) {
 		if v, _ := srv.MatterRead(tdef.AttrMinSetpointDeadBand); v != int8(20) {
 			t.Errorf("minSetpointDeadBand %v, want 20", v)
 		}
+	})
+
+	// ThermostatBehaviorTest.ts:67-82 at db91886c (#5057): the optional
+	// ThermostatRunningMode, served with AutoMode and Events.
+	t.Run("ThermostatRunningMode", func(t *testing.T) {
+		t.Run("is not exposed with AutoMode and without Events", func(t *testing.T) {
+			n := createThermo(t, autoThermo(true))
+			if slices.Contains(n.srv.MatterAttributes(), tdef.AttrThermostatRunningMode) {
+				t.Errorf("AttributeList %v includes ThermostatRunningMode (0x1E)", n.srv.MatterAttributes())
+			}
+			if v, held := n.srv.MatterRead(tdef.AttrThermostatRunningMode); held {
+				t.Errorf("ThermostatRunningMode reads %v without Events", v)
+			}
+		})
+		t.Run("defaults to Off with AutoMode and Events", func(t *testing.T) {
+			cfg := thermo.DefaultThermostatConfig()
+			cfg.Features = thermo.ThermostatFeatureHEAT | thermo.ThermostatFeatureCOOL | thermo.ThermostatFeatureAUTO | thermo.ThermostatFeatureTEVT
+			srv := mustNew(t, cfg)
+			if v, held := srv.MatterRead(tdef.AttrThermostatRunningMode); !held || v != uint8(tdef.ThermostatRunningModeOff) {
+				t.Errorf("ThermostatRunningMode %v (held %v), want Off", v, held)
+			}
+		})
 	})
 
 	t.Run("startup reconciliation", func(t *testing.T) {

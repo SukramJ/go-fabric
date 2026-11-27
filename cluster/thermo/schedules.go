@@ -21,12 +21,11 @@ import (
 
 // The MatterScheduleConfiguration feature (MSCH): the device's stored week
 // programs, the active one, SetActiveScheduleRequest and the atomic write
-// of Schedules. matter.js implements it behind its forward feature
-// thermostat-msch, not released ("MatterScheduleConfiguration feature is
-// not released yet", packages/node/src/behaviors/thermostat/ThermostatServer.ts:267-271
-// at b25ed960); the server mirrors that implementation and is offered
-// behind the extension BD-chip-Thermostat-Schedules (ahead.go, owner
-// decision 291). The SchedulePort, the device's own storage of its
+// of Schedules. matter.js implements it in
+// packages/node/src/behaviors/thermostat/ThermostatServer.ts, released
+// since #5044 (no forward gate at db91886c); the server mirrors that
+// implementation, selected by the feature bit alone (the extension
+// BD-chip-Thermostat-Schedules is retired). The SchedulePort, the device's own storage of its
 // programs, has no matter.js counterpart; it follows connectedhomeip's
 // ThermostatSchedules::Delegate.
 

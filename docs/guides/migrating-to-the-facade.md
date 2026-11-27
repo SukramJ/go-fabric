@@ -42,6 +42,38 @@ still held there. Each row names the facade route, or the section of
 | `cluster/core` | `SoftwareVersionFromString` (`daemon_matter.go:527`) | `node.SoftwareVersionFromString` |
 | `cluster/core` | `RegulatoryIndoorOutdoor` (`daemon_matter.go:506`) | `node.RegulatoryIndoorOutdoor` for `Commissioning.LocationCapability` |
 
+## Retired in v0.29.0, removable in v0.31.0: the extension `BD-chip-Thermostat-Schedules`
+
+matter.js released MatterScheduleConfiguration (#5044, pin `db91886c`), so
+the Thermostat's MSCH is no longer ahead of matter.js: the device layer
+composes it when the declaration sets
+`thermostatdef.FeatureMatterScheduleConfiguration` (or
+`ThermostatConfig.Features` has `thermo.ThermostatFeatureMSCH`), under any
+policies. The register ID is retired (`surface.RetiredExtensions`,
+`surface.ExtensionRetired`). Until its removal it stays known:
+
+- `surface.Policies.Extensions` may still name it; it selects nothing.
+- `node.AheadRows()` still lists it, so a host that validates its
+  configuration against that list keeps starting. A page that offers the
+  extensions for selection leaves out what `surface.ExtensionRetired`
+  reports.
+- It is left out of `surface.Policies.Digest()` and of
+  `surface.Report.Extensions`: a host that names it moves its policies
+  digest once, at the upgrade, and its surface page no longer shows it.
+  `Extensions.Has` and `Extensions.IDs` still return it as named.
+- `thermo.Ahead` has no key for it any more.
+
+| Before | Route |
+| --- | --- |
+| `surface.NewExtensions("BD-chip-Thermostat-Schedules")` beside a Thermostat that declares MSCH | drop the ID; declaring the feature is enough |
+| a host flag that enabled the ID *and* made the device request MSCH | keep the flag on the device's feature; the policies need nothing |
+| a test asserting `ErrExtensionNotEnabled` for MSCH, or `Reference.Ahead == "BD-chip-Thermostat-Schedules"` | MSCH composes under the zero-value policies and no decision names a row |
+| a test asserting the ID in `Report.Extensions` | the report lists no retired ID |
+
+The reference daemon's `--thermostat-schedules` keeps its meaning (MSCH on
+the demo thermostat, off by default); `--extensions
+BD-chip-Thermostat-Schedules` is accepted with a warning and does nothing.
+
 ## Deprecated in v0.24.0, removable in v0.26.0: the OTA provider's hooks
 
 The OTA provider's requestors now have update attempts, owned by the

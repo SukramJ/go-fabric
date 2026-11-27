@@ -58,11 +58,14 @@ func rootCluster(r surface.Report, id uint32) surface.Cluster {
 
 // TestNodeAheadRows: node.AheadRows is the one answer — the root
 // servers' rows and the device layer's (the Thermostat's), sorted, each
-// once (W5-api-14).
+// once (W5-api-14) — and, for their deprecation window, the retired IDs,
+// so a host validating against it keeps accepting one (owner decision
+// 740).
 func TestNodeAheadRows(t *testing.T) {
 	want := append([]string{threadRow, timeSyncRow, termsRow}, thermo.Ahead.IDs()...)
 	want = append(want, closure.Ahead.IDs()...)
 	want = append(want, valve.Ahead.IDs()...)
+	want = append(want, surface.RetiredExtensions()...)
 	slices.Sort(want)
 	want = slices.Compact(want)
 	if got := node.AheadRows(); !slices.Equal(got, want) {

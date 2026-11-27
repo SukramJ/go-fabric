@@ -62,6 +62,7 @@ import (
 	"thingfabric.dev/go-fabric/node"
 	"thingfabric.dev/go-fabric/schema"
 	"thingfabric.dev/go-fabric/store"
+	"thingfabric.dev/go-fabric/surface"
 )
 
 // CSA test identity. 0xFFF1 is the Connectivity Standards Alliance's test
@@ -145,7 +146,7 @@ func parseFlags() flags {
 	flag.StringVar(&f.wifiSimSSIDs, "wifi-sim-ssid", defaultWiFiSimSSIDs, "TESTING ONLY, with --wifi-sim: the networks the simulated driver finds and joins, comma-separated ssid:passphrase (an entry without a passphrase takes any); see wifisim.go")
 	flag.StringVar(&f.metricsExpvar, "metrics-expvar", "", "address (\"127.0.0.1:9090\") to serve the node's metrics on as /debug/vars, in expvar's JSON shape and without authentication — a non-loopback address is refused unless --metrics-expvar-any-address; off when empty; see metrics.go")
 	flag.BoolVar(&f.metricsAnyAddress, "metrics-expvar-any-address", false, "serve --metrics-expvar on an address that is not loopback (\":9090\", a LAN address), where anyone who reaches it reads the counters without authentication")
-	flag.BoolVar(&f.thermostatSchedules, "thermostat-schedules", false, "serve MatterScheduleConfiguration (week programs) on the demo thermostat — enables the extension BD-chip-Thermostat-Schedules; off by default until a live ecosystem pairing is verified (issue #273); see fleet_climate.go")
+	flag.BoolVar(&f.thermostatSchedules, "thermostat-schedules", false, "serve MatterScheduleConfiguration (week programs) on the demo thermostat; off by default until a live ecosystem pairing is verified (issue #273); see fleet_climate.go")
 	flag.BoolVar(&f.tcRequired, "tc-required", false, "TESTING ONLY: serve GeneralCommissioning's TermsAndConditions feature with version 1 and acknowledgement bit 1 required — what the CSA's CGEN cases expect as PIXIT.CGEN.TCRevision / RequiredTCAcknowledgements — and enable the extension "+termsAndConditionsRow+"; a commissioner then has to send SetTCAcknowledgements before CommissioningComplete (chip-tool pairing --tc-acknowledgements 1 --tc-acknowledgements-version 1); see surface.go")
 	flag.BoolVar(&f.unitTesting, "unit-testing", false, "TESTING ONLY: serve CHIP's UnitTesting cluster (0xFFF1FC05; floatSingle, octetString, structAttr, listLongOctetString) on the Aggregator, endpoint 1, as matter.js's all-clusters test app serves it, for the data-type steps of TC-IDM-3.1 and TC-IDM-4.1 and the manufacturer-specific cluster TC-IDM-2.1 looks for; see unit_testing.go")
 	flag.StringVar(&f.extensions, "extensions", "", "comma-separated \"Ahead of matter.js\" register IDs to enable (surface.Policies.Extensions, notes/parity/by_design.md), on the node and every device; an unknown ID stops the daemon with the list of known ones; see surface.go")
@@ -315,8 +316,15 @@ func compose(ctx context.Context, f flags, logger *slog.Logger, passcode uint32,
 	if err != nil {
 		return nil, nil, err
 	}
+	for _, id := range policies.Extensions.IDs() {
+		if surface.ExtensionRetired(id) {
+			logger.Warn("surface.extension_retired", slog.String("extension", id),
+				slog.String("note", "a retired extension selects nothing; see the CHANGELOG"))
+		}
+	}
 	devices := newFleet()
 	devices.surface = policies
+	devices.thermostat.schedules = f.thermostatSchedules
 	otaDownloads := f.otaDir
 	if otaDownloads == "" {
 		otaDownloads = filepath.Join(filepath.Dir(f.dbPath), "ota")

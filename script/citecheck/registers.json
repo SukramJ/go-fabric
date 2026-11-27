@@ -2,7 +2,7 @@
   {
     "file": "notes/parity/by_design.md",
     "tree": "matterjs-server",
-    "line": 133,
+    "line": 132,
     "citation": "camera-controller.ts:133",
     "at": "0bd06f2",
     "error": "file not found"
@@ -10,7 +10,7 @@
   {
     "file": "notes/parity/by_design.md",
     "tree": "matterjs-server",
-    "line": 143,
+    "line": 142,
     "citation": "NetworkClient.ts:35",
     "at": "0bd06f22",
     "error": "file not found"
@@ -18,7 +18,7 @@
   {
     "file": "notes/parity/by_design.md",
     "tree": "matterjs-server",
-    "line": 144,
+    "line": 143,
     "citation": "ClientEventEmitter.ts:45-74",
     "at": "0bd06f22",
     "error": "file not found"
@@ -26,7 +26,7 @@
   {
     "file": "notes/parity/by_design.md",
     "tree": "matterjs-server",
-    "line": 145,
+    "line": 144,
     "citation": "LogDestination.ts:77-91",
     "at": "0bd06f22",
     "error": "file not found"
@@ -34,7 +34,7 @@
   {
     "file": "notes/parity/by_design.md",
     "tree": "matterjs-server",
-    "line": 150,
+    "line": 149,
     "citation": "PeerSet.ts:218",
     "at": "0bd06f2",
     "error": "file not found"
@@ -42,16 +42,22 @@
   {
     "file": "notes/parity/by_design.md",
     "tree": "matterjs-server",
-    "line": 150,
+    "line": 149,
     "citation": "SessionManager.ts:376",
     "at": "0bd06f2",
     "error": "file not found"
   },
   {
     "file": "notes/parity/by_design.md",
-    "line": 1123,
+    "line": 1122,
     "citation": "packages/protocol/src/interaction/SubscriptionHandler.ts:284",
     "error": "file not found"
+  },
+  {
+    "file": "notes/parity/by_design.md",
+    "line": 1150,
+    "citation": "element.ts:568-573",
+    "error": "line beyond end of file"
   },
   {
     "file": "notes/parity/by_design.md",
@@ -61,19 +67,13 @@
   },
   {
     "file": "notes/parity/by_design.md",
-    "line": 1152,
-    "citation": "element.ts:568-573",
-    "error": "line beyond end of file"
-  },
-  {
-    "file": "notes/parity/by_design.md",
-    "line": 1329,
+    "line": 1328,
     "citation": "aggregator.ts:62",
     "error": "ambiguous"
   },
   {
     "file": "notes/parity/by_design.md",
-    "line": 2836,
+    "line": 2835,
     "citation": "endpoints/bridged-node.ts:39-73",
     "error": "ambiguous"
   },

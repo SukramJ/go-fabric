@@ -108,7 +108,7 @@ func TestSurfaceStoredOnlyWithItsRaisedVersions(t *testing.T) {
 	db := openDB(t, filepath.Join(t.TempDir(), "versions.db"))
 	startRun(t, db, surface.Policies{}, nil, light(t, "light", nil), thermostat(t, "thermo", false, nil)).stop(t)
 
-	p := surface.Policies{Extensions: surface.NewExtensions(mschRow)}
+	var p surface.Policies // MSCH composes under the zero value (matter.js released it, #5044)
 	refuse := func(cfg *node.Config) {
 		r := &refusingKeys{Port: cfg.Store.Credentials, keys: []string{"basic_information.configuration_version", "bridged_configuration_version."}}
 		r.refuse.Store(true)
@@ -137,7 +137,7 @@ func TestSurfaceUnreadIsNotAFirstAssembly(t *testing.T) {
 	db := openDB(t, filepath.Join(t.TempDir(), "unread.db"))
 	startRun(t, db, surface.Policies{}, nil, light(t, "light", nil), thermostat(t, "thermo", false, nil)).stop(t)
 
-	p := surface.Policies{Extensions: surface.NewExtensions(mschRow)}
+	var p surface.Policies // MSCH composes under the zero value (matter.js released it, #5044)
 	unread := func(cfg *node.Config) {
 		r := &refusingKeys{Port: cfg.Store.Credentials, keys: []string{"bridged_surface_digest.thermo"}}
 		r.refuseRead.Store(true)
