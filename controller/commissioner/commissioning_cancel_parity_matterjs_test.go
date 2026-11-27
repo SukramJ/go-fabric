@@ -25,6 +25,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"thingfabric.dev/go-fabric/client/discovery"
@@ -133,17 +134,19 @@ func TestCommissioningCancelParity(t *testing.T) {
 
 	t.Run("stops a commissioning step and ends the failsafe on abort signal", func(t *testing.T) {
 		t.Parallel()
-		dev := newCancelDevice()
-		ctx, cancel := context.WithCancelCause(context.Background())
-		defer cancel(nil)
-		dev.withhold = isCommand(gencomm.CmdSetRegulatoryConfig)
-		dev.onWithheld = func() { cancel(errCallerGaveUp) }
-		f, clock := newTestFlow(t, dev.handle)
-		f.steps = []step{armStep(f), regulatoryStep(f)}
-		_, err := runDriven(t, clock, func() error { return f.execute(ctx) })
-		if !isCancel(err) || err.Error() != errCallerGaveUp.Error() || dev.expiries.Load() != 1 || f.failsafeMayBeArmed() {
-			t.Fatalf("error %v, %d expiries, may be armed %v; want the reason, 1 and false", err, dev.expiries.Load(), f.failsafeMayBeArmed())
-		}
+		synctest.Test(t, func(t *testing.T) {
+			dev := newCancelDevice()
+			ctx, cancel := context.WithCancelCause(context.Background())
+			defer cancel(nil)
+			dev.withhold = isCommand(gencomm.CmdSetRegulatoryConfig)
+			dev.onWithheld = func() { cancel(errCallerGaveUp) }
+			f, clock := newTestFlow(t, dev.handle)
+			f.steps = []step{armStep(f), regulatoryStep(f)}
+			_, err := runDriven(t, clock, func() error { return f.execute(ctx) })
+			if !isCancel(err) || err.Error() != errCallerGaveUp.Error() || dev.expiries.Load() != 1 || f.failsafeMayBeArmed() {
+				t.Fatalf("error %v, %d expiries, may be armed %v; want the reason, 1 and false", err, dev.expiries.Load(), f.failsafeMayBeArmed())
+			}
+		})
 	})
 
 	// matter.js rejects with the reason itself (`throw asError(cancel.reason)`,
@@ -151,43 +154,47 @@ func TestCommissioningCancelParity(t *testing.T) {
 	// error comes back as it is, its message kept.
 	t.Run("rejects with the reason itself when it wraps the context's error", func(t *testing.T) {
 		t.Parallel()
-		dev := newCancelDevice()
-		ctx, cancel := context.WithCancelCause(context.Background())
-		defer cancel(nil)
-		reason := fmt.Errorf("user quit: %w", context.Canceled)
-		dev.withhold = isCommand(gencomm.CmdSetRegulatoryConfig)
-		dev.onWithheld = func() { cancel(reason) }
-		f, clock := newTestFlow(t, dev.handle)
-		f.steps = []step{armStep(f), regulatoryStep(f)}
-		_, err := runDriven(t, clock, func() error { return f.execute(ctx) })
-		if err != reason || dev.expiries.Load() != 1 { //nolint:errorlint // the identity is the point
-			t.Fatalf("error %v, %d expiries; want the reason itself (%v) and 1", err, dev.expiries.Load(), reason)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			dev := newCancelDevice()
+			ctx, cancel := context.WithCancelCause(context.Background())
+			defer cancel(nil)
+			reason := fmt.Errorf("user quit: %w", context.Canceled)
+			dev.withhold = isCommand(gencomm.CmdSetRegulatoryConfig)
+			dev.onWithheld = func() { cancel(reason) }
+			f, clock := newTestFlow(t, dev.handle)
+			f.steps = []step{armStep(f), regulatoryStep(f)}
+			_, err := runDriven(t, clock, func() error { return f.execute(ctx) })
+			if err != reason || dev.expiries.Load() != 1 { //nolint:errorlint // the identity is the point
+				t.Fatalf("error %v, %d expiries; want the reason itself (%v) and 1", err, dev.expiries.Load(), reason)
+			}
+		})
 	})
 
 	t.Run("stops a read the device does not answer", func(t *testing.T) {
 		t.Parallel()
-		dev := newCancelDevice()
-		dev.expiryAnswers = false
-		ctx, cancel := context.WithCancelCause(context.Background())
-		defer cancel(nil)
-		var reads atomic.Int32
-		dev.withhold = func(req imRequest) bool { return isRead(req) && reads.Add(1) > 1 } // the first read is BasicCommissioningInfo
-		var clock *fakeClock
-		var canceledAt atomic.Int64
-		dev.onWithheld = func() { canceledAt.Store(clock.Now().UnixNano()); cancel(errCallerGaveUp) }
-		var f *flow
-		f, clock = newTestFlow(t, dev.handle)
-		f.steps = []step{armStep(f), readStep(f)}
-		end, err := runDriven(t, clock, func() error { return f.execute(ctx) })
-		if !isCancel(err) || dev.expiries.Load() != 1 {
-			t.Fatalf("error %v, %d expiries; want the reason and 1", err, dev.expiries.Load())
-		}
-		// The expiry gets no answer either: the commissioning waits only the
-		// limit for a canceled expiry.
-		if settled := end.Sub(time.Unix(0, canceledAt.Load())); settled >= 3*time.Second {
-			t.Fatalf("settled %v after the cancel, want less than 3 s", settled)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			dev := newCancelDevice()
+			dev.expiryAnswers = false
+			ctx, cancel := context.WithCancelCause(context.Background())
+			defer cancel(nil)
+			var reads atomic.Int32
+			dev.withhold = func(req imRequest) bool { return isRead(req) && reads.Add(1) > 1 } // the first read is BasicCommissioningInfo
+			var clock *fakeClock
+			var canceledAt atomic.Int64
+			dev.onWithheld = func() { canceledAt.Store(clock.Now().UnixNano()); cancel(errCallerGaveUp) }
+			var f *flow
+			f, clock = newTestFlow(t, dev.handle)
+			f.steps = []step{armStep(f), readStep(f)}
+			end, err := runDriven(t, clock, func() error { return f.execute(ctx) })
+			if !isCancel(err) || dev.expiries.Load() != 1 {
+				t.Fatalf("error %v, %d expiries; want the reason and 1", err, dev.expiries.Load())
+			}
+			// The expiry gets no answer either: the commissioning waits only the
+			// limit for a canceled expiry.
+			if settled := end.Sub(time.Unix(0, canceledAt.Load())); settled >= 3*time.Second {
+				t.Fatalf("settled %v after the cancel, want less than 3 s", settled)
+			}
+		})
 	})
 
 	t.Run("runs no further step after a step that does not observe the cancel", func(t *testing.T) {
@@ -288,24 +295,26 @@ func TestCommissioningCancelParity(t *testing.T) {
 
 	t.Run("stops waiting for the failsafe expiry after a failed step when the cancel comes during it", func(t *testing.T) {
 		t.Parallel()
-		dev := newCancelDevice()
-		ctx, cancel := context.WithCancelCause(context.Background())
-		defer cancel(nil)
-		var clock *fakeClock
-		var canceledAt atomic.Int64
-		dev.withhold = func(req imRequest) bool { e, ok := armRequest(req); return ok && e == 0 }
-		dev.onWithheld = func() { canceledAt.Store(clock.Now().UnixNano()); cancel(errCallerGaveUp) }
-		var f *flow
-		f, clock = newTestFlow(t, dev.handle)
-		gone := errors.New("the device stopped answering")
-		f.steps = []step{armStep(f), {8, 1, "fail", func(context.Context) (stepResult, error) { return 0, gone }}}
-		end, err := runDriven(t, clock, func() error { return f.execute(ctx) })
-		if !isCancel(err) || errors.Is(err, gone) {
-			t.Fatalf("error %v, want the cancel's reason, not the step's", err)
-		}
-		if settled := end.Sub(time.Unix(0, canceledAt.Load())); settled >= 3*time.Second {
-			t.Fatalf("settled %v after the cancel, want less than 3 s", settled)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			dev := newCancelDevice()
+			ctx, cancel := context.WithCancelCause(context.Background())
+			defer cancel(nil)
+			var clock *fakeClock
+			var canceledAt atomic.Int64
+			dev.withhold = func(req imRequest) bool { e, ok := armRequest(req); return ok && e == 0 }
+			dev.onWithheld = func() { canceledAt.Store(clock.Now().UnixNano()); cancel(errCallerGaveUp) }
+			var f *flow
+			f, clock = newTestFlow(t, dev.handle)
+			gone := errors.New("the device stopped answering")
+			f.steps = []step{armStep(f), {8, 1, "fail", func(context.Context) (stepResult, error) { return 0, gone }}}
+			end, err := runDriven(t, clock, func() error { return f.execute(ctx) })
+			if !isCancel(err) || errors.Is(err, gone) {
+				t.Fatalf("error %v, want the cancel's reason, not the step's", err)
+			}
+			if settled := end.Sub(time.Unix(0, canceledAt.Load())); settled >= 3*time.Second {
+				t.Fatalf("settled %v after the cancel, want less than 3 s", settled)
+			}
+		})
 	})
 }
 

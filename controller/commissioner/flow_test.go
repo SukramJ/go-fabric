@@ -15,11 +15,13 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"thingfabric.dev/go-fabric/client/exchange"
 	"thingfabric.dev/go-fabric/client/handshake"
 	"thingfabric.dev/go-fabric/client/interaction"
+	"thingfabric.dev/go-fabric/clock/clocktest"
 	"thingfabric.dev/go-fabric/cluster/spec"
 	gencomm "thingfabric.dev/go-fabric/cluster/spec/generalcommissioning"
 	"thingfabric.dev/go-fabric/controller/ca"
@@ -119,7 +121,7 @@ func newTestFlow(t *testing.T, handle func(imRequest) (uint8, []byte, bool)) (*f
 func newLossyTestFlow(t *testing.T, handle func(imRequest) (uint8, []byte, bool), lose func(imRequest) bool) (f *flow, clock *fakeClock) {
 	t.Helper()
 	clock = newFakeClock()
-	dev := &scriptedDevice{session: 0x0101, inbox: make(chan []byte, 1024), handle: handle, lose: lose}
+	dev := &scriptedDevice{session: 0x0101, inbox: make(chan []byte, 1024), stop: make(chan struct{}), handle: handle, lose: lose}
 	defer func() { flowDevices.Store(f, dev) }()
 	mgr, err := exchange.NewManager(&deviceConn{dev: dev}, exchange.Config{Clock: clock, Rand: func() float64 { return 0.5 }})
 	if err != nil {
@@ -127,8 +129,12 @@ func newLossyTestFlow(t *testing.T, handle func(imRequest) (uint8, []byte, bool)
 	}
 	s := newScriptedSession(t, mgr, dev)
 	go dev.run()
+	t.Cleanup(func() { close(dev.stop) })
 	t.Cleanup(mgr.Close)
-	authority, err := ca.New(ca.Config{})
+	// The CA issues on a clock of its own: inside a synctest bubble
+	// (runDriven's callers) the wall clock starts at 2000-01-01, and the CA's
+	// back-dated notBefore would leave the Matter epoch.
+	authority, err := ca.New(ca.Config{Clock: clocktest.New(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -407,40 +413,42 @@ func TestFlowDisarmsFailsafeWhenCallerAborts(t *testing.T) {
 
 	t.Run("a disarm that fails is logged and the abort is what returns", func(t *testing.T) {
 		t.Parallel()
-		// The device takes ArmFailSafe(0) and never answers it.
-		dev := &failsafeDevice{info: info}
-		var silent atomic.Int32
-		f, clock := newTestFlow(t, func(req imRequest) (uint8, []byte, bool) {
-			if req.opcode == im.OpcodeInvokeRequest {
-				if _, fields, err := decodeInvoke(req.payload); err == nil {
-					var arm gencomm.ArmFailSafeRequest
-					if arm.DecodeTLV(fields) == nil && arm.ExpiryLengthSeconds == 0 {
-						silent.Add(1)
-						return 0, nil, false
+		synctest.Test(t, func(t *testing.T) {
+			// The device takes ArmFailSafe(0) and never answers it.
+			dev := &failsafeDevice{info: info}
+			var silent atomic.Int32
+			f, clock := newTestFlow(t, func(req imRequest) (uint8, []byte, bool) {
+				if req.opcode == im.OpcodeInvokeRequest {
+					if _, fields, err := decodeInvoke(req.payload); err == nil {
+						var arm gencomm.ArmFailSafeRequest
+						if arm.DecodeTLV(fields) == nil && arm.ExpiryLengthSeconds == 0 {
+							silent.Add(1)
+							return 0, nil, false
+						}
 					}
 				}
+				return dev.handle(req)
+			})
+			var logged syncBuffer
+			f.log = slog.New(slog.NewTextHandler(&logged, nil))
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			var canceledAt time.Time
+			f.steps = []step{arm(f), abortStep(8, func() { canceledAt = clock.Now(); cancel() })}
+			end, err := runDriven(t, clock, func() error { return f.execute(ctx) })
+			if err != context.Canceled || silent.Load() != 1 { //nolint:errorlint // returned as is
+				t.Fatalf("error %v, ArmFailSafe(0) sent %d times, want context.Canceled and once", err, silent.Load())
 			}
-			return dev.handle(req)
+			if waited := end.Sub(canceledAt); waited >= canceledExpiryWait+time.Second {
+				t.Fatalf("the expiry waited %v after the cancel, want less than %v (CommissioningCancelTest.ts: settled in less than 3 s)", waited, canceledExpiryWait+time.Second)
+			}
+			if !strings.Contains(logged.String(), "matter.controller.commissioning.reset_failsafe_failed") {
+				t.Fatalf("the failed disarm is not logged: %q", logged.String())
+			}
+			if f.failSafeEnd.IsZero() {
+				t.Fatal("the fail-safe counts as disarmed although the device never confirmed")
+			}
 		})
-		var logged syncBuffer
-		f.log = slog.New(slog.NewTextHandler(&logged, nil))
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		var canceledAt time.Time
-		f.steps = []step{arm(f), abortStep(8, func() { canceledAt = clock.Now(); cancel() })}
-		end, err := runDriven(t, clock, func() error { return f.execute(ctx) })
-		if err != context.Canceled || silent.Load() != 1 { //nolint:errorlint // returned as is
-			t.Fatalf("error %v, ArmFailSafe(0) sent %d times, want context.Canceled and once", err, silent.Load())
-		}
-		if waited := end.Sub(canceledAt); waited >= canceledExpiryWait+time.Second {
-			t.Fatalf("the expiry waited %v after the cancel, want less than %v (CommissioningCancelTest.ts: settled in less than 3 s)", waited, canceledExpiryWait+time.Second)
-		}
-		if !strings.Contains(logged.String(), "matter.controller.commissioning.reset_failsafe_failed") {
-			t.Fatalf("the failed disarm is not logged: %q", logged.String())
-		}
-		if f.failSafeEnd.IsZero() {
-			t.Fatal("the fail-safe counts as disarmed although the device never confirmed")
-		}
 	})
 }
 
@@ -571,40 +579,42 @@ func TestFlowDisarmsFailsafeStartedNotAnswered(t *testing.T) {
 
 	t.Run("the disarm of an unanswered first ArmFailSafe failing", func(t *testing.T) {
 		t.Parallel()
-		// The device takes both and answers neither.
-		dev := &failsafeDevice{info: info}
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		first := unanswered(dev, 1, cancel)
-		var disarms atomic.Int32
-		var disarmAt atomic.Int64
-		var clock *fakeClock
-		var f *flow
-		f, clock = newTestFlow(t, func(req imRequest) (uint8, []byte, bool) {
-			if expiry, ok := armRequest(req); ok && expiry == 0 {
-				if disarms.Add(1) == 1 {
-					disarmAt.Store(clock.Now().UnixNano())
+		synctest.Test(t, func(t *testing.T) {
+			// The device takes both and answers neither.
+			dev := &failsafeDevice{info: info}
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			first := unanswered(dev, 1, cancel)
+			var disarms atomic.Int32
+			var disarmAt atomic.Int64
+			var clock *fakeClock
+			var f *flow
+			f, clock = newTestFlow(t, func(req imRequest) (uint8, []byte, bool) {
+				if expiry, ok := armRequest(req); ok && expiry == 0 {
+					if disarms.Add(1) == 1 {
+						disarmAt.Store(clock.Now().UnixNano())
+					}
+					return 0, nil, false
 				}
-				return 0, nil, false
+				return first(req)
+			})
+			var logged syncBuffer
+			f.log = slog.New(slog.NewTextHandler(&logged, nil))
+			f.steps = []step{arm(f)}
+			end, err := runDriven(t, clock, func() error { return f.execute(ctx) })
+			if err != context.Canceled || disarms.Load() != 1 { //nolint:errorlint // returned as is
+				t.Fatalf("error %v, ArmFailSafe(0) sent %d times, want context.Canceled and once", err, disarms.Load())
 			}
-			return first(req)
+			if waited := end.Sub(time.Unix(0, disarmAt.Load())); waited >= canceledExpiryWait+time.Second {
+				t.Fatalf("the expiry waited %v, want less than %v from the cancel (CommissioningCancelTest.ts: settled in less than 3 s)", waited, canceledExpiryWait+time.Second)
+			}
+			if !strings.Contains(logged.String(), "matter.controller.commissioning.reset_failsafe_failed") {
+				t.Fatalf("the failed disarm is not logged: %q", logged.String())
+			}
+			if !f.failsafeMayBeArmed() {
+				t.Fatal("the fail-safe counts as disarmed although the device never confirmed")
+			}
 		})
-		var logged syncBuffer
-		f.log = slog.New(slog.NewTextHandler(&logged, nil))
-		f.steps = []step{arm(f)}
-		end, err := runDriven(t, clock, func() error { return f.execute(ctx) })
-		if err != context.Canceled || disarms.Load() != 1 { //nolint:errorlint // returned as is
-			t.Fatalf("error %v, ArmFailSafe(0) sent %d times, want context.Canceled and once", err, disarms.Load())
-		}
-		if waited := end.Sub(time.Unix(0, disarmAt.Load())); waited >= canceledExpiryWait+time.Second {
-			t.Fatalf("the expiry waited %v, want less than %v from the cancel (CommissioningCancelTest.ts: settled in less than 3 s)", waited, canceledExpiryWait+time.Second)
-		}
-		if !strings.Contains(logged.String(), "matter.controller.commissioning.reset_failsafe_failed") {
-			t.Fatalf("the failed disarm is not logged: %q", logged.String())
-		}
-		if !f.failsafeMayBeArmed() {
-			t.Fatal("the fail-safe counts as disarmed although the device never confirmed")
-		}
 	})
 }
 
@@ -689,35 +699,37 @@ func TestFlowReconnectAbort(t *testing.T) {
 
 	t.Run("the expiry is bounded from the cancel", func(t *testing.T) {
 		t.Parallel()
-		// The device takes ArmFailSafe(0) and never answers it.
-		dev := &failsafeDevice{info: info}
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		var disarms atomic.Int32
-		var canceledAt time.Time
-		var clock *fakeClock
-		f, logged := rig(t, func(req imRequest) (uint8, []byte, bool) {
-			if expiry, ok := armRequest(req); ok && expiry == 0 {
-				disarms.Add(1)
-				return 0, nil, false
+		synctest.Test(t, func(t *testing.T) {
+			// The device takes ArmFailSafe(0) and never answers it.
+			dev := &failsafeDevice{info: info}
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			var disarms atomic.Int32
+			var canceledAt time.Time
+			var clock *fakeClock
+			f, logged := rig(t, func(req imRequest) (uint8, []byte, bool) {
+				if expiry, ok := armRequest(req); ok && expiry == 0 {
+					disarms.Add(1)
+					return 0, nil, false
+				}
+				return dev.handle(req)
+			}, func(ctx context.Context, f *flow) error {
+				canceledAt = f.now()
+				cancel()
+				return waitForContext(ctx, f)
+			})
+			clock = f.c.ctx.Clock.(*fakeClock)
+			end, err := runDriven(t, clock, func() error { return f.execute(ctx) })
+			if err != context.Canceled || disarms.Load() != 1 { //nolint:errorlint // the reason itself
+				t.Fatalf("error %v, ArmFailSafe(0) sent %d times, want context.Canceled and once", err, disarms.Load())
 			}
-			return dev.handle(req)
-		}, func(ctx context.Context, f *flow) error {
-			canceledAt = f.now()
-			cancel()
-			return waitForContext(ctx, f)
+			if waited := end.Sub(canceledAt); waited >= canceledExpiryWait+time.Second {
+				t.Fatalf("the expiry waited %v after the cancel, want less than %v (CommissioningCancelTest.ts: settled in less than 3 s)", waited, canceledExpiryWait+time.Second)
+			}
+			if !strings.Contains(logged.String(), "matter.controller.commissioning.reset_failsafe_failed") {
+				t.Fatalf("the failed disarm is not logged: %q", logged.String())
+			}
 		})
-		clock = f.c.ctx.Clock.(*fakeClock)
-		end, err := runDriven(t, clock, func() error { return f.execute(ctx) })
-		if err != context.Canceled || disarms.Load() != 1 { //nolint:errorlint // the reason itself
-			t.Fatalf("error %v, ArmFailSafe(0) sent %d times, want context.Canceled and once", err, disarms.Load())
-		}
-		if waited := end.Sub(canceledAt); waited >= canceledExpiryWait+time.Second {
-			t.Fatalf("the expiry waited %v after the cancel, want less than %v (CommissioningCancelTest.ts: settled in less than 3 s)", waited, canceledExpiryWait+time.Second)
-		}
-		if !strings.Contains(logged.String(), "matter.controller.commissioning.reset_failsafe_failed") {
-			t.Fatalf("the failed disarm is not logged: %q", logged.String())
-		}
 	})
 
 	t.Run("on a closed session nothing is sent", func(t *testing.T) {
@@ -861,30 +873,30 @@ func (d *stepDeadline) Err() error {
 	}
 }
 
-// driveStep is how far runDriven moves the fake clock at a time.
-const driveStep = 50 * time.Millisecond
-
-// runDriven runs run and advances clock by driveStep at a time until it
-// returns: the flow's waits — the exchange's response timeout, the
-// expiry's canceledExpiryWait — run on clock. It returns clock's time at
-// the return and run's error; the test fails after ten wall seconds.
-// Between two steps it paces with clock's Yield (the fake clock's own
-// pause), not a wall-clock sleep of its own.
+// runDriven runs run and moves clock forward only while everything of the
+// bubble waits — the flow, the scripted device and the manager durably
+// blocked (synctest.Wait) — and then to the earliest armed deadline and
+// no further (clocktest.Fake.AdvanceToNext). The flow's waits — the
+// exchange's response timeout, the expiry's canceledExpiryWait — run on
+// clock, so the time it returns is the flow's own: a goroutine the
+// scheduler stalls stalls the clock with it. It returns clock's time at
+// run's return and run's error, and fails the test when everything waits
+// and nothing is armed. It runs inside the synctest.Test bubble that built
+// the flow (newTestFlow), so the scripted device and the manager belong to
+// it.
 func runDriven(t *testing.T, clock *fakeClock, run func() error) (time.Time, error) {
 	t.Helper()
 	done := make(chan error, 1)
 	go func() { done <- run() }()
-	deadline := time.Now().Add(10 * time.Second)
 	for {
+		synctest.Wait()
 		select {
 		case err := <-done:
 			return clock.Now(), err
 		default:
 		}
-		if time.Now().After(deadline) {
-			t.Fatal("the flow has not returned")
+		if _, ok := clock.AdvanceToNext(); !ok {
+			t.Fatal("the flow waits and no timer is armed")
 		}
-		clock.Advance(driveStep)
-		clock.Yield()
 	}
 }

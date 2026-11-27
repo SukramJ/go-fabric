@@ -92,6 +92,9 @@ type scriptedDevice struct {
 	mu      sync.Mutex
 	counter uint32
 	inbox   chan []byte
+	// stop, when set, ends run without closing inbox (newLossyTestFlow's
+	// cleanup), so a synctest bubble's device goroutine exits with it.
+	stop chan struct{}
 	// received counts the datagrams the manager sent the device.
 	received atomic.Int32
 }
@@ -127,9 +130,19 @@ func (d *scriptedDevice) receive(b []byte) {
 	d.inbox <- b
 }
 
-// run serves the inbox until it closes.
+// run serves the inbox until it closes or stop does.
 func (d *scriptedDevice) run() {
-	for b := range d.inbox {
+	for {
+		var b []byte
+		select {
+		case <-d.stop:
+			return
+		case in, ok := <-d.inbox:
+			if !ok {
+				return
+			}
+			b = in
+		}
 		hdr, hl, err := message.UnmarshalHeader(b)
 		if err != nil {
 			continue
