@@ -60,12 +60,15 @@ func TestBatchErrorNamesTheHeldCallRefusedAtCommit(t *testing.T) {
 		want wantCall
 	}{
 		{"Add of a held key", func(t *testing.T, b *node.Batch) error {
+			t.Helper()
 			return b.Add(bridgedWithParts(t, "a"))
 		}, wantCall{node.BatchAdd, "a", false, node.ErrDuplicateKey}},
 		{"Add of a served part key", func(t *testing.T, b *node.Batch) error {
+			t.Helper()
 			return b.Add(bridgedWithParts(t, "y", part))
 		}, wantCall{node.BatchAdd, "y", false, node.ErrDuplicateKey}},
 		{"Replace", func(t *testing.T, b *node.Batch) error {
+			t.Helper()
 			return b.Replace(endpoint.StringKey("r"), bridgedWithParts(t, "r", part))
 		}, wantCall{node.BatchReplace, "r", false, node.ErrDuplicateKey}},
 		{"Forget", func(_ *testing.T, b *node.Batch) error {
