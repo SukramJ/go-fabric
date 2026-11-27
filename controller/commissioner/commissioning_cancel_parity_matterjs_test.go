@@ -21,6 +21,7 @@ package commissioner
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -142,6 +143,25 @@ func TestCommissioningCancelParity(t *testing.T) {
 		_, err := runDriven(t, clock, func() error { return f.execute(ctx) })
 		if !isCancel(err) || err.Error() != errCallerGaveUp.Error() || dev.expiries.Load() != 1 || f.failsafeMayBeArmed() {
 			t.Fatalf("error %v, %d expiries, may be armed %v; want the reason, 1 and false", err, dev.expiries.Load(), f.failsafeMayBeArmed())
+		}
+	})
+
+	// matter.js rejects with the reason itself (`throw asError(cancel.reason)`,
+	// ControllerCommissioningFlow.ts:486): a reason that wraps the context's
+	// error comes back as it is, its message kept.
+	t.Run("rejects with the reason itself when it wraps the context's error", func(t *testing.T) {
+		t.Parallel()
+		dev := newCancelDevice()
+		ctx, cancel := context.WithCancelCause(context.Background())
+		defer cancel(nil)
+		reason := fmt.Errorf("user quit: %w", context.Canceled)
+		dev.withhold = isCommand(gencomm.CmdSetRegulatoryConfig)
+		dev.onWithheld = func() { cancel(reason) }
+		f, clock := newTestFlow(t, dev.handle)
+		f.steps = []step{armStep(f), regulatoryStep(f)}
+		_, err := runDriven(t, clock, func() error { return f.execute(ctx) })
+		if err != reason || dev.expiries.Load() != 1 { //nolint:errorlint // the identity is the point
+			t.Fatalf("error %v, %d expiries; want the reason itself (%v) and 1", err, dev.expiries.Load(), reason)
 		}
 	})
 
@@ -338,12 +358,7 @@ func TestClientAttestationCancelParity(t *testing.T) {
 	f.c.ctx.Attestation = store
 	done := make(chan error, 1)
 	go func() { _, err := f.deviceAttestation(ctx); done <- err }()
-	select {
-	case err := <-done:
-		if !isCancel(err) {
-			t.Fatalf("deviceAttestation = %v, want the cancel's reason", err)
-		}
-	case <-time.After(5 * time.Second):
-		t.Fatal("the attestation still waits for the lookup after the cancel")
+	if err := receive(t, "the attestation's return after the cancel", done); !isCancel(err) {
+		t.Fatalf("deviceAttestation = %v, want the cancel's reason", err)
 	}
 }
