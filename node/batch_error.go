@@ -47,7 +47,11 @@ func (o BatchOp) String() string {
 // BatchError is what [Partition.Batch] returns when anything failed after
 // fn returned: fn's own error beside the errors of the calls that answered
 // nil and failed later, the store errors no call owns, and the reassembly's.
-// A call that returned nil succeeded unless Calls names it. It unwraps to
+// A call that returned nil succeeded unless Calls names it, or a later
+// call of the batch on the same key superseded or dropped it (a held
+// Replace superseded by a later Replace, a held Add dropped by a Remove
+// or by a Forget applied at the end, a held Replace dropped with its
+// endpoint; see [Partition.Batch]). It unwraps to
 // each non-nil part, so errors.Is finds every sentinel a part carries
 // ([ErrDuplicateKey], [ErrUnknownKey], a store's error, …).
 type BatchError struct {
@@ -70,8 +74,10 @@ type BatchError struct {
 	// erasures of its Forgets wait, recorded as forgets in progress,
 	// until a reassembly succeeds; the next Batch, an empty one
 	// included, reassembles and runs them, [Aggregator.RetirePartition]
-	// does too, [Node.Stop] runs them once nothing is served, and the
-	// next [New] finishes what is left.
+	// does too (returning its error plain), [Node.Stop] runs them once nothing is served, and the
+	// next [New] finishes what is left. Until then a removed device
+	// is still bound: an Add of the same instance is
+	// [device.ErrAddedElsewhere] in the next batch, which heals.
 	Reassembly error
 }
 
@@ -112,11 +118,15 @@ type BatchCallError struct {
 	// StableKey for an Add, the key argument otherwise. A collision with
 	// a part key names that key in Err's text.
 	Key device.SourceKey
-	// Applied reports that the set took the call's change and Err is
-	// what failed after it — the store's reservation or erasure work
+	// Applied reports that the call changed state and Err is what
+	// failed with or after it: the store's reservation or erasure work
 	// (an Add stays in the set, a Forget's device out of it, and the
-	// Forget can be made again). False: the call changed nothing — it
-	// was refused at its judgement or undone.
+	// Forget can be made again), or a Replace held to the end of fn by
+	// a declaration the specification level withholds, which took the
+	// replaced endpoint off the wire as at the call (decision 728).
+	// False: the set is as it was without the call — refused at its
+	// judgement or undone; a declaration the level withholds is still
+	// recorded as withheld for [Node.Surface].
 	Applied bool
 	// Err is what failed, the call's errors joined.
 	Err error

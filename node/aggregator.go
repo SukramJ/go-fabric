@@ -143,6 +143,10 @@ type Aggregator struct {
 	// (decision 722). a.mu guards both.
 	leftDetach []func()
 	leftErase  []reservationOp
+	// afterFailedReassembly, when set, runs in a batch whose reassembly
+	// failed before its work is parked (tests: a concurrent reassembly
+	// in that window).
+	afterFailedReassembly func()
 	// forgetMu serialises the record of the forgets in progress
 	// (markForget).
 	forgetMu sync.Mutex
@@ -273,8 +277,9 @@ func (a *Aggregator) findLocked(key string) (part *partition, idx int) {
 // endpoints ([ErrPartitionNotEmpty]): Remove them first, or in a
 // [Partition.Batch]. Its reassembly redoes one a batch failed, and the
 // unbinding and erasures that batch left then run as an empty
-// [Partition.Batch] of the default partition does, whose [*BatchError]
-// it returns (decisions 718, 722).
+// [Partition.Batch] of the default partition runs them; the store's or
+// the reassembly's error of that work is returned, wrapped, the
+// partition retired all the same (decisions 718, 722, 725).
 func (a *Aggregator) RetirePartition(ctx context.Context, name string) error {
 	scope := scopeOf(name)
 	if scope == Scope {
@@ -316,7 +321,17 @@ func (a *Aggregator) RetirePartition(ctx context.Context, name string) error {
 	if !left {
 		return nil
 	}
-	return a.Partition(Scope).Batch(ctx, func(*Batch) error { return nil })
+	err := a.Partition(Scope).Batch(ctx, func(*Batch) error { return nil })
+	// The retirement stands: what failed is the work left, its parts
+	// returned plain — a [*BatchError] is a batch's result alone
+	// (decision 725).
+	if be, ok := errors.AsType[*BatchError](err); ok {
+		err = errors.Join(be.Store, be.Reassembly)
+	}
+	if err != nil {
+		return fmt.Errorf("node: partition retired; the work a failed reassembly left: %w", err)
+	}
+	return nil
 }
 
 // Add adds ep under the Aggregator — matter.js `aggregator.add(endpoint)`
@@ -575,8 +590,12 @@ type takenCall struct {
 // [ErrStopped] on a stopped node, or a [*BatchError]: fn's error, the
 // calls that failed after fn, the store errors of no call and the
 // reassembly's error. A call that returned nil succeeded unless
-// [BatchError.Calls] names it — by its kind and its own key, in call
-// order ([BatchCallError]): a held call refused or failed at its
+// [BatchError.Calls] names it, or a later call of the batch on the same
+// key superseded or dropped it — a held Replace superseded by a later
+// Replace, a held Add dropped by a Remove or by a Forget applied at the
+// end, a held Replace dropped with its endpoint by a Remove or a Forget.
+// Calls names a call by its kind and its own key, in call order
+// ([BatchCallError]): a held call refused or failed at its
 // judgement ([ErrDuplicateKey], [ErrUnknownKey] for a held Replace whose
 // key left the partition, [ErrReservedKey], [ErrPolicyMismatch] or the
 // refusal of a server that needs the node's Matter time of a device
@@ -584,7 +603,9 @@ type takenCall struct {
 // specification level withholds, a device's attach error), a device
 // added or replaced at the call that gained during fn a part key another
 // endpoint serves ([ErrDuplicateKey], the take undone, see [Batch]) —
-// none of them applied — and the store work of an applied call (an Add's
+// none of them applied, but for a held Replace whose declaration the
+// level withholds, which took the replaced endpoint off the wire
+// (decision 728) — and the store work of an applied call (an Add's
 // release, a Remove's reservation, a Forget's erasure). errors.Is finds
 // every sentinel through it (issue #616, decisions 719-721).
 //
@@ -598,7 +619,11 @@ type takenCall struct {
 // one that still cannot run — Stop, a crash, a store that refuses it —
 // is finished at the next [New] before the host adds anything (decision
 // 726). An erasure whose record cannot be written is its Forget's
-// [BatchCallError], applied: make the Forget again. So a batch that starts after a failed reassembly
+// [BatchCallError], applied: make the Forget again. Until the next
+// reassembly succeeds a removed device is still bound, so an Add of the
+// same instance is refused at the call with [device.ErrAddedElsewhere];
+// the batch that refuses it heals and unbinds it, and the next Add takes
+// it (decision 727). So a batch that starts after a failed reassembly
 // returned serves the whole set, or returns why not (issue #633, decision
 // 718).
 //
@@ -670,6 +695,9 @@ func (p *Partition) Batch(ctx context.Context, fn func(b *Batch) error) error {
 		reErr = a.reassembleIfBehind(ctx)
 	}
 	if reErr != nil {
+		if f := a.afterFailedReassembly; f != nil {
+			f()
+		}
 		left, recErr := a.leave(ctx, detach, erase, keep, &b.calls)
 		storeErr = errors.Join(storeErr, recErr)
 		if left {
@@ -1169,7 +1197,13 @@ func (b *Batch) commitPending() error {
 					refused[t.seq] = err
 					continue
 				}
-				errs = append(errs, b.calls.add(t.origins, false, err))
+				// An error of a call that changed the set anyway is the
+				// call's, applied (decision 728).
+				changed, isChanged := err.(changedError)
+				if isChanged {
+					err = changed.err
+				}
+				errs = append(errs, b.calls.add(t.origins, isChanged, err))
 				applied = true
 			}
 			if applied {
@@ -1227,10 +1261,23 @@ func (b *Batch) judgeLocked(t pendingCall) (blocked bool, err error) {
 		if k, ok := a.servedOfLocked(entries, part, i); ok {
 			return true, fmt.Errorf("%w: %s", ErrDuplicateKey, k)
 		}
-		return false, b.replaceLocked(t.seq, t.origins, part, i, t.key, t.ep, entries)
+		err = b.replaceLocked(t.seq, t.origins, part, i, t.key, t.ep, entries)
+		if err != nil && len(withheldKeys(entries)) > 0 {
+			// A declaration the level withholds took the replaced
+			// endpoint off the wire (replaceWithheldLocked): the call
+			// changed the set.
+			return false, changedError{err}
+		}
+		return false, err
 	}
 	return false, nil
 }
+
+// changedError is the error of a held call judgeLocked applied although
+// it failed: the call changed the set ([BatchCallError.Applied]).
+type changedError struct{ err error }
+
+func (e changedError) Error() string { return e.err.Error() }
 
 // addedLocked reports whether ep, the set's endpoint under key, is one
 // the batch's Add put there, and that Add's place in call order; a.mu is

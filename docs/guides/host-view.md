@@ -266,11 +266,18 @@ errors of a held change arrive in `Batch`'s result, not from the call
 (`ErrDuplicateKey`, `ErrUnknownKey` and the others its doc names); a
 call after `fn` returned is `ErrBatchDone`. Anything that fails after
 `fn` makes the result a `*node.BatchError`: a call that returned nil
-succeeded unless its `Calls` names it — one `*node.BatchCallError` per
+succeeded unless its `Calls` names it, or a later call of the batch on
+the same key superseded or dropped it (a held `Replace` superseded by a
+later `Replace`, a held `Add` dropped by a `Remove` or `Forget`) — one
+`*node.BatchCallError` per
 call, in call order, with the call's kind (`BatchAdd`, `BatchReplace`,
 `BatchRemove`, `BatchForget`), its own key and `Applied`, which says
-whether the set took the change and only the store work after it failed
-(an `Add` then stays added, a `Forget` can be made again). `Store`
+whether the call changed state and only the store work after it failed
+(an `Add` then stays added, a `Forget` can be made again) — or, for a
+held `Replace` by a declaration the specification level withholds,
+whether it took the replaced endpoint off the wire. An erasure a failed
+reassembly deferred is recorded as a forget in progress: `Stop` runs it,
+and the next start finishes what is left. `Store`
 holds the store errors of no call, `Reassembly` the reassembly's: the
 set holds the batch's changes but the node still serves the topology
 before, keeps the removed devices bound and defers the erasures. The
