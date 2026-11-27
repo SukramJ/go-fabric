@@ -138,7 +138,7 @@ func TestReportChunksStayWithinThePeerLimit(t *testing.T) {
 	for i := range reports {
 		reports[i] = makeAttributeReport(uint16(i + 1)) //nolint:gosec // bounded fixture
 	}
-	chunks, err := chunkReportData(im.ReportData{Reports: reports}, limits.budget, limits.hardCap)
+	chunks, err := chunkReportData(nil, im.ReportData{Reports: reports}, limits.budget, limits.hardCap)
 	if err != nil {
 		t.Fatal(err)
 	}

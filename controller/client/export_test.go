@@ -178,12 +178,38 @@ func PatchRemoveFabric(r *Registry, fn func(fabricIndex uint8, invoke func(fabri
 	}
 }
 
+// SetReactionGate sets the test seam every reaction of r to a
+// BasicInformation event calls, with the node and the event id, before it
+// runs.
+func SetReactionGate(r *Registry, gate func(n *Node, event uint32)) {
+	r.mu.Lock()
+	r.reactionGate = gate
+	r.mu.Unlock()
+}
+
+// NoteLeaveOnLatch arms a decommission's leave latch for fabricIndex on n,
+// delivers a Leave of fabricIndex to it as a report does — live as the
+// report's — and reports whether the latch saw it.
+func NoteLeaveOnLatch(r *Registry, n *Node, fabricIndex uint8, live bool) bool {
+	latch := &leaveLatch{fabricIndex: fabricIndex}
+	r.mu.Lock()
+	r.leaves[n] = latch
+	r.mu.Unlock()
+	defer func() {
+		r.mu.Lock()
+		delete(r.leaves, n)
+		r.mu.Unlock()
+	}()
+	r.noteLeave(n, fabricIndex, live)
+	return latch.seen.Load()
+}
+
 // EmitLeave delivers a BasicInformation Leave event of fabricIndex to r as
-// n's subscription does (onEvent) and waits for the reaction it starts —
+// n's established subscription does (onEvent) and waits for the reaction it starts —
 // matter.js's leave.emit on the peer's BasicInformationClient events
 // (DecommissionTest.ts:239 at b25ed960).
 func EmitLeave(r *Registry, n *Node, fabricIndex uint8) {
-	r.onEvent(n, 0, basicinformation.ClusterID, basicinformation.EventLeave, basicinformation.LeaveEvent{FabricIndex: fabricIndex})
+	r.onEvent(n, 0, basicinformation.ClusterID, basicinformation.EventLeave, basicinformation.LeaveEvent{FabricIndex: fabricIndex}, true)
 	r.work.Wait()
 }
 

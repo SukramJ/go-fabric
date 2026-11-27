@@ -286,7 +286,7 @@ func (r *Registry) commission(ctx context.Context, n *Node, o CommissionOptions)
 // ClientNode.decommission (packages/node/src/node/ClientNode.ts:200-210 at
 // b25ed960) as the node's fabric operation: a commissioned node is
 // decommissioned first (CommissioningClient.decommission,
-// CommissioningClient.ts:340-446), then the node is deleted (:208). A
+// CommissioningClient.ts:388-492 at b25ed960), then the node is deleted (:208). A
 // removal the peer refused, or one that was not confirmed, returns its
 // error and keeps the node. A node that failed to load is refused with its
 // load error and nothing is erased (:175-178, assertNotGone); [Registry.Forget]
@@ -384,7 +384,7 @@ func (r *Registry) storeReportedFabricIndex(n *Node, fabricIndex uint8) {
 }
 
 // leaveLatch is the decommission's watch for the peer's leave event
-// (CommissioningClient.ts:380-391).
+// (CommissioningClient.ts:426-437 at b25ed960).
 type leaveLatch struct {
 	fabricIndex uint8
 	seen        atomic.Bool
@@ -392,26 +392,29 @@ type leaveLatch struct {
 
 // noteLeave is the latch's listener: a leave of the fabric index being
 // removed, while the subscription is active, confirms the removal
-// (:384-390).
-func (r *Registry) noteLeave(n *Node, fabricIndex uint8) {
+// (:430-436, the guard :433). matter.js's listener runs inside the
+// report's awaited emit, so a Leave of the priming report finds the
+// subscription inactive; live — whether it was active when the report
+// arrived — gives the Go listener the same answer (onLeave).
+func (r *Registry) noteLeave(n *Node, fabricIndex uint8, live bool) {
 	r.mu.Lock()
 	l := r.leaves[n]
 	r.mu.Unlock()
-	if l != nil && l.fabricIndex == fabricIndex && n.SubscriptionActive() {
+	if l != nil && l.fabricIndex == fabricIndex && live && n.SubscriptionActive() {
 		l.seen.Store(true)
 	}
 }
 
 // decommission is CommissioningClient.decommission
-// (CommissioningClient.ts:340-446): without an OperationalCredentials
+// (CommissioningClient.ts:388-492 at b25ed960): without an OperationalCredentials
 // cluster in the image, or without our fabric index on the peer, the
 // CurrentFabricIndex is read with the default subscription's fabric
-// filter (:349-371); the leave latch is armed before RemoveFabric goes out
-// (:377-391); a non-Ok status fails whatever the leave event says
-// (:396-404, :418-420); an error is a confirmed removal when the leave was
-// seen or the session was lost to the removal (:405-417); then the peer's
-// sessions are given up (:422-427) and the record's commissioning fields
-// cleared — not the addresses (:429-435). It returns the former address.
+// filter (:397-417); the leave latch is armed before RemoveFabric goes out
+// (:423-437); a non-Ok status fails whatever the leave event says
+// (:442-450, :464-466); an error is a confirmed removal when the leave was
+// seen or the session was lost to the removal (:451-463); then the peer's
+// sessions are given up (:468-473) and the record's commissioning fields
+// cleared — not the addresses (:475-479). It returns the former address.
 func (r *Registry) decommission(ctx context.Context, n *Node) (PeerAddress, error) {
 	addr, ok := n.commissionedAddress()
 	if !ok {
@@ -422,8 +425,8 @@ func (r *Registry) decommission(ctx context.Context, n *Node) (PeerAddress, erro
 	oc := n.opCreds()
 	current := currentFabricIndex(oc)
 	if oc == nil || (rec.FabricIndexOnPeer == 0 && current == 0) {
-		// The read has the cache's fabric filter (CommissioningClient.ts:391-392
-		// at db021da0).
+		// The read has the cache's fabric filter (CommissioningClient.ts:406-409
+		// at b25ed960).
 		n.mu.RLock()
 		noFilter := !n.s.cacheFabricFiltered()
 		n.mu.RUnlock()
@@ -517,7 +520,7 @@ func (r *Registry) decommission(ctx context.Context, n *Node) (PeerAddress, erro
 // removalConfirmedBy reports whether an error of RemoveFabric means the
 // command was delivered: matter.js causedBy(PeerMessageMissingError,
 // PeerLeftError, FabricRemovedError, PeerInitiatedCloseError)
-// (CommissioningClient.ts:437-440 at db021da0). PeerMessageMissingError and
+// (CommissioningClient.ts:452-455 at b25ed960). PeerMessageMissingError and
 // PeerInitiatedCloseError are client/exchange's
 // [*exchange.PeerMessageMissingError] and [*exchange.PeerInitiatedCloseError];
 // PeerLeftError is [ErrPeerLeft]; FabricRemovedError is [ErrFabricRemoved].

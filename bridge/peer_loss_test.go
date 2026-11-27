@@ -191,7 +191,7 @@ func threeChunkReport(t *testing.T, subID uint32) im.ReportData {
 			Value: im.AttributeValue{Value: bytes.Repeat([]byte{byte('a' + i)}, 700)},
 		})
 	}
-	chunks, err := chunkReportData(report, udpChunkLimits.budget, udpChunkLimits.hardCap)
+	chunks, err := chunkReportData(nil, report, udpChunkLimits.budget, udpChunkLimits.hardCap)
 	if err != nil || len(chunks) != 3 {
 		t.Fatalf("report splits into %d chunks (%v), want 3", len(chunks), err)
 	}

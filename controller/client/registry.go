@@ -125,6 +125,12 @@ type Registry struct {
 	// RegistryReactions): the group the clock carries, nil outside a
 	// fabrictest site.
 	inflight *inflight.Group
+	// reactionGate is a test seam, under mu, nil in production: a
+	// reaction to a BasicInformation event (goReaction) calls it with the
+	// node and the event id before it runs, so a test can hold the
+	// reaction past the moment the node's subscription became
+	// established (issue #628).
+	reactionGate func(n *Node, event uint32)
 
 	// op is matter.js Peers.#mutex (Peers.ts:91): it serializes the
 	// registration of a fabric operation, ForAddress's creation, the cull,
@@ -814,7 +820,7 @@ func (r *Registry) hooksFor(id string, holder *nodeHolder) Hooks {
 	host := h.Event
 	h.Event = func(endpoint uint16, cluster, event uint32, e EventData, value any) {
 		if n := holder.get(); n != nil {
-			r.onEvent(n, endpoint, cluster, event, value)
+			r.onEvent(n, endpoint, cluster, event, value, n.deliveryLive.Load())
 		}
 		if host != nil {
 			host(endpoint, cluster, event, e, value)

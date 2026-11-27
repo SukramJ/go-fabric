@@ -14,3 +14,10 @@ func SetAvStreamCommitRefusal(a *AvStream, refuse func() error) {
 func SetZoneCommitRefusal(z *Zones, refuse func() error) {
 	z.refuseForTests = refuse
 }
+
+// SetEvictHook makes p call hook between the admission of a new session
+// and the removal of the victim it names; nil restores the production
+// path.
+func SetEvictHook(p *Provider, hook func(victim ProviderSession)) {
+	p.beforeEvictForTests = hook
+}

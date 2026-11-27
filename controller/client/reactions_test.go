@@ -62,8 +62,8 @@ func eventReport(event, number uint64) im.EventReport {
 
 // TestReactionsNeedSubscription: a leave, shutDown or startUp delivered
 // without an active default subscription may be stale and is ignored
-// (Peers.ts:812-824, :842-851, :872-881). The events come from the
-// newly-commissioned read, which emits them (NetworkClient.ts:303-308)
+// (Peers.ts:869-881, :899-908, :929-938 at b25ed960). The events come from the
+// newly-commissioned read, which emits them (NetworkClient.ts:304-309 at b25ed960)
 // with no default subscription active; a host read would not emit them
 // at all (W4-ctlim-01).
 func TestReactionsNeedSubscription(t *testing.T) {
@@ -90,6 +90,75 @@ func TestReactionsNeedSubscription(t *testing.T) {
 		}
 		if sr.reg.Size() != 1 || sr.session.IsPeerLost() {
 			t.Fatal("an ignored reaction acted")
+		}
+	})
+}
+
+// TestReactionsOfReportBeforeSubscriptionHeldLate: a ShutDown, StartUp
+// and Leave of the newly-commissioned read are ignored also when their
+// reactions run only after the default subscription became active — the
+// interleaving of issue #628. matter.js's #onShutdown and #onStartUp run
+// inside the report's awaited emit and see the subscription inactive by
+// construction; the Go reactions run on goroutines of their own, so each
+// needs the report's live flag. The gate holds every reaction until the
+// subscription is active.
+func TestReactionsOfReportBeforeSubscriptionHeldLate(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		logs := &msgLog{}
+		sr := newScriptedRegistry(t, seedCommissioned(3), func(c *client.RegistryConfig) { c.Logger = slog.New(logs) })
+		n := sr.reg.Get("peer1")
+		client.SetNewlyCommissioned(n)
+		release := make(chan struct{})
+		client.SetReactionGate(sr.reg, func(*client.Node, uint32) { <-release })
+		if err := client.SaveSettingsAutoSubscribe(n); err != nil {
+			t.Fatal(err)
+		}
+		started := make(chan error, 1)
+		go func() { started <- n.Start(context.Background()) }()
+		boot := sr.next(t)
+		readRequestOf(t, boot)
+		sr.reply(t, boot, im.InteractionModelProtocolID, im.OpcodeReportData, dataReport(t, 0, sr.imageWithOpCreds("ours"),
+			eventReport(uint64(basicinfo.EventShutDown), 1), eventReport(uint64(basicinfo.EventStartUp), 2), leaveEvent(3, 3)))
+		if err := <-started; err != nil {
+			t.Fatal(err)
+		}
+		sub := sr.next(t)
+		subscribeRequestOf(t, sub)
+		sr.reply(t, sub, im.InteractionModelProtocolID, im.OpcodeReportData, dataReport(t, 33, nil))
+		sr.reply(t, sub, im.InteractionModelProtocolID, im.OpcodeSubscribeResponse, subscribeResponse(t, 33))
+		waitUntil(t, "the subscription", n.SubscriptionActive)
+		close(release)
+		synctest.Wait()
+		client.WaitRegistry(sr.reg)
+		for _, want := range []string{"leave_ignored", "shutdown_ignored", "startup_ignored"} {
+			if !logs.has("matter.controller.client.registry." + want) {
+				t.Errorf("no %s", want)
+			}
+		}
+		if sr.reg.Size() != 1 || sr.session.IsPeerLost() || !n.SubscriptionActive() {
+			t.Fatal("a reaction to an event of the read acted after the subscription became active")
+		}
+	})
+}
+
+// TestLeaveLatchNeedsLiveReport: a decommission's leave latch counts a
+// Leave only when the subscription was active when its report arrived
+// (CommissioningClient.ts:430-436 at b25ed960, whose listener runs inside
+// the report's awaited emit) — a Leave of a report from before the
+// subscription does not confirm the removal, although the subscription is
+// active when the listener runs.
+func TestLeaveLatchNeedsLiveReport(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		sr := newScriptedRegistry(t, seedCommissioned(3), nil)
+		n := sr.reg.Get("peer1")
+		sr.subscribe(t, n, sr.imageWithOpCreds("ours"), 33)
+		if client.NoteLeaveOnLatch(sr.reg, n, 3, false) {
+			t.Fatal("the latch counted a Leave of a report from before the subscription")
+		}
+		if !client.NoteLeaveOnLatch(sr.reg, n, 3, true) {
+			t.Fatal("the latch missed a Leave of a live report")
 		}
 	})
 }

@@ -131,3 +131,43 @@ func BenchmarkEncodeReportData(b *testing.B) {
 		benchReportBytes = buf
 	}
 }
+
+// BenchmarkChunkInitialReportWildcard measures the path a wildcard
+// Subscribe-Initial report goes out through, which neither benchmark above
+// passes: the chunker admits every report (and with it resolves every
+// value), fills the chunks at the UDP budget, and each chunk is encoded
+// as the bridge sends it. It is the measure of the per-value cost the
+// chunker carries (#625).
+func BenchmarkChunkInitialReportWildcard(b *testing.B) {
+	br := newBenchBridge(b, manyTempSensorsSnapshotterForTest())
+	dispatcher := br.Dispatcher()
+	if dispatcher == nil {
+		b.Fatal("dispatcher nil after Start — topology not assembled")
+	}
+	// A PASE subscriber, as BenchmarkBuildInitialReportWildcard.
+	report, matched := br.buildInitialReport(im.WithAuthModePASE(context.Background()), dispatcher, im.SubscribeRequest{
+		AttributeRequests: []im.ConcreteAttributePath{{}},
+	})
+	if matched == 0 {
+		b.Fatal("wildcard subscribe matched no paths — fixture assembles no reportable attributes")
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		c := newReportChunker(nil, im.ReportData{HasSubscription: true, SubscriptionID: 1}, reportChunkPayloadBudget, reportChunkHardCap, sliceAttributeReports(report.Reports), nil)
+		for {
+			chunk, ok, err := c.Next()
+			if err != nil {
+				b.Fatalf("chunker: %v", err)
+			}
+			if !ok {
+				break
+			}
+			buf, err := EncodeReportData(chunk)
+			if err != nil {
+				b.Fatalf("EncodeReportData: %v", err)
+			}
+			benchReportBytes = buf
+		}
+	}
+}

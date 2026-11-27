@@ -125,7 +125,7 @@ seams through which the facade, the test-support packages, the reference
 programs and the module's own tests reach package internals (`bridgeseam`,
 `channelseam`, `coreseam`, `dclseam`, `deviceseam`, `exchangeseam`, `facadeseam`, `fabrictestseam`,
 `nodeseam`, `sealseam`, `sessionseam`, `specseam`, `surfaceseam`, `udpseam`, `inflight`, `clockvar`); shared
-internals behind them (`serialqueue`, `forward`, `netwatch`, `valuejson`, `attestids`, `reportchunk`, `caseauth`, `deepcopy`);
+internals behind them (`serialqueue`, `forward`, `netwatch`, `valuejson`, `attestids`, `reportchunk`, `valueenc`, `caseauth`, `deepcopy`);
 and test support (`paritytest`, `chipdm`, the chip-tool suite `chiptool`). Nothing else is private by convention, so nothing
 else may be changed as if it were.
 
@@ -331,7 +331,13 @@ certification run: it runs every chip-tool job and certification family the
 nightly run does — the `long` group, whose one case waits 3 h 10 min, by its
 result on the base commit when the pull request changes documentation only —
 checks that the nested modules build against the versions
-they require, and cannot merge with one of them red
+they require, and cannot merge with one of them red. A release pull request in
+release shape — documentation plus, in the nested modules' and the examples'
+`go.mod`, only `require` lines of `thingfabric.dev/go-fabric…` modules that the
+same `go.mod` replaces with a local path — builds nothing its base commit did
+not, so it takes every chip-tool job's and family group's result from a
+nightly or dispatched run on the base commit and runs the nested modules'
+check and `ci.yml` itself
 ([Certifiability](https://github.com/thingfabric/go-fabric/blob/main/docs/certifiability.md#how-the-status-is-produced)).
 
 A guard holds the rule: `make apidiff` compares every public package with

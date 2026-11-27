@@ -293,6 +293,7 @@ var floors = []packageFloor{
 		why:          "declaration-only seam: an interface and a function variable transport/udp installs from its init, so the package holds no statement a test could execute",
 	},
 	{pkg: "thingfabric.dev/go-fabric/internal/valuejson", min: 87},
+	{pkg: "thingfabric.dev/go-fabric/internal/valueenc", min: 93, why: "#625: the two decoder-error returns of the one-element check are not reached by the tests"},
 	{pkg: "thingfabric.dev/go-fabric/internal/caseauth", min: 100},
 	{pkg: "thingfabric.dev/go-fabric/logring", min: 99},
 	{pkg: "thingfabric.dev/go-fabric/mdns", min: 92},

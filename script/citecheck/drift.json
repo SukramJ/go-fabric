@@ -311,7 +311,7 @@
   },
   {
     "file": "bridge/receive_dispatch.go",
-    "line": 652,
+    "line": 653,
     "citation": "InteractionMessenger.ts:431-460",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "at": "db021da0",
@@ -321,7 +321,7 @@
   },
   {
     "file": "bridge/receive_dispatch.go",
-    "line": 734,
+    "line": 735,
     "citation": "CommandInvokeResponse.ts:292-295",
     "resolved": "packages/protocol/src/action/server/CommandInvokeResponse.ts",
     "at": "db021da0",
@@ -350,7 +350,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 2447,
+    "line": 2465,
     "citation": "packages/node/src/behavior/state/managed/Datasource.ts:776-796",
     "resolved": "packages/node/src/behavior/state/managed/Datasource.ts",
     "identifier": "onChange",
@@ -967,7 +967,7 @@
   },
   {
     "file": "client/interaction/server.go",
-    "line": 23,
+    "line": 24,
     "citation": "InteractionServer.ts:302-304",
     "resolved": "packages/node/src/node/server/InteractionServer.ts",
     "at": "db021da0",
@@ -977,7 +977,7 @@
   },
   {
     "file": "client/interaction/server.go",
-    "line": 211,
+    "line": 212,
     "citation": "AttributeReadResponse.ts:160-162",
     "resolved": "packages/protocol/src/action/server/AttributeReadResponse.ts",
     "at": "db021da0",
@@ -2178,7 +2178,7 @@
   },
   {
     "file": "controller/client/node.go",
-    "line": 88,
+    "line": 96,
     "citation": "NetworkClient.ts:385-391",
     "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
     "identifier": "isNewlyCommissioned",
@@ -2187,7 +2187,7 @@
   },
   {
     "file": "controller/client/node.go",
-    "line": 105,
+    "line": 113,
     "citation": "NetworkClient.ts:268-273",
     "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
     "identifier": "fabricLabelReconciled",
@@ -2196,7 +2196,7 @@
   },
   {
     "file": "controller/client/node.go",
-    "line": 449,
+    "line": 463,
     "citation": "NetworkClient.ts:60-102",
     "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
     "identifier": "ClientNode",
@@ -2215,15 +2215,16 @@
   {
     "file": "controller/client/reactions_test.go",
     "line": 65,
-    "citation": "Peers.ts:812-824",
+    "citation": "Peers.ts:869-881",
     "resolved": "packages/node/src/node/client/Peers.ts",
+    "at": "b25ed960",
     "identifier": "startUp",
-    "nearest": 774,
+    "nearest": 922,
     "occurrences": 2
   },
   {
     "file": "controller/client/reactions_test.go",
-    "line": 185,
+    "line": 254,
     "citation": "Peers.ts:945-947",
     "resolved": "packages/node/src/node/client/Peers.ts",
     "at": "b25ed960",
@@ -2305,7 +2306,7 @@
   },
   {
     "file": "controller/client/registry.go",
-    "line": 437,
+    "line": 443,
     "citation": "CommissioningClient.ts:685-714",
     "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
     "identifier": "#bindPeer",

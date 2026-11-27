@@ -253,7 +253,7 @@ const citecheckDriftRatchet = 410
 // Phase 8's gate repair: the stale pins of fable-read-reg-w1 and
 // fable-diff-a1 N7 re-cited at b25ed960 (measured by make cite-report:
 // 2650 → 2641) (2641).
-const citecheckOffPinRatchet = 2641
+const citecheckOffPinRatchet = 2638
 
 // offPinRowRE reads the off-pin row of summary.md.
 var offPinRowRE = regexp.MustCompile(`(?m)^\| ` + regexp.QuoteMeta(offPinRow) + ` \| (\d+) \|$`)

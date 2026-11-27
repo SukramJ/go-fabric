@@ -308,7 +308,7 @@ func TestStreamInitialReportChunks_ChunkBudgetSplit(t *testing.T) {
 	}
 
 	// chunkReportData is the same function streamInitialReportChunks calls.
-	chunks, err := chunkReportData(report, reportChunkPayloadBudget, reportChunkHardCap)
+	chunks, err := chunkReportData(nil, report, reportChunkPayloadBudget, reportChunkHardCap)
 	if err != nil {
 		t.Fatalf("chunkReportData: %v", err)
 	}

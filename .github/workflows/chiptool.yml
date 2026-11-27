@@ -61,6 +61,10 @@
 #   - long-on-base: a release pull request that changes documentation only
 #     — `long`'s result on the pull request's base commit, from a nightly or
 #     dispatched run of this workflow; the gate is red without a passed one.
+#     A release pull request in release shape (documentation plus
+#     thingfabric.dev require lines its go.mod replaces, issue 632) reads
+#     every chip-tool leg, Go-TH group and family group there instead of
+#     running them.
 #   - nested-release: a release pull request only — `make
 #     nested-release-check`, each nested module built against the go-fabric
 #     version its go.mod requires, its replace dropped (R2-P5-sup-01).
@@ -74,8 +78,12 @@
 # `long` by its result on the base commit when the release pull request
 # changes documentation only (owner, 2026-11-24: the release diff is the
 # CHANGELOG, and the 3 h 10 min wait need not be paid twice for one tree;
-# a release pull request that changes code runs `long` itself) — the full
-# run is the gate of a release, not of every
+# a release pull request that changes code runs `long` itself), and every
+# chip job by its result on the base commit when the release pull request
+# is in release shape (owner, 2026-11-26, issue 632: a nested release
+# raises require lines that a replace makes inert, so no leg builds
+# anything the base commit did not; nested-release and ci.yml still run)
+# — the full run is the gate of a release, not of every
 # pull request (owner, 2026-11-10; v0.20.0 was tagged with an app-energy
 # failure only the nightly run showed). The `changes` job computes it once:
 # `full` (a labelled or release pull request) replaces the label test at
@@ -84,7 +92,8 @@
 # (chip-families-gate) is the gate: on a release pull request it is red
 # unless the suite, the control leg, the BLE-Wi-Fi leg, the BLE cases leg,
 # the Go-TH groups, the nested modules' release shape and every family
-# group ran and passed; on any other event it judges the families and the
+# group ran and passed (in release shape: passed on the base commit); on
+# any other event it judges the families and the
 # Go-TH groups. No new check name. ble-virtual.yml and otbr-virtual.yml
 # stay outside the gate: they need kernel modules a hosted runner may lack
 # and run weekly.
@@ -148,6 +157,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       code: ${{ steps.filter.outputs.code }}
+      release_shape: ${{ steps.filter.outputs.release_shape }}
       families: ${{ steps.groups.outputs.matrix }}
       full: ${{ steps.scope.outputs.full }}
       release: ${{ steps.scope.outputs.release }}
@@ -177,15 +187,27 @@ jobs:
           echo "release=$release" >> "$GITHUB_OUTPUT"
           echo "full=$full" >> "$GITHUB_OUTPUT"
           echo "head branch: ${HEAD_REF:-<none>}; release pull request: $release; full set: $full"
+      # `code`: a path that is not documentation changed. `release_shape`
+      # (issue 632, owner 2026-11-26): a release pull request whose only
+      # paths that are not documentation are go.mod files beside the root
+      # (the nested modules', the examples'), each changed only in `require`
+      # lines of thingfabric.dev/go-fabric… modules that the same go.mod
+      # replaces with a local path -- so no build moves. Read line by line
+      # from the diff: a go.sum, a replace, a require of another module or
+      # any other go.mod line is code (TestWorkflowFilterVerdict). Such a
+      # pull request takes the chip-tool legs', the Go-TH groups' and the
+      # family groups' verdicts from its base commit (job long-on-base).
       - id: filter
         env:
           EVENT: ${{ github.event_name }}
+          RELEASE: ${{ steps.scope.outputs.release }}
           BASE: ${{ github.event.pull_request.base.sha }}
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
           if [ "$EVENT" != "pull_request" ]; then
             echo "code=false" >> "$GITHUB_OUTPUT"
+            echo "release_shape=false" >> "$GITHUB_OUTPUT"
             echo "not a pull request -- the event's own condition decides"
             exit 0
           fi
@@ -205,7 +227,49 @@ jobs:
             echo "-> a path that is not documentation changed; the suite runs without a label"
           else
             echo "code=false" >> "$GITHUB_OUTPUT"
+            echo "release_shape=false" >> "$GITHUB_OUTPUT"
             echo "-> documentation only; the suite runs only if labelled"
+            exit 0
+          fi
+          # Release shape: every path that is not documentation is a go.mod
+          # below the root whose changed lines are all `require` lines of a
+          # thingfabric.dev/go-fabric… module it replaces with a local path.
+          shape=true
+          if [ "$RELEASE" != "true" ]; then
+            shape=false
+            why="not a release pull request"
+          fi
+          mod_re='thingfabric\.dev/go-fabric(/[^[:space:]]+)?'
+          require_re="^[+-][[:space:]]*(require[[:space:]]+)?($mod_re)[[:space:]]+v[^[:space:]]+[[:space:]]*(//.*)?$"
+          while [ "$shape" = true ] && IFS= read -r f; do
+            if grep -Eq "$docs_only" <<<"$f"; then continue; fi
+            case "$f" in
+              go.mod | */testdata/*) shape=false; why="$f is not a nested module's or an example's go.mod"; break ;;
+              */go.mod) ;;
+              *) shape=false; why="$f is neither documentation nor a go.mod"; break ;;
+            esac
+            if ! head_mod=$(git show "$HEAD:$f" 2>/dev/null); then
+              shape=false; why="$f is deleted"; break
+            fi
+            # The changed lines: every +/- line after the first hunk header.
+            lines=$(git diff --no-renames -U0 "$BASE" "$HEAD" -- "$f" | awk '/^@@/ { h = 1; next } h && /^[+-]/')
+            if [ -z "$lines" ]; then shape=false; why="$f changes in its mode alone"; break; fi
+            while IFS= read -r line; do
+              if [[ ! "$line" =~ $require_re ]]; then
+                shape=false; why="$f changes a line that is not a thingfabric.dev require: $line"; break
+              fi
+              mod="${BASH_REMATCH[2]}"
+              replace_re="^[[:space:]]*(replace[[:space:]]+)?${mod//./\\.}([[:space:]]+v[^[:space:]]+)?[[:space:]]+=>[[:space:]]+\.\.?/"
+              if ! grep -Eq "$replace_re" <<<"$head_mod"; then
+                shape=false; why="$f does not replace $mod with a local path"; break
+              fi
+            done <<<"$lines"
+          done <<<"$changed"
+          echo "release_shape=$shape" >> "$GITHUB_OUTPUT"
+          if [ "$shape" = true ]; then
+            echo "-> release shape: documentation and replaced thingfabric.dev require lines only; the chip-tool verdicts come from the base commit"
+          else
+            echo "-> not release shape (${why}); every leg runs"
           fi
       # The certification-family groups, and which of them this event runs.
       # One place for the split (TestWorkflowRunsEveryFamily holds it to the
@@ -259,7 +323,9 @@ jobs:
           )
           # core-* and commissioning*: every event. long: never a pull
           # request but a release one that changes code (a documentation-only
-          # one reads long's result on its base commit, job long-on-base).
+          # one reads long's result on its base commit, job long-on-base; one
+          # in release shape runs no group, and long-on-base reads every group
+          # of this list on the base commit).
           # thread: never here — it needs the
           # virtual OTBR agent and runs in otbr-virtual.yml (dispatch and
           # weekly), after the agent's own live test. The rest: every event
@@ -287,11 +353,14 @@ jobs:
   chiptool:
     name: chip-tool commissions the reference daemon
     needs: changes
+    # A release pull request in release shape reads this job's verdict on
+    # its base commit instead (job long-on-base, issue 632).
     if: |
-      github.event_name == 'schedule' ||
-      github.event_name == 'workflow_dispatch' ||
-      needs.changes.outputs.full == 'true' ||
-      needs.changes.outputs.code == 'true'
+      needs.changes.outputs.release_shape != 'true' && (
+        github.event_name == 'schedule' ||
+        github.event_name == 'workflow_dispatch' ||
+        needs.changes.outputs.full == 'true' ||
+        needs.changes.outputs.code == 'true')
     runs-on: ubuntu-24.04
     # Without the Go-TH leg (the gocert job's), the suite step ran about
     # two minutes on 2026-11-15 (run 43707934752: 42 minutes for the step,
@@ -404,11 +473,14 @@ jobs:
   gocert:
     name: Go-TH certification cases (${{ matrix.group }})
     needs: changes
+    # A release pull request in release shape reads this job's verdict on
+    # its base commit instead (job long-on-base, issue 632).
     if: |
-      github.event_name == 'schedule' ||
-      github.event_name == 'workflow_dispatch' ||
-      needs.changes.outputs.full == 'true' ||
-      needs.changes.outputs.code == 'true'
+      needs.changes.outputs.release_shape != 'true' && (
+        github.event_name == 'schedule' ||
+        github.event_name == 'workflow_dispatch' ||
+        needs.changes.outputs.full == 'true' ||
+        needs.changes.outputs.code == 'true')
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     strategy:
@@ -487,11 +559,14 @@ jobs:
     # it byte-for-byte, or every pull request waits on a check nobody reports.
     name: chip-tool control leg (CHIP app, no go-fabric)
     needs: changes
+    # A release pull request in release shape reads this job's verdict on
+    # its base commit instead (job long-on-base, issue 632).
     if: |
-      github.event_name == 'schedule' ||
-      github.event_name == 'workflow_dispatch' ||
-      needs.changes.outputs.full == 'true' ||
-      needs.changes.outputs.code == 'true'
+      needs.changes.outputs.release_shape != 'true' && (
+        github.event_name == 'schedule' ||
+        github.event_name == 'workflow_dispatch' ||
+        needs.changes.outputs.full == 'true' ||
+        needs.changes.outputs.code == 'true')
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -559,11 +634,14 @@ jobs:
     # 2026-11-13); keep it when the job moves.
     name: chip-tool commissions over BLE onto Wi-Fi (chip's mocks)
     needs: changes
+    # A release pull request in release shape reads this job's verdict on
+    # its base commit instead (job long-on-base, issue 632).
     if: |
-      github.event_name == 'schedule' ||
-      github.event_name == 'workflow_dispatch' ||
-      needs.changes.outputs.full == 'true' ||
-      needs.changes.outputs.code == 'true'
+      needs.changes.outputs.release_shape != 'true' && (
+        github.event_name == 'schedule' ||
+        github.event_name == 'workflow_dispatch' ||
+        needs.changes.outputs.full == 'true' ||
+        needs.changes.outputs.code == 'true')
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
@@ -585,11 +663,14 @@ jobs:
   chiptool-ble-cases:
     name: certification cases commissioning over BLE onto Wi-Fi (chip's mocks)
     needs: changes
+    # A release pull request in release shape reads this job's verdict on
+    # its base commit instead (job long-on-base, issue 632).
     if: |
-      github.event_name == 'schedule' ||
-      github.event_name == 'workflow_dispatch' ||
-      needs.changes.outputs.full == 'true' ||
-      needs.changes.outputs.code == 'true'
+      needs.changes.outputs.release_shape != 'true' && (
+        github.event_name == 'schedule' ||
+        github.event_name == 'workflow_dispatch' ||
+        needs.changes.outputs.full == 'true' ||
+        needs.changes.outputs.code == 'true')
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
@@ -611,11 +692,14 @@ jobs:
   chip-families:
     name: certification families (${{ matrix.group }})
     needs: changes
+    # A release pull request in release shape reads this job's verdict on
+    # its base commit instead (job long-on-base, issue 632).
     if: |
-      github.event_name == 'schedule' ||
-      github.event_name == 'workflow_dispatch' ||
-      needs.changes.outputs.full == 'true' ||
-      needs.changes.outputs.code == 'true'
+      needs.changes.outputs.release_shape != 'true' && (
+        github.event_name == 'schedule' ||
+        github.event_name == 'workflow_dispatch' ||
+        needs.changes.outputs.full == 'true' ||
+        needs.changes.outputs.code == 'true')
     runs-on: ubuntu-24.04
     timeout-minutes: 350
     strategy:
@@ -750,18 +834,30 @@ jobs:
           echo "::error::the nested modules are not in release shape (exit $rc, above)"
           exit 1
 
-  # `long` on the base commit, for a release pull request that changes
-  # documentation only (owner, 2026-11-24). Its tree differs from the base
-  # commit's in documentation alone, so `long`'s result there is its result:
-  # the job looks up a completed nightly or dispatched run of this workflow
-  # on the base commit whose `certification families (long)` job passed.
-  # Without one it is red and says how to get one: dispatch this workflow
-  # on main while main is the base commit (a dispatch shares the nightly
-  # run's concurrency group, so it cancels a nightly run in progress).
+  # Verdicts on the base commit, for a release pull request whose tree
+  # builds what its base commit built. Two classes (the `code touched`
+  # job decides):
+  #
+  #   - documentation only (owner, 2026-11-24): `long` alone — the pull
+  #     request runs every other leg itself, and its tree differs from the
+  #     base commit's in documentation alone;
+  #   - release shape (issue 632, owner 2026-11-26): documentation plus
+  #     thingfabric.dev require lines that the same go.mod replaces with a
+  #     local path — every chip-tool leg, every Go-TH group and every family
+  #     group the release pull request would run (`long` included); the pull
+  #     request runs none of them, only nested-release and ci.yml.
+  #
+  # The job looks up a completed nightly or dispatched run of this workflow
+  # on the base commit in which every one of those jobs passed. Without one
+  # it is red and says how to get one: dispatch this workflow (without
+  # families) on main while main is the base commit (a dispatch shares the
+  # nightly run's concurrency group, so it cancels a nightly run in
+  # progress). The job keeps its name, which branch protection does not
+  # list (script/requiredchecks).
   long-on-base:
-    name: certification families (long) on the base commit
+    name: chip-tool verdicts on the base commit
     needs: changes
-    if: needs.changes.outputs.release == 'true' && needs.changes.outputs.code != 'true'
+    if: needs.changes.outputs.release == 'true' && (needs.changes.outputs.code != 'true' || needs.changes.outputs.release_shape == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -771,19 +867,46 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           BASE: ${{ github.event.pull_request.base.sha }}
+          SHAPE: ${{ needs.changes.outputs.release_shape }}
+          FAMILIES: ${{ needs.changes.outputs.families }}
         run: |
           set -euo pipefail
+          # The jobs whose verdicts this pull request takes from the base
+          # commit, by the names they report under: `long` alone, or in
+          # release shape every leg the release gate reads but the nested
+          # modules' (TestWorkflowLongOnBaseNamesEveryLeg holds the names).
+          required=("certification families (long)")
+          if [ "$SHAPE" = "true" ]; then
+            required=(
+              "chip-tool commissions the reference daemon"
+              "chip-tool control leg (CHIP app, no go-fabric)"
+              "chip-tool commissions over BLE onto Wi-Fi (chip's mocks)"
+              "certification cases commissioning over BLE onto Wi-Fi (chip's mocks)"
+              "Go-TH certification cases (gocert-cadmin)"
+              "Go-TH certification cases (gocert-dd)"
+              "Go-TH certification cases (gocert-rest)"
+            )
+            while IFS= read -r group; do
+              required+=("certification families ($group)")
+            done < <(jq -r '.include[].group' <<<"$FAMILIES")
+          fi
+          echo "verdicts read on the base commit $BASE:"; printf '  %s\n' "${required[@]}"
           runs=$(gh api "repos/$REPO/actions/workflows/chiptool.yml/runs?head_sha=$BASE&status=completed&per_page=100" \
             --jq '.workflow_runs[] | select(.event == "schedule" or .event == "workflow_dispatch") | .id')
           for id in $runs; do
-            verdict=$(gh api "repos/$REPO/actions/runs/$id/jobs?per_page=100" \
-              --jq '.jobs[] | select(.name == "certification families (long)") | .conclusion')
-            if [ "$verdict" = "success" ]; then
-              echo "long passed on the base commit $BASE in run $id"
+            passed=$(gh api "repos/$REPO/actions/runs/$id/jobs?per_page=100" \
+              --jq '.jobs[] | select(.conclusion == "success") | .name')
+            missing=()
+            for name in "${required[@]}"; do
+              if ! grep -qxF "$name" <<<"$passed"; then missing+=("$name"); fi
+            done
+            if [ "${#missing[@]}" -eq 0 ]; then
+              echo "every one passed on the base commit $BASE in run $id"
               exit 0
             fi
+            echo "run $id: not passed: $(printf '%s; ' "${missing[@]}")"
           done
-          echo "::error::no passed 'certification families (long)' on the base commit $BASE (runs looked at: ${runs:-none}); dispatch chiptool.yml on main while main is $BASE, or wait for the nightly run"
+          echo "::error::no run on the base commit $BASE in which every job above passed (runs looked at: ${runs:-none}); dispatch chiptool.yml without families on main while main is $BASE, or wait for the nightly run"
           exit 1
 
   # The required status check for the certification families. Branch
@@ -803,8 +926,12 @@ jobs:
   # release shape and the family groups — must have run and passed; a
   # skipped, failed or cancelled one is red. A release pull request that
   # changes documentation only gets `long` from long-on-base, which must
-  # have passed as well. That is why it needs every leg; on every other
-  # event only the families and the Go-TH groups are read.
+  # have passed as well. A release pull request in release shape (issue
+  # 632) runs none of the chip legs: it passes with nested-release and
+  # long-on-base, which reads every leg's verdict on the base commit — the
+  # only class whose base-commit verdicts the gate accepts. That is why it
+  # needs every leg; on every other event only the families and the Go-TH
+  # groups are read.
   chip-families-gate:
     name: chip certification cases against the reference daemon
     needs: [changes, chiptool, gocert, chiptool-control, chiptool-ble-wifi, chiptool-ble-cases, chip-families, nested-release, long-on-base]
@@ -824,13 +951,19 @@ jobs:
           NESTED: ${{ needs.nested-release.result }}
           CODE: ${{ needs.changes.outputs.code }}
           LONG_BASE: ${{ needs.long-on-base.result }}
+          SHAPE: ${{ needs.changes.outputs.release_shape }}
         run: |
           echo "code touched: $CHANGES; certification families: $FAMILIES; Go-TH groups: $GOCERT"
           if [ "$RELEASE" = "true" ]; then
             echo "release pull request: suite $SUITE, control leg $CONTROL, BLE-Wi-Fi leg $BLE_WIFI, BLE cases leg $BLE_CASES, nested modules $NESTED"
             failed=0
-            legs=("chip-tool suite=$SUITE" "Go-TH groups=$GOCERT" "control leg=$CONTROL" "BLE-Wi-Fi leg=$BLE_WIFI" "BLE cases leg=$BLE_CASES" "nested modules' release shape=$NESTED" "certification families=$FAMILIES")
-            if [ "$CODE" != "true" ]; then legs+=("long on the base commit=$LONG_BASE"); fi
+            if [ "$SHAPE" = "true" ]; then
+              echo "release shape: the chip legs' verdicts come from the base commit ($LONG_BASE)"
+              legs=("nested modules' release shape=$NESTED" "chip legs' verdicts on the base commit=$LONG_BASE")
+            else
+              legs=("chip-tool suite=$SUITE" "Go-TH groups=$GOCERT" "control leg=$CONTROL" "BLE-Wi-Fi leg=$BLE_WIFI" "BLE cases leg=$BLE_CASES" "nested modules' release shape=$NESTED" "certification families=$FAMILIES")
+              if [ "$CODE" != "true" ]; then legs+=("long on the base commit=$LONG_BASE"); fi
+            fi
             for leg in "${legs[@]}"; do
               if [ "${leg#*=}" != "success" ]; then
                 echo "::error::release gate: the ${leg%%=*} did not pass (${leg#*=})"

@@ -19,12 +19,29 @@
 // pulled at :555 — the read response's generator,
 // AttributeReadResponse.ts:64 — and sendAndResetReport awaits
 // sendDataReportMessage, :510, before it pulls further).
+//
+// The chunker resolves every value once, when it admits the report: the
+// attribute value or event payload is encoded alone, on an encoder of its
+// own under a recover ([valueenc.Encode]), and carried on as its bytes
+// ([Encoded]); every later encode — the size measurement, the chunk the
+// caller sends — writes those bytes back. A value whose encoder panics,
+// leaves a container open or writes other than one element answers its
+// path FAILURE (an AttributeStatusIB, an EventStatusIB) and the rest of the
+// report goes out, as connectedhomeip's report engine rolls the partial
+// AttributeReportIB back and writes a status for the path
+// (src/app/reporting/Engine.cpp:449-450, :487, :498 at 6170af84). The
+// EventStatusIB is this module's own floor — chip fails the report on a
+// stored event it cannot copy (src/app/reporting/Engine.cpp:697-703), see
+// the by_design row. matter.js
+// has no containment per attribute; the divergence is recorded in
+// notes/parity/by_design.md (#625).
 package reportchunk
 
 import (
 	"fmt"
 
 	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/internal/valueenc"
 	"thingfabric.dev/go-fabric/tlv"
 )
 
@@ -37,7 +54,23 @@ type List [][]byte
 // Member is one member of a [List], the item of a list split into appends.
 type Member []byte
 
-// Writer is write that also writes a [List] and a [Member] verbatim.
+// Encoded is a value the chunker has resolved: the one anonymous TLV
+// element its writer wrote for it, alone and in isolation. A writer
+// handed to the chunker writes it back verbatim under the tag the message
+// needs ([Writer]).
+type Encoded []byte
+
+// EncodeFailure is a value the chunker could not encode: the path it
+// answered FAILURE for instead, and why. IsEvent tells which path is set.
+type EncodeFailure struct {
+	IsEvent       bool
+	AttributePath im.ConcreteAttributePath
+	EventPath     im.ConcreteEventPath
+	Err           error
+}
+
+// Writer is write that also writes a [List], a [Member] and an [Encoded]
+// value verbatim.
 func Writer(write im.AttributeValueWriter) im.AttributeValueWriter {
 	return func(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeValue) {
 		if !v.IsNull {
@@ -50,6 +83,9 @@ func Writer(write im.AttributeValueWriter) im.AttributeValueWriter {
 				_ = enc.EndContainer()
 				return
 			case Member:
+				_ = enc.PutRawElement(tag, x)
+				return
+			case Encoded:
 				_ = enc.PutRawElement(tag, x)
 				return
 			}
@@ -93,16 +129,33 @@ func Reads(r *im.ReadReports) Source {
 
 // Split splits rd into chunks whose encoded size stays within budget, as
 // a [Chunker] over its reports does; a report that fits budget whole is
-// its one chunk.
-func Split(rd im.ReportData, budget, hardCap int, write im.AttributeValueWriter) ([]im.ReportData, error) {
-	probe, err := Encode(rd, Writer(write))
+// its one chunk. Every value is resolved first, as the chunker admits it
+// ([Encoded]; failed, when not nil, hears of each that answered FAILURE),
+// so a report that fits is its one chunk with its values resolved.
+func Split(rd im.ReportData, budget, hardCap int, write im.AttributeValueWriter, failed func(EncodeFailure)) ([]im.ReportData, error) {
+	r := resolver{write: Writer(write), failed: failed}
+	if len(rd.Reports) > 0 {
+		reports := make([]im.AttributeReport, len(rd.Reports))
+		for i, rep := range rd.Reports {
+			reports[i] = r.attribute(rep)
+		}
+		rd.Reports = reports
+	}
+	if len(rd.EventReports) > 0 {
+		events := make([]im.EventReport, len(rd.EventReports))
+		for i, ev := range rd.EventReports {
+			events[i] = r.event(ev)
+		}
+		rd.EventReports = events
+	}
+	probe, err := Encode(rd, r.write)
 	if err != nil {
 		return nil, err
 	}
 	if len(probe) <= budget {
 		return []im.ReportData{rd}, nil
 	}
-	c := New(rd, budget, hardCap, write, Slice(rd.Reports), func() []im.EventReport { return rd.EventReports })
+	c := New(rd, budget, hardCap, write, Slice(rd.Reports), func() []im.EventReport { return rd.EventReports }, failed)
 	chunks := make([]im.ReportData, 0, 4)
 	for {
 		chunk, ok, err := c.Next()
@@ -128,6 +181,7 @@ type Chunker struct {
 	template        im.ReportData
 	budget, hardCap int
 	write           im.AttributeValueWriter
+	resolve         resolver
 	attributes      Source
 	events          func() []im.EventReport
 	eventReports    []im.EventReport
@@ -154,10 +208,14 @@ type Chunker struct {
 // HasSubscription, SubscriptionID and SuppressResponse; its report arrays
 // are ignored) drawn from attributes and then events (nil: none), each
 // chunk at most budget bytes when encoded with write ([Writer] wraps it),
-// an entry above hardCap alone answered ResourceExhausted.
-func New(template im.ReportData, budget, hardCap int, write im.AttributeValueWriter, attributes Source, events func() []im.EventReport) *Chunker {
+// an entry above hardCap alone answered ResourceExhausted. Every value is
+// resolved when its report is admitted ([Encoded]): write runs once per
+// value, and a value it cannot encode answers its path FAILURE — failed,
+// when not nil, hears of each.
+func New(template im.ReportData, budget, hardCap int, write im.AttributeValueWriter, attributes Source, events func() []im.EventReport, failed func(EncodeFailure)) *Chunker {
 	template.Reports, template.EventReports, template.MoreChunkedMessages = nil, nil, false
 	c := &Chunker{template: template, budget: budget, hardCap: hardCap, write: Writer(write), attributes: attributes, events: events}
+	c.resolve = resolver{write: c.write, failed: failed}
 	c.current = c.fresh()
 	if body, err := c.encode(c.current); err == nil {
 		c.freshSize = len(body)
@@ -266,6 +324,7 @@ func (c *Chunker) measureOverhead(aloneSize int, twice im.ReportData) (int, erro
 }
 
 func (c *Chunker) addAttributeReport(rep im.AttributeReport) error {
+	rep = c.resolve.attribute(rep)
 	rep = ApplyFabricScope(rep, c.write)
 	if parts, ok := SplitList(c.template, rep, c.budget, c.write); ok {
 		if oversized, err := c.anyPartOversized(parts); err != nil {
@@ -311,7 +370,7 @@ func (c *Chunker) addAttributeReport(rep im.AttributeReport) error {
 }
 
 func (c *Chunker) addEventReport(ev im.EventReport) error {
-	ev, aloneSize, err := c.capOversizedEventReport(ev)
+	ev, aloneSize, err := c.capOversizedEventReport(c.resolve.event(ev))
 	if err != nil {
 		return err
 	}
@@ -353,9 +412,7 @@ func ApplyFabricScope(rep im.AttributeReport, write im.AttributeValueWriter) im.
 	}
 	scope := *rep.FabricScope
 	rep.FabricScope = nil
-	enc := tlv.NewEncoder()
-	Writer(write)(enc, tlv.AnonymousTag(), rep.Value)
-	encoded, err := enc.Bytes()
+	encoded, err := encodeValue(Writer(write), rep.Value)
 	if err != nil {
 		return AttributeStatus(rep, im.StatusFailure)
 	}
@@ -404,6 +461,11 @@ func SplitList(rd im.ReportData, rep im.AttributeReport, budget int, write im.At
 		if len(v) < 2 {
 			return nil, false
 		}
+	case Encoded:
+		// A resolved value splits only when it is a list.
+		if len(v) == 0 || (tlv.ElementType(v[0]) != tlv.TypeArray && tlv.ElementType(v[0]) != tlv.TypeList) {
+			return nil, false
+		}
 	case Member, []byte, string:
 		return nil, false
 	}
@@ -420,9 +482,7 @@ func SplitList(rd im.ReportData, rep im.AttributeReport, budget int, write im.At
 	}
 	members, ok := rep.Value.Value.(List)
 	if !ok {
-		enc := tlv.NewEncoder()
-		write(enc, tlv.AnonymousTag(), rep.Value)
-		encoded, err := enc.Bytes()
+		encoded, err := encodeValue(write, rep.Value)
 		if err != nil {
 			return nil, false
 		}
@@ -535,4 +595,64 @@ func (c *Chunker) capOversizedEventReport(ev im.EventReport) (out im.EventReport
 		IsStatus: true,
 		Status:   im.StatusIB{Status: im.StatusResourceExhausted},
 	})
+}
+
+// resolver resolves a report's value once ([Encoded]), or answers its path
+// FAILURE when the value cannot be encoded.
+type resolver struct {
+	write  im.AttributeValueWriter
+	failed func(EncodeFailure)
+}
+
+// attribute is rep with its value resolved, or the AttributeStatusIB
+// FAILURE of its path. A status, and a value already carried as bytes,
+// is returned as it is.
+func (r resolver) attribute(rep im.AttributeReport) im.AttributeReport {
+	if rep.IsStatus || resolved(rep.Value) {
+		return rep
+	}
+	el, err := encodeValue(r.write, rep.Value)
+	if err != nil {
+		if r.failed != nil {
+			r.failed(EncodeFailure{AttributePath: rep.Path, Err: err})
+		}
+		return AttributeStatus(rep, im.StatusFailure)
+	}
+	rep.Value = im.AttributeValue{Value: Encoded(el)}
+	return rep
+}
+
+// event is ev with its payload resolved, or the EventStatusIB FAILURE of
+// its path. A status, an event without a payload and a payload already
+// carried as bytes are returned as they are.
+func (r resolver) event(ev im.EventReport) im.EventReport {
+	if ev.IsStatus || ev.Data.IsNull || ev.Data.Value == nil || resolved(ev.Data) {
+		return ev
+	}
+	el, err := encodeValue(r.write, ev.Data)
+	if err != nil {
+		if r.failed != nil {
+			r.failed(EncodeFailure{IsEvent: true, EventPath: ev.Path, Err: err})
+		}
+		return im.EventReport{Path: ev.Path, IsStatus: true, Status: im.StatusIB{Status: im.StatusFailure}}
+	}
+	ev.Data = im.AttributeValue{Value: Encoded(el)}
+	return ev
+}
+
+// resolved reports a value already carried as its encoding.
+func resolved(v im.AttributeValue) bool {
+	if v.IsNull {
+		return false
+	}
+	switch v.Value.(type) {
+	case Encoded, List, Member:
+		return true
+	}
+	return false
+}
+
+// encodeValue is v as write writes it, in isolation ([valueenc.Encode]).
+func encodeValue(write im.AttributeValueWriter, v im.AttributeValue) ([]byte, error) {
+	return valueenc.Encode(func(enc *tlv.Encoder, tag tlv.Tag) { write(enc, tag, v) })
 }
