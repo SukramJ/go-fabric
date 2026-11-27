@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"thingfabric.dev/go-fabric/device"
 	"thingfabric.dev/go-fabric/endpoint"
 	epmem "thingfabric.dev/go-fabric/endpoint/memstore"
 	"thingfabric.dev/go-fabric/node"
@@ -229,5 +230,135 @@ func TestParkedErasureUnrecordedNamesTheForget(t *testing.T) {
 	}
 	if hasEndpointRecord(t, s.eps, "b") {
 		t.Error("b's record survived the heal")
+	}
+}
+
+// TestRestoredEndpointsKeepTheTopologyBehind (Fable F2, Opus L3): a
+// concurrent reassembly that succeeds between a batch's failed one and
+// its restore of the endpoints it held back clears the failure record;
+// the restore records the topology behind again, so the next empty batch
+// serves them even when the parked erasure cannot be judged.
+func TestRestoredEndpointsKeepTheTopologyBehind(t *testing.T) {
+	s := newParkStores()
+	s.creds.readKey = "endpoint_number_reserved.k"
+	labels := &failingLabelReads{}
+	n := s.node(t, labels, "a", "k")
+	agg := n.Aggregator()
+	node.SetAfterFailedReassembly(agg, func() {
+		node.SetAfterFailedReassembly(agg, nil)
+		if err := node.Reassemble(t.Context(), agg); err != nil {
+			t.Errorf("the concurrent reassembly: %v", err)
+		}
+	})
+	labels.fails.Store(1)
+	reassemblyErr(t, agg.Batch(t.Context(), func(b *node.Batch) error {
+		// k forgotten and added again: held out of the reassembly.
+		if err := b.Forget(endpoint.StringKey("k")); err != nil {
+			return err
+		}
+		return b.Add(kitLight(t, "k"))
+	}))
+	if _, ok := servedNumberOf(n, "k"); ok {
+		t.Fatal("k is served; the concurrent reassembly ran with k held back")
+	}
+	s.creds.failRead.Store(true)
+	err := agg.Batch(t.Context(), func(*node.Batch) error { return nil })
+	if !errors.Is(err, errFaulty) {
+		t.Fatalf("empty batch: %v; want the skipped erasure's error", err)
+	}
+	if _, ok := servedNumberOf(n, "k"); !ok {
+		t.Error("k is not served after the empty batch: the restore left the topology behind unrecorded")
+	}
+}
+
+// TestSameInstanceAddedAgainBeforeTheHeal (decision 727): a device removed
+// in a batch whose reassembly failed is still served and bound, so adding
+// the same instance again in the next batch is refused at the call with
+// device.ErrAddedElsewhere; that batch heals and unbinds it, and the one
+// after it adds it.
+func TestSameInstanceAddedAgainBeforeTheHeal(t *testing.T) {
+	ctx := t.Context()
+	n, labels, _, lights := behindNode(t, "a", "b")
+	agg := n.Aggregator()
+	labels.fails.Store(1)
+	reassemblyErr(t, agg.Batch(ctx, func(b *node.Batch) error {
+		return b.Remove(endpoint.StringKey("a"))
+	}))
+	addA := func(b *node.Batch) error { return b.Add(lights["a"]) }
+	if err := agg.Batch(ctx, addA); !errors.Is(err, device.ErrAddedElsewhere) {
+		t.Fatalf("the first Add of the same instance: %v; want ErrAddedElsewhere", err)
+	}
+	if _, ok := servedNumberOf(n, "a"); ok {
+		t.Fatal("a is served after the healing batch")
+	}
+	if err := agg.Batch(ctx, addA); err != nil {
+		t.Fatalf("the second Add of the same instance: %v", err)
+	}
+	if _, ok := lights["a"].EndpointNumber(); !ok {
+		t.Error("a is not served and bound after the second Add")
+	}
+}
+
+// TestRetirePartitionErrorsArePlain (decision 725; Opus L1): a failed
+// reassembly of RetirePartition itself is a plain error and the next
+// empty batch heals it; the work a failed batch left that fails in
+// RetirePartition is returned plain too, never a *BatchError.
+func TestRetirePartitionErrorsArePlain(t *testing.T) {
+	t.Run("own reassembly", func(t *testing.T) {
+		ctx := t.Context()
+		n, labels, _, _ := behindNode(t, "a")
+		agg := n.Aggregator()
+		labels.fails.Store(1)
+		err := agg.RetirePartition(ctx, "old")
+		if !errors.Is(err, errLabelRead) || errors.As(err, new(*node.BatchError)) {
+			t.Fatalf("RetirePartition: %v (%T); want the reassembly's error plain", err, err)
+		}
+		before := node.Reassemblies(agg)
+		if err := agg.Batch(ctx, func(*node.Batch) error { return nil }); err != nil {
+			t.Fatalf("the healing batch: %v", err)
+		}
+		if node.Reassemblies(agg)-before != 1 {
+			t.Error("the empty batch after RetirePartition's failure did not reassemble")
+		}
+	})
+	t.Run("work left", func(t *testing.T) {
+		s := newParkStores()
+		labels := &failingLabelReads{}
+		n := s.node(t, labels, "a", "b")
+		reassemblyErr(t, parkForgetB(t, n, labels))
+		s.creds.failRead.Store(true)
+		err := n.Aggregator().RetirePartition(t.Context(), "old")
+		if !errors.Is(err, errFaulty) || errors.As(err, new(*node.BatchError)) {
+			t.Fatalf("RetirePartition: %v (%T); want the left work's error plain", err, err)
+		}
+	})
+}
+
+// TestCancelForgetErrorIsStore (Opus L1): the cancel of a forget in
+// progress for a key forgotten and added again in the batch is no call's
+// store work: its error is BatchError.Store.
+func TestCancelForgetErrorIsStore(t *testing.T) {
+	ctx := t.Context()
+	creds := &failingReadA9{Port: memstore.New(), fail: "aggregator.forget_pending"}
+	cfg := minimalConfig(nil)
+	cfg.Store = node.Store{Credentials: creds, Endpoints: epmem.New()}
+	n := newNode(t, cfg)
+	agg := n.Aggregator()
+	if err := agg.Add(ctx, kitLight(t, "k")); err != nil {
+		t.Fatal(err)
+	}
+	// The forgets in progress are read by the new Add's release, twice by
+	// the erasure, then by the cancel: that read fails.
+	creds.skip.Store(3)
+	creds.armed.Store(true)
+	err := agg.Batch(ctx, func(b *node.Batch) error {
+		if err := b.Forget(endpoint.StringKey("k")); err != nil {
+			return err
+		}
+		return b.Add(kitLight(t, "k"))
+	})
+	var be *node.BatchError
+	if !errors.As(err, &be) || be.Calls != nil || !errors.Is(be.Store, errReadA9) {
+		t.Fatalf("Batch: %v; want the cancel's read error in Store alone", err)
 	}
 }

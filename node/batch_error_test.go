@@ -9,10 +9,13 @@ import (
 	"strings"
 	"testing"
 
+	closurecontroldef "thingfabric.dev/go-fabric/cluster/spec/closurecontrol"
+	"thingfabric.dev/go-fabric/device"
 	"thingfabric.dev/go-fabric/endpoint"
 	epmem "thingfabric.dev/go-fabric/endpoint/memstore"
 	"thingfabric.dev/go-fabric/node"
 	"thingfabric.dev/go-fabric/store/memstore"
+	"thingfabric.dev/go-fabric/surface"
 )
 
 // wantCall is the expected form of one [node.BatchCallError].
@@ -267,4 +270,118 @@ func TestBatchOpString(t *testing.T) {
 	if !strings.Contains(e.Error(), "Add k") || !errors.Is(e, node.ErrDuplicateKey) {
 		t.Errorf("BatchCallError %q", e)
 	}
+}
+
+// TestBatchErrorWithheldHeldReplaceIsApplied (decision 728, Opus M1): a
+// Replace held for a part key another endpoint serves, judged at the end
+// once that endpoint left, whose declaration the specification level
+// withholds takes the replaced endpoint off the wire: it is named with
+// its *surface.WithheldError as applied — it changed the set.
+func TestBatchErrorWithheldHeldReplaceIsApplied(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	low := surface.Policies{Level: "1.4.2"}
+	cfg := minimalConfig(nil)
+	cfg.Store = node.Store{Credentials: memstore.New(), Endpoints: epmem.New()}
+	cfg.Surface = low
+	n := newNode(t, cfg)
+	agg := n.Aggregator()
+	bridged := func(key string, parts ...*device.Device) *device.BridgedNode {
+		d, err := device.NewBridgedNode(device.Options{StableKey: endpoint.StringKey(key), Name: key, Surface: low})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, p := range parts {
+			if err := d.AddPart(p); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return d
+	}
+	for _, ep := range []node.Endpoint{bridged("other", light(t, "other/light", &low).Device), bridged("k")} {
+		if err := agg.Add(ctx, ep); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := n.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	closure, err := device.NewClosure(device.Options{StableKey: endpoint.StringKey("k/c"), Name: "c", Surface: low},
+		closurecontroldef.Declare{Features: closurecontroldef.FeaturePositioning})
+	if closure == nil {
+		t.Fatalf("closure: %v", err)
+	}
+	repl := bridged("k", light(t, "other/light", &low).Device, closure.Device)
+	err = agg.Batch(ctx, func(b *node.Batch) error {
+		if err := b.Replace(endpoint.StringKey("k"), repl); err != nil {
+			t.Fatalf("Replace: %v; want it held", err)
+		}
+		return b.Remove(endpoint.StringKey("other"))
+	})
+	be := checkCalls(t, err, wantCall{node.BatchReplace, "k", true, surface.ErrWithheld})
+	if _, ok := errors.AsType[*surface.WithheldError](be.Calls[0].Err); !ok {
+		t.Errorf("Err %v; want the *surface.WithheldError", be.Calls[0].Err)
+	}
+	if _, ok := servedNumberOf(n, "k"); ok {
+		t.Error("k is still served; the withheld Replace takes it off the wire")
+	}
+}
+
+// TestBatchErrorSupersededCallsAreNotNamed (Opus M2): a held call that a
+// later call of the batch on the same key superseded or dropped answered
+// nil, did not take, and is not named — a held Replace superseded by a
+// later Replace, a held Add dropped by a Remove.
+func TestBatchErrorSupersededCallsAreNotNamed(t *testing.T) {
+	t.Parallel()
+	t.Run("Replace superseded", func(t *testing.T) {
+		t.Parallel()
+		n := batchNode(t, bridgedWithParts(t, "a", "a/p"), bridgedWithParts(t, "r"))
+		later := bridgedWithParts(t, "r", "r/q")
+		err := n.Aggregator().Batch(t.Context(), func(b *node.Batch) error {
+			if err := b.Replace(endpoint.StringKey("r"), bridgedWithParts(t, "r", "a/p")); err != nil {
+				return err
+			}
+			return b.Replace(endpoint.StringKey("r"), later)
+		})
+		if err != nil {
+			t.Fatalf("Batch: %v; want nil — the held Replace was superseded", err)
+		}
+		if _, ok := servedNumberOf(n, "r/q"); !ok {
+			t.Error("the later Replace is not served")
+		}
+	})
+	t.Run("Add dropped by Remove", func(t *testing.T) {
+		t.Parallel()
+		n := batchNode(t, bridgedWithParts(t, "a", "a/p"))
+		err := n.Aggregator().Batch(t.Context(), func(b *node.Batch) error {
+			if err := b.Add(bridgedWithParts(t, "y", "a/p")); err != nil {
+				return err
+			}
+			return b.Remove(endpoint.StringKey("y"))
+		})
+		if err != nil {
+			t.Fatalf("Batch: %v; want nil — the held Add was dropped", err)
+		}
+		if _, ok := servedNumberOf(n, "y"); ok {
+			t.Error("y is served")
+		}
+	})
+}
+
+// TestBatchErrorFoldedReplaceNamesBothCalls (Opus L1): a Replace of a key
+// only the batch's held Add holds is held in its place; refused at the
+// end, both calls are named.
+func TestBatchErrorFoldedReplaceNamesBothCalls(t *testing.T) {
+	t.Parallel()
+	n := batchNode(t, bridgedWithParts(t, "a", "a/p"))
+	err := n.Aggregator().Batch(t.Context(), func(b *node.Batch) error {
+		if err := b.Add(bridgedWithParts(t, "y", "a/p")); err != nil {
+			return err
+		}
+		return b.Replace(endpoint.StringKey("y"), bridgedWithParts(t, "y", "a/p", "y/q"))
+	})
+	checkCalls(t, err,
+		wantCall{node.BatchAdd, "y", false, node.ErrDuplicateKey},
+		wantCall{node.BatchReplace, "y", false, node.ErrDuplicateKey},
+	)
 }
