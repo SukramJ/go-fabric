@@ -47,13 +47,31 @@ func UnexpectedPanics() (n int64, last string) {
 	return unexpectedPanics.Load(), last
 }
 
+// ForgetUnexpectedPanics takes n back from the tripwire's count, for a
+// test that provokes undeclared panics on purpose — a runtime error or an
+// unhashable value, which [ExpectPanic] cannot declare. A test seam;
+// production code does not call it.
+func ForgetUnexpectedPanics(n int64) { unexpectedPanics.Add(-n) }
+
 // notePanic counts r, recovered as pe, unless a test declared it.
 func notePanic(r any, pe *PanicError) {
-	if t := reflect.TypeOf(r); t != nil && t.Comparable() {
-		if _, ok := expectedPanics.Load(r); ok {
-			return
-		}
+	if t := reflect.TypeOf(r); t != nil && t.Comparable() && declared(r) {
+		return
 	}
 	unexpectedPanics.Add(1)
 	lastUnexpected.Store(pe)
+}
+
+// declared reports whether a test declared r. A value of a comparable type
+// can still be unhashable — a struct whose interface field holds a slice —
+// and the lookup panics hashing it (P10-err-6401); such a value cannot
+// have been declared, so the panic is recovered here and answers false.
+func declared(r any) (ok bool) {
+	defer func() {
+		if recover() != nil {
+			ok = false
+		}
+	}()
+	_, ok = expectedPanics.Load(r)
+	return ok
 }
