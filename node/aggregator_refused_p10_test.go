@@ -113,3 +113,30 @@ func TestRefusedReassemblyKeepsTheServedInstance(t *testing.T) {
 		t.Errorf("DataVersion of k after the refused reassembly = %d, want %d: the node took the refused snapshot's instances", got, before)
 	}
 }
+
+// TestApplyStagedLeavesAMismatchUnlessSettled: after a reassembly
+// returned, a stage for another topology is left for the snapshotter's
+// hook — a concurrent Bridge().Reassemble may have staged it — and only
+// the settled hook drops it (P10F-fsm-6405, the hook after Reassemble).
+func TestApplyStagedLeavesAMismatchUnlessSettled(t *testing.T) {
+	served, other := &endpoint.Topology{}, &endpoint.Topology{}
+	inst := map[string]*servedInstance{"k": {}}
+	st := &stagedSnapshot{topo: other, instances: inst}
+	a := &Aggregator{staged: st}
+
+	a.applyStagedLocked(served, false)
+	if a.staged != st || a.instances != nil {
+		t.Fatalf("unsettled mismatch: staged %p instances %v, want the stage kept and nothing applied", a.staged, a.instances)
+	}
+	a.applyStagedLocked(other, false)
+	if a.staged != nil || a.instances["k"] != inst["k"] {
+		t.Fatalf("unsettled match: staged %p, want the stage applied", a.staged)
+	}
+
+	a.staged = st
+	a.instances = nil
+	a.applyStagedLocked(served, true)
+	if a.staged != nil || a.instances != nil {
+		t.Fatalf("settled mismatch: staged %p instances %v, want the stage dropped unapplied", a.staged, a.instances)
+	}
+}
