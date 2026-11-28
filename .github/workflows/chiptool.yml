@@ -109,6 +109,12 @@
 # starts it missed exactly those (R2-P5-sup-03); TestWorkflowCodeFilter
 # holds the rule.
 
+# A dispatched run names its inputs, so long-on-base can tell a full run
+# from one with update_fixtures (which relaxes the family groups' drift
+# checks) or narrowed families: the runs API does not carry the inputs
+# (P10-sup-7001). Every other event keeps GitHub's default title.
+run-name: ${{ github.event_name == 'workflow_dispatch' && format('chiptool dispatch: update_fixtures={0}, families={1}', github.event.inputs.update_fixtures, github.event.inputs.families) || '' }}
+
 on:
   schedule:
     # Offset from the 03:17 nightly so the two heavy workflows do not compete
@@ -891,8 +897,10 @@ jobs:
             done < <(jq -r '.include[].group' <<<"$FAMILIES")
           fi
           echo "verdicts read on the base commit $BASE:"; printf '  %s\n' "${required[@]}"
+          # A dispatched run counts only when its title (the run-name) says
+          # it ran without update_fixtures and without families (P10-sup-7001).
           runs=$(gh api "repos/$REPO/actions/workflows/chiptool.yml/runs?head_sha=$BASE&status=completed&per_page=100" \
-            --jq '.workflow_runs[] | select(.event == "schedule" or .event == "workflow_dispatch") | .id')
+            --jq '.workflow_runs[] | select(.event == "schedule" or (.event == "workflow_dispatch" and .display_title == "chiptool dispatch: update_fixtures=false, families=")) | .id')
           for id in $runs; do
             passed=$(gh api "repos/$REPO/actions/runs/$id/jobs?per_page=100" \
               --jq '.jobs[] | select(.conclusion == "success") | .name')
@@ -906,7 +914,7 @@ jobs:
             fi
             echo "run $id: not passed: $(printf '%s; ' "${missing[@]}")"
           done
-          echo "::error::no run on the base commit $BASE in which every job above passed (runs looked at: ${runs:-none}); dispatch chiptool.yml without families on main while main is $BASE, or wait for the nightly run"
+          echo "::error::no run on the base commit $BASE in which every job above passed (runs looked at: ${runs:-none}); dispatch chiptool.yml without families and without update_fixtures on main while main is $BASE, or wait for the nightly run"
           exit 1
 
   # The required status check for the certification families. Branch

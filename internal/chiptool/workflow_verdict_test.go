@@ -293,12 +293,16 @@ func TestWorkflowGroupsSelection(t *testing.T) {
 // base commit passed every job the pull request takes from there —
 // `certification families (long)` for a documentation-only release pull
 // request, every chip-tool leg, Go-TH group and family group of the
-// release matrix for one in release shape (issue 632).
+// release matrix for one in release shape (issue 632). A dispatched run
+// with update_fixtures relaxes the family groups' drift checks and is no
+// such verdict (P10-sup-7001): the event `workflow_dispatch+update` stands
+// for it, its display title rendered from the workflow's run-name.
 func TestWorkflowLongOnBaseVerdict(t *testing.T) {
 	if _, err := exec.LookPath("jq"); err != nil {
 		t.Fatalf("jq, which gh's --jq and the step run, is not on PATH: %v", err)
 	}
-	script := runBlockAfter(t, chiptoolWorkflow(t), "  long-on-base:")
+	wf := chiptoolWorkflow(t)
+	script := runBlockAfter(t, wf, "  long-on-base:")
 	const families = `{"include":[{"group":"core-su","families":"SU"},{"group":"long","families":"DGGEN"}]}`
 	legs := []string{
 		"chip-tool commissions the reference daemon",
@@ -347,6 +351,9 @@ func TestWorkflowLongOnBaseVerdict(t *testing.T) {
 		{"release shape, split over two runs", "true", []run{{"11", "schedule", legs[:4], nil}, {"12", "schedule", legs[4:], nil}}, 1},
 		{"release shape, second run passed", "true", []run{{"11", "schedule", legs[1:], nil}, {"12", "workflow_dispatch", legs, nil}}, 0},
 		{"release shape, a pull request's run", "true", []run{{"11", "pull_request", legs, nil}}, 1},
+		{"docs only, a dispatched fixture update", "false", []run{{"11", "workflow_dispatch+update", long, nil}}, 1},
+		{"release shape, a dispatched fixture update", "true", []run{{"11", "workflow_dispatch+update", legs, nil}}, 1},
+		{"release shape, a fixture update, then a full dispatch", "true", []run{{"11", "workflow_dispatch+update", legs, nil}, {"12", "workflow_dispatch", legs, nil}}, 0},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -356,7 +363,9 @@ func TestWorkflowLongOnBaseVerdict(t *testing.T) {
 			}
 			var runsJSON []string
 			for _, r := range tc.runs {
-				runsJSON = append(runsJSON, `{"id":`+r.id+`,"event":"`+r.event+`"}`)
+				event, update := strings.CutSuffix(r.event, "+update")
+				title := dispatchTitle(t, wf, event, update)
+				runsJSON = append(runsJSON, `{"id":`+r.id+`,"event":"`+event+`","display_title":`+strconv.Quote(title)+`}`)
 				var jobs []string
 				for _, n := range r.passed {
 					jobs = append(jobs, `{"name":`+strconv.Quote(n)+`,"conclusion":"success"}`)
@@ -392,6 +401,26 @@ func TestWorkflowLongOnBaseVerdict(t *testing.T) {
 			}
 		})
 	}
+}
+
+// dispatchTitle renders chiptool.yml's run-name for a run of event, with
+// update_fixtures set or not and no families: the display title the runs
+// API reports for it. Without a run-name it is "" (the default title is
+// GitHub's and not modelled here).
+func dispatchTitle(t *testing.T, wf, event string, update bool) string {
+	t.Helper()
+	m := regexp.MustCompile(`(?m)^run-name: (.*)$`).FindStringSubmatch(wf)
+	if m == nil {
+		return ""
+	}
+	f := regexp.MustCompile(`^\$\{\{ github\.event_name == 'workflow_dispatch' && format\('([^']*)', github\.event\.inputs\.update_fixtures, github\.event\.inputs\.families\) \|\| '' \}\}$`).FindStringSubmatch(m[1])
+	if f == nil {
+		t.Fatalf("chiptool.yml's run-name %q is not the form this test renders", m[1])
+	}
+	if event != "workflow_dispatch" {
+		return ""
+	}
+	return strings.NewReplacer("{0}", strconv.FormatBool(update), "{1}", "").Replace(f[1])
 }
 
 // TestWorkflowLongOnBaseNamesEveryLeg holds the release-shape path to the
