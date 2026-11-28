@@ -336,7 +336,7 @@ func (a *Assembler) assemble(ctx context.Context, snapshots []Snapshot) (*Topolo
 	}
 	seen := run.seen
 
-	topology.pending = &pendingCommit{run: func() {
+	topology.pending = &pendingCommit{run: func() { //nolint:contextcheck // the commit runs at the caller's swap, after the assembly's ctx is done; Identify.Close bounds itself and takes no ctx by contract
 		a.commitMu.Lock()
 		defer a.commitMu.Unlock()
 		if a.gen != gen {
