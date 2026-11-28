@@ -1759,7 +1759,7 @@ func (a *Aggregator) snapshot(ctx context.Context) (*endpoint.Topology, error) {
 		}
 		snaps = append(snaps, endpoint.Snapshot{Scope: p.scope, Endpoints: specs})
 	}
-	topo, err := a.n.assembler.Assemble(ctx, snaps)
+	topo, err := a.n.assembler.AssemblePending(ctx, snaps)
 	if err != nil {
 		return nil, err
 	}

@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"slices"
 	"sort"
+	"sync"
 
 	"thingfabric.dev/go-fabric/clock"
 	mattercore "thingfabric.dev/go-fabric/cluster/core"
@@ -205,6 +206,12 @@ type Assembler struct {
 	// Aggregator, so a version survives reassembly as a bridged
 	// endpoint's does (review II, decision 46).
 	rootState, aggregatorState *endpointState
+	// commitMu guards gen and every commit's run against the start of the
+	// next assembly.
+	commitMu sync.Mutex
+	// gen counts the assemblies begun; a pending commit of an earlier one
+	// is void ([Assembler.AssemblePending]).
+	gen uint64
 }
 
 // New returns an assembler. logger may be nil; the assembler then
@@ -245,12 +252,49 @@ func New(s Store, cfg Config, logger *slog.Logger) (*Assembler, error) {
 //
 // Assemble waits for an assembly in progress until ctx ends; the wait's
 // error wraps ctx's.
+//
+// Assemble commits what the assembly changes in the assembler's per-key
+// state before it returns; [Assembler.AssemblePending] leaves that to the
+// caller.
 func (a *Assembler) Assemble(ctx context.Context, snapshots []Snapshot) (*Topology, error) {
 	release, err := a.enterAssembly(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer release()
+	topology, err := a.assemble(ctx, snapshots)
+	if err != nil {
+		return nil, err
+	}
+	topology.Commit()
+	return topology, nil
+}
+
+// AssemblePending is [Assembler.Assemble] without the commit: what the
+// assembly changes in the per-key state the assembler keeps across
+// assemblies — a key's first state, an adopted or new instance, the
+// restored NodeLabel and ConfigurationVersion, the release of the keys the
+// snapshots no longer carry — is applied by [Topology.Commit], so a
+// topology its caller refuses leaves that state as the topology served
+// before it. A bridge's Snapshotter returns it; the bridge commits the
+// topology where it swaps it in. A pending commit is void once the
+// assembler begins its next assembly.
+func (a *Assembler) AssemblePending(ctx context.Context, snapshots []Snapshot) (*Topology, error) {
+	release, err := a.enterAssembly(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	return a.assemble(ctx, snapshots)
+}
+
+// assemble builds the topology with its commit pending; the caller holds
+// the assembly slot.
+func (a *Assembler) assemble(ctx context.Context, snapshots []Snapshot) (*Topology, error) {
+	a.commitMu.Lock()
+	a.gen++
+	gen := a.gen
+	a.commitMu.Unlock()
 	// Apple-compatible three-tier topology (mirrors matter.js's
 	// `BridgedDevicesNode.ts`):
 	//   EP 0 = RootNode  (DeviceType 0x0016) — system services
@@ -292,21 +336,30 @@ func (a *Assembler) Assemble(ctx context.Context, snapshots []Snapshot) (*Topolo
 	}
 	seen := run.seen
 
-	// The state of an endpoint is shared with the live topology's endpoint
-	// of the same key, so what a spec restores into it is written only now
-	// that the whole assembly succeeded: a failed Assemble leaves the
-	// topology that keeps serving untouched (R2-C2-fsm-0451).
-	for _, restore := range run.restores {
-		restore()
-	}
+	topology.pending = &pendingCommit{run: func() {
+		a.commitMu.Lock()
+		defer a.commitMu.Unlock()
+		if a.gen != gen {
+			return
+		}
+		// The state of an endpoint is shared with the live topology's
+		// endpoint of the same key, so what a spec restores into it is
+		// written only once the whole assembly succeeded and its topology
+		// is taken: a failed Assemble, or a topology its caller refused,
+		// leaves the topology that keeps serving untouched (R2-C2-fsm-0451,
+		// P10-fsm-6001).
+		for _, restore := range run.restores {
+			restore()
+		}
 
-	// Release the state of sources that vanished / were de-exposed this
-	// run so a later re-add gets a fresh version (matches matter.js
-	// destroying the Datasource on endpoint removal), a running Identify
-	// countdown stops, and the registry stays bounded to the live
-	// topology. State of endpoints still present in `seen` is retained,
-	// keeping their version stable.
-	a.states.retain(seen) //nolint:contextcheck // a removed endpoint's Identify tells its host to stop on a goroutine of its own, not bound by this assembly
+		// Release the state of sources that vanished / were de-exposed
+		// this run so a later re-add gets a fresh version (matches
+		// matter.js destroying the Datasource on endpoint removal), a
+		// running Identify countdown stops, and the registry stays bounded
+		// to the live topology. State of endpoints still present in `seen`
+		// is retained, keeping their version stable.
+		a.states.retain(seen)
+	}}
 
 	sort.SliceStable(topology.Endpoints, func(i, j int) bool {
 		return topology.Endpoints[i].ID < topology.Endpoints[j].ID

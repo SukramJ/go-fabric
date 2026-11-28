@@ -971,6 +971,27 @@ type Topology struct {
 	// dispatches every write straight to its server. The node sets it on
 	// every topology it serves.
 	Persister WritePersister
+	// pending is the assembler's commit of this topology
+	// ([Assembler.AssemblePending]); nil for a topology built otherwise.
+	pending *pendingCommit
+}
+
+// pendingCommit runs an assembly's commit once.
+type pendingCommit struct {
+	once sync.Once
+	run  func()
+}
+
+// Commit applies what the assembly of t changes in its assembler's
+// per-key state ([Assembler.AssemblePending]). It is idempotent, does
+// nothing for a topology [Assembler.Assemble] returned (committed
+// already) or that no assembler built, and nothing once the assembler
+// has begun its next assembly.
+func (t *Topology) Commit() {
+	if t == nil || t.pending == nil {
+		return
+	}
+	t.pending.once.Do(t.pending.run)
 }
 
 // FindByID returns the endpoint with id ID, or nil when no such
