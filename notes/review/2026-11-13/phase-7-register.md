@@ -1142,6 +1142,7 @@ branch: `d0e4675c1` G1, `56edf570b` G2, `86378fde6` G4 (P10F-A);
 | P10-api-6702 | note | fixed: a Cancel after the winner's attempt returned is logged at DEBUG as `cancel_after_outcome` | `ec69a9a93` |
 | P10-fsm-6701 | note | as the reference (verify-b §2): matter.js has the same window at `db91886c` — `#maybeStartResolving` returns while `#resolveAbort` is set (`packages/general/src/net/dns-sd/IpServiceStatus.ts:153`), the resolution's `.finally` clears it and starts nothing (`:177-185`), and `connecting()` calls `#maybeStartResolving` once (`:149`); no change owed. Whether another task can run in that gap in practice: unverified | — |
 | P10-fsm-6001 | low | fixed (decision 760): `(*endpoint.Assembler).AssemblePending` and `(*endpoint.Topology).Commit`; the bridge commits the assembly it swaps in | `2b08dce17` |
+| P10F-fsm-6405 | low | fixed (decision 765; coordinator row from fable-diff-g10.md note 1, read, not run): node applies a snapshot's instances / touched / retired only once the bridge serves that topology | `f1f26157c` |
 | P10-doc-6004 | note | fixed (citations at `db91886c`) | `a1c2ccd99` |
 | P10-conc-6901 | note | fixed: a cancelled mutant run kills its process group | `a87b1c1cd` |
 | P10-sup-6902 | note | fixed: `-wide` refuses an empty or flag-shaped entry | `e335c16ff` |
