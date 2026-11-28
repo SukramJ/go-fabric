@@ -336,12 +336,15 @@ func (c *Commissioner) Interaction(p *peer.Peer) *interaction.Interaction {
 // closed on every path, with a CommissioningTransitionError on success and
 // the error on failure (:299-307, #closePaseSession :313-319).
 //
-// ctx bounds the whole call. The flow's own bounds are the ones the
-// device states: each step's timeout, and the total by the device's
-// MaxCumulativeFailsafeSeconds (up to about 18 hours), so a device that
-// answers every step just inside its timeout keeps Commission running
-// that long unless ctx ends first; a caller that wants a shorter bound
-// gives ctx a deadline (review II, R2-P6-bound-1812).
+// ctx bounds the call until CommissioningComplete is started. The flow's
+// own bounds are the ones the device states: each step's timeout, and the
+// total by the device's MaxCumulativeFailsafeSeconds (up to about 18
+// hours), so a device that answers every step just inside its timeout
+// keeps Commission running that long unless ctx ends first; a caller that
+// wants a shorter bound gives ctx a deadline (review II, R2-P6-bound-1812).
+// Once CommissioningComplete is started ctx no longer ends the call: the
+// device's answer and each exchange's response timeout bound steps 20.1
+// and 98.1 (review II, P10-doc-6201).
 //
 // A node id the call determines is held until it returns: a concurrent
 // Commission with the same NodeID is [ErrNodeIDConflict].

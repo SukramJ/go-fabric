@@ -635,8 +635,8 @@ func (f *flow) currentArmInterval() *armInterval {
 // detachArmInterval stops the timer — no further period — and returns
 // it with a re-arm that may be in flight, nil for none: matter.js
 // #expireFailsafe stopping #armFailsafeInterval
-// (packages/protocol/src/peer/ControllerCommissioningFlow.ts:1098-1099 at
-// b25ed960). The caller awaits the re-arm (awaitArmInterval) or cancels
+// (packages/protocol/src/peer/ControllerCommissioningFlow.ts:1154-1155 at
+// db91886c). The caller awaits the re-arm (awaitArmInterval) or cancels
 // it (cancelArmInterval).
 func (f *flow) detachArmInterval() *armInterval {
 	f.mu.Lock()
@@ -651,8 +651,9 @@ func (f *flow) detachArmInterval() *armInterval {
 }
 
 // awaitArmInterval awaits a re-arm of ai in flight without cancelling it,
-// bounded by ctx — `await this.#periodicArm` (:1107), so the re-arm cannot
-// arm the fail-safe again behind the expiry. ctx ending cancels it.
+// bounded by ctx — `await this.#periodicArm` (:1163 at db91886c), so the
+// re-arm cannot arm the fail-safe again behind the expiry. ctx ending
+// cancels it.
 func awaitArmInterval(ctx context.Context, ai *armInterval) {
 	if ai == nil {
 		return
