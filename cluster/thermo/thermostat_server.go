@@ -86,14 +86,16 @@ const (
 )
 
 // servedFeatures are the features whose elements the server serves.
-// MatterScheduleConfiguration and the Events feature's events of the
-// selection are served as matter.js implements them behind its forward
-// gates (ThermostatServer.ts:267-271 gates MSCH, :272-276 Events, the
-// events emitted at :2094-2164 and :2246 at b25ed960; schedules.go,
-// events.go; the Ahead rows, ahead.go), and ThermostatSuggestions as
-// matter.js serves it (#setupSuggestions, :2261, called at :375;
-// suggestions.go). ScheduleConfiguration (removed from the specification,
-// refused, :259-263) and Setback (deprecated, refused, :264-266) are not.
+// MatterScheduleConfiguration is selected by its feature bit, as matter.js
+// serves it released (no forward gate in ThermostatServer.ts's initialize,
+// :255, at db91886c; schedules.go). The Events feature's events are served
+// as matter.js implements them behind its thermostat-events forward gate
+// (:264-268; #setupEvents :2078, called at :368, the events emitted at
+// :2086-2164 and :2238; events.go; the BD-chip-Thermostat-Events row,
+// ahead.go), and ThermostatSuggestions as matter.js serves it
+// (#setupSuggestions, :2253, called at :367; suggestions.go).
+// ScheduleConfiguration (removed from the specification, refused,
+// :256-260) and Setback (deprecated, refused, :261-263) are not.
 const servedFeatures = ThermostatFeatureHEAT | ThermostatFeatureCOOL | ThermostatFeatureAUTO | ThermostatFeatureLTNE |
 	ThermostatFeatureOCC | ThermostatFeaturePRES | ThermostatFeatureMSCH | ThermostatFeatureTEVT | ThermostatFeatureTSUGGEST
 
