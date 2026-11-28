@@ -517,7 +517,7 @@ func (c *Central) Connect(ctx context.Context, p ble.Peripheral) (ble.Connection
 // reserve reserves addr for one Connect, through whichever proxy: refused
 // while another Connect holds it, up or still connecting.
 // Mirrors matter.js packages/nodejs-ble/src/NobleBleChannel.ts:166-179 at
-// b25ed9604f: #openChannels → "already connected", #connectionsInProgress
+// db91886c: #openChannels → "already connected", #connectionsInProgress
 // → "already in progress", the slot reserved before the connect.
 func (c *Central) reserve(addr uint64) (*addrHold, error) {
 	c.mu.Lock()

@@ -11,7 +11,7 @@
 // server (bridge.Config.BLE), its production path.
 //
 // The peripheral's GATT behaviour follows matter.js's BLE server
-// (packages/nodejs-ble/src/BlenoBleServer.ts at 0ceb202d): the handshake
+// (packages/nodejs-ble/src/BlenoBleServer.ts at db91886c): the handshake
 // request arrives on C1, and the session — with its handshake response —
 // starts when the central subscribes to C2. A C2 subscribe before the
 // handshake request starts nothing, as that server throws on it
@@ -19,7 +19,7 @@
 // before handshake Request"); this peripheral then stores the request
 // written after such a subscribe and does not answer it. A peripheral can
 // also play the stalled peer matter.js's channel tests model
-// (packages/nodejs-ble/test/NobleBleChannelTest.ts:208-346 at b25ed960,
+// (packages/nodejs-ble/test/NobleBleChannelTest.ts:208-346 at db91886c,
 // handshakeOnlyMatterService): it completes the handshake at the offered
 // segment size and then answers no BTP packet — see [Peripheral.Stall]
 // and [Faults].
@@ -182,7 +182,7 @@ type Peripheral struct {
 	// then answer no BTP packet of that session, each one handed to the
 	// receiver instead, the connection kept — the stalled peripherals
 	// matter.js's renegotiation workaround targets
-	// (packages/nodejs-ble/test/NobleBleChannelTest.ts:208-212 at b25ed960).
+	// (packages/nodejs-ble/test/NobleBleChannelTest.ts:208-212 at db91886c).
 	Stall func(offeredSegmentSize int) (withhold func(packet []byte))
 	// Faults are the GATT failures every connection shows.
 	Faults Faults
@@ -202,7 +202,7 @@ type Peripheral struct {
 
 // Faults are GATT failures a peripheral or its platform shows, after the
 // fakes of matter.js's channel tests
-// (packages/nodejs-ble/test/NobleBleChannelTest.ts:212-346 at b25ed960).
+// (packages/nodejs-ble/test/NobleBleChannelTest.ts:212-346 at db91886c).
 // Writes are counted per connection, from 1.
 type Faults struct {
 	// UnsubscribeC2 is the error every UnsubscribeC2 returns, the
