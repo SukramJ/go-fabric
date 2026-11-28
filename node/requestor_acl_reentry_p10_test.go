@@ -35,7 +35,9 @@ func TestWebRTCRequestorGrantFabricReentersAggregator(t *testing.T) {
 		return true
 	}}
 	n = newNode(t, cfg)
-	other, err := device.NewCameraController(device.Options{StableKey: endpoint.StringKey("other:1"), Name: "o"})
+	// other serves no requestor, so before ctl's Add no fabric holds the
+	// entry: the assertion at the end pins the ensure after ctl's reassembly.
+	other, err := device.NewContactSensor(device.Options{StableKey: endpoint.StringKey("other:1"), Name: "o"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,8 +71,13 @@ func TestWebRTCRequestorGrantFabricReentersAggregator(t *testing.T) {
 	case <-wait.Done():
 		t.Fatal("Add did not return: GrantFabric's Aggregator call waits on the reassembly lock the reassembly that asks it holds")
 	}
-	if err := <-removed; err != nil {
-		t.Errorf("GrantFabric's Remove: %v", err)
+	select {
+	case err := <-removed:
+		if err != nil {
+			t.Errorf("GrantFabric's Remove: %v", err)
+		}
+	default:
+		t.Error("GrantFabric was not asked after ctl's reassembly")
 	}
 	if got := s.holding(); !slices.Equal(got, s.all) {
 		t.Errorf("fabrics %v hold the requestor's entry, want %v", got, s.all)
