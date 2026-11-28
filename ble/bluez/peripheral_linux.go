@@ -848,7 +848,9 @@ func (p *peripheral) followAdapter(gen uint64, added, adv bool) {
 			}
 			if err == nil {
 				p.advMu.Unlock()
-				rl.held()
+				if !superseded {
+					rl.held()
+				}
 				return
 			}
 		}
