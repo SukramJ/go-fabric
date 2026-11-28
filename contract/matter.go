@@ -73,9 +73,11 @@ type ClusterServer interface {
 	// and it does not keep the *tlv.Encoder past its return: the encoder
 	// may be reset and reused for the next value (tlv.Encoder.Reset), so a
 	// write on a kept encoder lands in another value. One that
-	// panics, leaves a container open or writes no element or more than
-	// one answers FAILURE (an AttributeStatusIB) for its own path, logged
-	// at ERROR; the rest of the read, the priming report or the
+	// panics, leaves a container open, writes no element or more than
+	// one, or tags a container's members against the container's rule — a
+	// Structure's members carry a context or profile tag, an Array's are
+	// anonymous — answers FAILURE (an AttributeStatusIB) for its own
+	// path, logged at ERROR; the rest of the read, the priming report or the
 	// subscription's report goes out, and the subscription stays.
 	//
 	// It takes no context on purpose: a read answers from memory —

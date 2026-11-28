@@ -74,3 +74,35 @@ func splitWithPanicP10(t *testing.T, pv any) {
 		t.Fatalf("reports %+v: want attribute 1 as data and attribute 9 as FAILURE", chunks[0].Reports)
 	}
 }
+
+// TestSplitMalformedElementCostsOnePathP10 (P10-wire-6402): the writer
+// writes, for attribute 9, one balanced element with an anonymous member
+// in a Structure. FAILURE for 9; attribute 1 goes out. Red at d1ab4e970:
+// 9 went out as data with the malformed bytes.
+func TestSplitMalformedElementCostsOnePathP10(t *testing.T) {
+	w := func(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeValue) {
+		if s, ok := v.Value.(string); ok && s == "boom" {
+			enc.StartStruct(tag)
+			enc.PutUint(tlv.AnonymousTag(), 1)
+			_ = enc.EndContainer()
+			return
+		}
+		enc.PutUTF8(tag, v.Value.(string))
+	}
+	chunks, err := reportchunk.Split(im.ReportData{Reports: []im.AttributeReport{attr(1, "ok"), attr(9, "boom")}}, 4000, 1280, w, nil)
+	if err != nil || len(chunks) != 1 {
+		t.Fatalf("chunks %d err %v", len(chunks), err)
+	}
+	var sawOne, failedNine bool
+	for _, r := range chunks[0].Reports {
+		switch r.Path.Attribute {
+		case 1:
+			sawOne = !r.IsStatus
+		case 9:
+			failedNine = r.IsStatus && r.Status.Status == im.StatusFailure
+		}
+	}
+	if !sawOne || !failedNine {
+		t.Fatalf("reports %+v: want attribute 1 as data and attribute 9 as FAILURE", chunks[0].Reports)
+	}
+}
