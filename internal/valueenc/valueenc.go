@@ -74,8 +74,9 @@ func PanicStack(err error) []byte {
 	return nil
 }
 
-// newPanicError is the [*PanicError] of the recovered value r.
-func newPanicError(r any) *PanicError {
+// NewPanicError is the [*PanicError] of the recovered value r. For a
+// recover outside this package that logs what it caught.
+func NewPanicError(r any) *PanicError {
 	msg := "(redacted)"
 	if re, ok := r.(runtime.Error); ok {
 		msg = re.Error()
@@ -170,7 +171,7 @@ func encodeOn(enc *tlv.Encoder, write func(enc *tlv.Encoder, tag tlv.Tag)) (elem
 func run(write func(enc *tlv.Encoder, tag tlv.Tag), enc *tlv.Encoder) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			pe := newPanicError(r)
+			pe := NewPanicError(r)
 			notePanic(r, pe)
 			err = pe
 		}
