@@ -195,6 +195,10 @@ var environmentSkips = map[string]int{
 	// wpa_supplicant.
 	"thread/otbr/live_test.go:TestLiveOTBR":                       1,
 	"wifi/wpasupplicant/live_linux_test.go:TestLiveWPASupplicant": 2,
+
+	// The operating system: a test whose subject is the file of the
+	// other GOOS, on a system that has none (P10-test-6903).
+	"script/mutate/notbuilt_p10_test.go:TestMutateOtherGOOSFileNotBuiltP10": 1,
 }
 
 // minTests is the floor on Test functions seen: fewer means the walk broke.
