@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Fixed
+
+- `node`: a camera controller (a `camera.Requestor` endpoint) added to a started node now gets the requestor's Operate/CASE ACL entry in each fabric `WebRTCRequestorConfig.GrantFabric` grants with the reassembly that mounts it, as matter.js installs it at once for a requestor added to an online node (`WebRtcTransportRequestorServer.ts:126-128` at db91886c). Before, the entry waited for the next Start or CommissioningComplete and the camera's signals were refused meanwhile (F-db91886c-8).
+
 ## [0.29.0] — 2026-11-27
 
 Review II phase 9 (decisions 730–748, #640): the matter.js pin moves b25ed960 → db91886c, and the behaviour the lift brings follows it. An InvokeRequest or WriteRequest without its false flags is answered instead of refused, and the sender's request-flag rule leaves a false SuppressResponse or TimedRequest out where both sides allow it; a Busy answer holds the node for the wait it asked for, with matter.js's jitter; a subscription report whose next chunk never comes ends the subscription; the commissioner's cancel after PASE follows matter.js and a cancelled commissioning returns the cancel's reason (`context.Cause`) — **a behavioural break for a host that matches the stopped step's error**; a WebRTC requestor can hold early signals for a session it is about to register; MatterScheduleConfiguration needs no extension any more, and `BD-chip-Thermostat-Schedules` becomes a retired extension ID; plus the dependency update (`golang.org/x/net`, `golang.org/x/tools`, `modernc.org/sqlite`; the pinned golangci-lint v2.15.0). `make apidiff` reports one incompatible change against `v0.28.0`: the value of `schema.SchemaSnapshotSHA256` — **a host pinning the snapshot's bytes updates its pin**. A host that names `BD-chip-Thermostat-Schedules` keeps starting; the ID leaves `Surface().Extensions` and `Policies.Digest`. The nested modules are not released: since their `v0.27.0` tags they changed only in two comment lines and their indirect requires, and `make apidiff` reports no incompatible change there.

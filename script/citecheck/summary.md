@@ -6,16 +6,16 @@ Second tree: a sentence naming matterjs-server is checked against `MATTERJS_SERV
 
 | Metric | Count |
 |---|---|
-| Citations | 11933 |
+| Citations | 11936 |
 | Go files citing | 1892 |
-| Resolved: exact path from a tree root (packages/, support/, examples/) | 3441 |
+| Resolved: exact path from a tree root (packages/, support/, examples/) | 3442 |
 | Resolved: unique suffix | 249 |
-| Resolved: unique basename | 8243 |
-| Checked at their own `at <sha>`, the pin | 2105 |
+| Resolved: unique basename | 8245 |
+| Checked at their own `at <sha>`, the pin | 2108 |
 | **Checked at another matter.js commit** (their own `at <sha>`, not the pin) | 3305 |
 | Checked against matterjs-server (`MATTERJS_SERVER_DIR`) at their `at <sha>` | 678 |
-| Drift-checked (the sentence names a name the file contains) | 5390 |
-| Hard-checked only | 6543 |
+| Drift-checked (the sentence names a name the file contains) | 5391 |
+| Hard-checked only | 6545 |
 | **Hard errors** | 0 |
 | **Drift** | 415 |
 
@@ -37,12 +37,12 @@ Line citations whose sentence names a matter.js commit other than the pin are ch
 
 | Reference | Count |
 |---|---|
-| A .ts file named without a line part | 2796 |
+| A .ts file named without a line part | 2797 |
 | … whose sentence names another matter.js commit | 614 |
 | A bare line part bound to the .ts file named before it (checked; not a citation, drift or hard error of the run) | 599 |
 | … checked at another matter.js commit | 319 |
 | … with a hard error at the commit it was checked at | 3 |
-| A bare line part after a .ts citation or after no file (not checked) | 3126 |
+| A bare line part after a .ts citation or after no file (not checked) | 3128 |
 | A chip citation (a chip source in a sentence naming chip or connectedhomeip) | 1827 |
 | … naming a commit that is no matter.js commit | 883 |
 | … at a commit other than the harness commit `6170af84` (Makefile CHIP_TEST_IMAGE_COMMIT) | 6 |

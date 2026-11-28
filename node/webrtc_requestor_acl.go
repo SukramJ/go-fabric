@@ -27,8 +27,8 @@ type WebRTCRequestorConfig struct {
 	// :126-128), and a [Node] has no controller of its own, so no fabric
 	// gets it unasked: the fabric's administrator grants the access, or the
 	// host returns true here for the fabrics its cameras signal on. The node
-	// asks at Start and after each CommissioningComplete, on the calling
-	// goroutine.
+	// asks at Start, after each CommissioningComplete and after each
+	// successful reassembly of a started node, on the calling goroutine.
 	//
 	// A grant only ever adds the entry. Withdrawing it — false for a fabric
 	// granted before, or GrantFabric left nil — removes nothing: the entry
@@ -53,7 +53,9 @@ type WebRTCRequestorConfig struct {
 // check :154-167, the entry :168-177; FabricAuthority.ts:112-114, :126-128: the
 // fabrics whose root certificate is its CA's), which a [Node] does not
 // have. The facade calls it at Start and after each CommissioningComplete,
-// matter.js's node-online and fabric-added reactions. It never removes an
+// matter.js's node-online and fabric-added reactions, and after each
+// successful reassembly of a started node, matter.js's initialize on a node that is
+// online (:126-128). It never removes an
 // entry, from a fabric it no longer grants either (see GrantFabric).
 func (n *Node) ensureRequestorACL(ctx context.Context) {
 	if n.cfg.WebRTCRequestor == nil || n.cfg.WebRTCRequestor.GrantFabric == nil {

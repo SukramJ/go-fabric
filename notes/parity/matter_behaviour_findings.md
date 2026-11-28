@@ -509,7 +509,7 @@ reconcile's differences, F-db91886c-5, in
 c26625dfa; connectedhomeip at 6170af84 where an entry names it. Closed
 entries move to `matter_behaviour_findings_closed.md`, same section.
 
-- **F-db91886c-8: a requestor endpoint that a reassembly adds to a commissioned node gets no ACL entry until the next Start or CommissioningComplete.** Low, fails closed (only with `node.WebRTCRequestorConfig.GrantFabric` set): the camera's signals are refused by the ACL meanwhile. matter.js installs the entry for a requestor added to a node that is online at once: `initialize` runs `#nodeOnline` when the node is online (`packages/node/src/behaviors/web-rtc-transport-requestor/WebRtcTransportRequestorServer.ts:126-128` → `:143-181`; test `packages/node/test/behaviors/web-rtc-transport-requestor/WebRtcTransportRequestorServerTest.ts:1485`, whose comment `:1484` says it documents current behaviour, not a guarantee). Here `reassembleLocked` (`node/aggregator.go:1652-1662`) calls `attachCameraPeers` (`:1658`) but not `ensureRequestorACL`, whose only callers are `node/webrtc_provider_peers.go:25` (Start) and `node/node.go:1308` (CommissioningComplete). Minimal fix: `a.n.ensureRequestorACL(ctx)` after `aggregator.go:1658` (idempotent through `addLocalOperateEntry`'s duplicate check) and a node test for a late requestor endpoint; the testparity register row's `missing` line then empties. Unverified: whether `NotifyLocalEntryInstalledOn` may run under `reassembleMu`, and whether a host can add a requestor-bearing endpoint through the aggregator at all. Raised by the Fable read after P1-G (F3); outside #5045, its own unit.
+None open: F-db91886c-8, the last, closed 2026-11-28.
 
 ## Tier 3 — LOW
 
