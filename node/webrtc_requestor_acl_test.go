@@ -146,3 +146,36 @@ func TestWebRTCRequestorACLWithdrawnGrantKeepsTheEntry(t *testing.T) {
 		}
 	}
 }
+
+// TestWebRTCRequestorACLOnEndpointAddedAfterStart: a camera controller
+// added to a started node gets the requestor's entry in each granted
+// fabric's ACL with the reassembly that mounts it, not only at the next
+// Start or CommissioningComplete (F-db91886c-8). matter.js's initialize
+// runs #nodeOnline at once for a requestor endpoint added to a node that
+// is online (WebRtcTransportRequestorServer.ts:126-128 → :143-181 at
+// db91886c; WebRtcTransportRequestorServerTest.ts:1484-1503, "installs
+// the entry when the node is already online").
+func TestWebRTCRequestorACLOnEndpointAddedAfterStart(t *testing.T) {
+	ctx := context.Background()
+	s := newRequestorACLSite(t)
+	cfg := s.cfg()
+	cfg.WebRTCRequestor = &node.WebRTCRequestorConfig{GrantFabric: func(node.FabricInfo) bool { return true }}
+	n := newNode(t, cfg)
+	if err := n.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = n.Stop(context.Background()) })
+	if got := s.holding(); len(got) != 0 {
+		t.Fatalf("before the controller is added fabrics %v hold the requestor's entry, want none", got)
+	}
+	ctl, err := device.NewCameraController(device.Options{StableKey: endpoint.StringKey("ctl:1"), Name: "ctl"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := n.Aggregator().Add(ctx, ctl); err != nil {
+		t.Fatal(err)
+	}
+	if got := s.holding(); !slices.Equal(got, s.all) {
+		t.Errorf("after the controller was added to the started node fabrics %v hold the requestor's entry, want %v", got, s.all)
+	}
+}

@@ -256,9 +256,13 @@ const testparityPlannedRatchet = 3
 // −1 ported +1 missing; TlvInvokeRequestTest.ts partial → ported with matter.js's
 // two DelayReportData literals asserted (second Fable read R7), −2 missing:
 // 183 ported, 1005 missing.
+// F-db91886c-8: the reassembly installs the requestor's ACL entry, so
+// WebRtcTransportRequestorServerTest.ts's late-endpoint case is ported
+// (node:TestWebRTCRequestorACLOnEndpointAddedAfterStart) and the file
+// partial → ported: 184 ported, 1004 missing.
 const (
-	testparityPortedRatchet  = 183
-	testparityMissingRatchet = 1005
+	testparityPortedRatchet  = 184
+	testparityMissingRatchet = 1004
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the

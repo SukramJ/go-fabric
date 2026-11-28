@@ -4797,17 +4797,15 @@
     },
     {
       "path": "packages/node/test/behaviors/web-rtc-transport-requestor/WebRtcTransportRequestorServerTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "cluster/camera:TestParityMatterJS_RequestorUpsertRemove",
         "cluster/camera:TestParityMatterJS_RequestorCommands",
         "cluster/camera:TestParityMatterJS_RequestorACLInstall",
         "cluster/camera:TestParityMatterJS_RequestorHoldUnknownSignals",
         "cluster/camera:TestParityMatterJS_RequestorSignalsAgainstChanges",
-        "cluster/camera:TestParityMatterJS_RequestorHeldSignalsOverTheWire"
-      ],
-      "missing": [
-        "ACL install adds an entry for a requestor endpoint added to a node that is online with a fabric"
+        "cluster/camera:TestParityMatterJS_RequestorHeldSignalsOverTheWire",
+        "node:TestWebRTCRequestorACLOnEndpointAddedAfterStart"
       ],
       "left": [
         {
@@ -4851,7 +4849,7 @@
           "reason": "the reentrancy of matter.js's transaction lock (the case documents current behaviour, not a guarantee); UpsertSession must not be called from the server's own change notification (cluster/camera/requestor.go)"
         }
       ],
-      "reason": "37 of the 45 cases run on cluster/camera's Requestor (brief 26-A1, phase 9 P1-G): upsert and remove by session key, the four commands' identity checks under the context the bridge stamps for a CASE invoke (matter.js's mocked remote actor), the refused, empty-candidate and end cases, the signalling handed to the RequestorPort; the hold of early signals on a driven clock (HoldUnknownSignals, its release, the 5 s from the arrival, MatterQuiesce for the node going offline and the endpoint closing or resetting, :978, :1013 and :1024 in one subtest; :858 and :873 in one); the End's lookup-and-removal and the registrations against a change that holds the requestor's publication lock; the held offer and end and a signal for another session behind a held one over the wire on fabrictest; the ACL install over the wire, the repeated online event a device restart (cluster/camera/requestor_parity_matterjs_test.go, requestor_hold_parity_matterjs_test.go). Missing: the ACL entry for a requestor endpoint a reassembly adds while the node is online with a fabric — node/ installs the entry at Start and after CommissioningComplete only (node/webrtc_provider_peers.go, node/node.go), outside #5045 (phase 9 P1-G, open question).",
+      "reason": "37 of the 45 cases run on cluster/camera's Requestor (brief 26-A1, phase 9 P1-G): upsert and remove by session key, the four commands' identity checks under the context the bridge stamps for a CASE invoke (matter.js's mocked remote actor), the refused, empty-candidate and end cases, the signalling handed to the RequestorPort; the hold of early signals on a driven clock (HoldUnknownSignals, its release, the 5 s from the arrival, MatterQuiesce for the node going offline and the endpoint closing or resetting, :978, :1013 and :1024 in one subtest; :858 and :873 in one); the End's lookup-and-removal and the registrations against a change that holds the requestor's publication lock; the held offer and end and a signal for another session behind a held one over the wire on fabrictest; the ACL install over the wire, the repeated online event a device restart (cluster/camera/requestor_parity_matterjs_test.go, requestor_hold_parity_matterjs_test.go). The ACL entry for a requestor endpoint added to a node that is online (:1485) runs on node/: the reassembly that mounts it installs the entry (node/webrtc_requestor_acl_test.go, F-db91886c-8).",
       "snapshotSha": "0b460c2ad6b117602ee2229790318100017e0486"
     },
     {

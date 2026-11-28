@@ -1656,6 +1656,14 @@ func (a *Aggregator) reassembleLocked(ctx context.Context) error {
 	}
 	a.behind.Store(false)
 	a.n.attachCameraPeers()
+	// Mirrors matter.js packages/node/src/behaviors/web-rtc-transport-requestor/
+	// WebRtcTransportRequestorServer.ts:126-128 at db91886c: initialize runs
+	// #nodeOnline (:143-181) at once for a requestor endpoint added to a node
+	// that is online. Reassembly runs only after Start (a.started), so this is
+	// the online case; before Start, camerasOnline installs the entry. The
+	// topology is served already, so the entry's write does not depend on the
+	// caller's context staying alive (as storeConfigVersions).
+	a.n.ensureRequestorACL(context.WithoutCancel(ctx))
 	a.n.announceSurface(ctx)
 	a.reassemblies.Add(1)
 	a.n.count(MetricAggregatorReassemblies)
