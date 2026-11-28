@@ -411,8 +411,6 @@ func (g *generator) fields(vs []*value, owner string) ([]*fieldInfo, error) {
 
 // resolve maps a value to its Go type. anonName names an anonymous struct
 // the value states inline.
-//
-//nolint:funlen // one case per matter.js metatype
 func (g *generator) resolve(v *value, anonName string) (typeInfo, error) {
 	t := typeInfo{name: v.Type}
 	if err := g.declareDefinitionValues(v); err != nil {
