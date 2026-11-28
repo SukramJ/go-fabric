@@ -1627,9 +1627,15 @@ func (a *Aggregator) setStarted() {
 }
 
 func (a *Aggregator) reassemble(ctx context.Context) error {
-	a.reassembleMu.Lock()
-	defer a.reassembleMu.Unlock()
-	return a.reassembleLocked(ctx)
+	err := func() error {
+		a.reassembleMu.Lock()
+		defer a.reassembleMu.Unlock()
+		return a.reassembleLocked(ctx)
+	}()
+	if err == nil {
+		a.ensureRequestorACL(ctx)
+	}
+	return err
 }
 
 // reassembleIfBehind reassembles if the last reassembly failed
@@ -1640,12 +1646,18 @@ func (a *Aggregator) reassembleIfBehind(ctx context.Context) error {
 	if !a.behind.Load() {
 		return nil
 	}
-	a.reassembleMu.Lock()
-	defer a.reassembleMu.Unlock()
-	if !a.behind.Load() {
-		return nil
+	ran, err := func() (bool, error) {
+		a.reassembleMu.Lock()
+		defer a.reassembleMu.Unlock()
+		if !a.behind.Load() {
+			return false, nil
+		}
+		return true, a.reassembleLocked(ctx)
+	}()
+	if ran && err == nil {
+		a.ensureRequestorACL(ctx)
 	}
-	return a.reassembleLocked(ctx)
+	return err
 }
 
 // reassembleLocked installs a new topology; reassembleMu is held.
@@ -1656,18 +1668,28 @@ func (a *Aggregator) reassembleLocked(ctx context.Context) error {
 	}
 	a.behind.Store(false)
 	a.n.attachCameraPeers()
-	// Mirrors matter.js packages/node/src/behaviors/web-rtc-transport-requestor/
-	// WebRtcTransportRequestorServer.ts:126-128 at db91886c: initialize runs
-	// #nodeOnline (:143-181) at once for a requestor endpoint added to a node
-	// that is online. Reassembly runs only after Start (a.started), so this is
-	// the online case; before Start, camerasOnline installs the entry. The
-	// topology is served already, so the entry's write does not depend on the
-	// caller's context staying alive (as storeConfigVersions).
-	a.n.ensureRequestorACL(context.WithoutCancel(ctx))
 	a.n.announceSurface(ctx)
 	a.reassemblies.Add(1)
 	a.n.count(MetricAggregatorReassemblies)
 	return nil
+}
+
+// ensureRequestorACL runs after a successful reassembly, with reassembleMu
+// released: GrantFabric is the host's and may call the Aggregator, whose
+// reassembly takes that lock (review II, P10-conc-6501, P10-conc-6003).
+// The entry is written after the surface is announced, and the ensures of
+// two reassemblies may interleave; the duplicate check runs under the
+// AccessControl write lock (addLocalOperateEntry).
+//
+// Mirrors matter.js packages/node/src/behaviors/web-rtc-transport-requestor/
+// WebRtcTransportRequestorServer.ts:126-128 at db91886c: initialize runs
+// #nodeOnline (:143-181) at once for a requestor endpoint added to a node
+// that is online. Reassembly runs only after Start (a.started), so this is
+// the online case; before Start, camerasOnline installs the entry. The
+// topology is served already, so the entry's write does not depend on the
+// caller's context staying alive (as storeConfigVersions).
+func (a *Aggregator) ensureRequestorACL(ctx context.Context) {
+	a.n.ensureRequestorACL(context.WithoutCancel(ctx))
 }
 
 // snapshot is the bridge's Snapshotter: one snapshot per partition, the
