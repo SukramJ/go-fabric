@@ -701,8 +701,8 @@ func TestWorkflowNoGoCacheOverACheckedOutRef(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	jobHeader := regexp.MustCompile(`(?m)^  [A-Za-z0-9_-]+:$`)
-	stepHeader := regexp.MustCompile(`(?m)^      - `)
+	jobHeader := regexp.MustCompile(`(?m)^ {2}[A-Za-z0-9_-]+:$`)
+	stepHeader := regexp.MustCompile(`(?m)^ {6}- `)
 	ref := regexp.MustCompile(`(?m)^ +ref: `)
 	path := regexp.MustCompile(`(?m)^ +path: `)
 	cache := regexp.MustCompile(`(?m)^ +cache: (\S+)$`)
