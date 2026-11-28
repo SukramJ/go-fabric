@@ -79,12 +79,23 @@ func PanicStack(err error) []byte {
 func NewPanicError(r any) *PanicError {
 	msg := "(redacted)"
 	if re, ok := r.(runtime.Error); ok {
-		msg = re.Error()
+		msg = runtimeErrorMessage(re)
 		if len(msg) > maxPanicMessage {
 			msg = msg[:maxPanicMessage]
 		}
 	}
 	return &PanicError{Type: fmt.Sprintf("%T", r), Message: msg, Stack: debug.Stack()}
+}
+
+// runtimeErrorMessage is re.Error(), or a fixed message when that panics:
+// a host type can implement [runtime.Error] (P10F-err-6404).
+func runtimeErrorMessage(re runtime.Error) (msg string) {
+	defer func() {
+		if recover() != nil {
+			msg = "(Error panicked)"
+		}
+	}()
+	return re.Error()
 }
 
 // Encode runs write on a fresh encoder and returns the one anonymous TLV
