@@ -490,8 +490,9 @@ func TestWorkflowLongOnBaseNamesEveryLeg(t *testing.T) {
 // require lines of thingfabric.dev/go-fabric… modules it replaces with a
 // local path. Its boundaries are code: a go.sum, a replace, a require of
 // another module, any other go.mod line, the root go.mod, a go.mod that
-// does not replace the module it raises, any other file — and a pull
-// request that is not a release one.
+// does not replace the module it raises (a versioned replace applies to
+// its version alone, P10-sup-7004), any other file — and a pull request
+// that is not a release one.
 func TestWorkflowFilterVerdict(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Fatalf("git, which the filter step runs, is not on PATH: %v", err)
@@ -544,6 +545,10 @@ func TestWorkflowFilterVerdict(t *testing.T) {
 	unreplaced := func(v string) string {
 		return "module example.invalid/fixture\n\ngo 1.27.4\n\nrequire thingfabric.dev/go-fabric " + v + "\n"
 	}
+	versioned := func(v string) string {
+		return "module example.invalid/versioned\n\ngo 1.27.4\n\nrequire thingfabric.dev/go-fabric " + v +
+			"\n\nreplace thingfabric.dev/go-fabric v0.26.0 => ../..\n"
+	}
 	git("init", "-q")
 	write("bridge/x.go", "package bridge\n\n// A file long enough for git to see its move as a rename.\nconst x = 1\n")
 	write("docs/index.md", "# docs\n")
@@ -553,6 +558,7 @@ func TestWorkflowFilterVerdict(t *testing.T) {
 	write("ble/bluez/go.sum", "github.com/godbus/dbus/v5 v5.2.4 h1:x=\n")
 	write("examples/ble-wifi-light/go.mod", example("v0.26.0"))
 	write("fixture/go.mod", unreplaced("v0.26.0"))
+	write("versioned/go.mod", versioned("v0.26.0"))
 	base := commit("base")
 	// branch commits one change set on top of base and returns to base.
 	branch := func(msg string, files map[string]string) string {
@@ -597,6 +603,7 @@ func TestWorkflowFilterVerdict(t *testing.T) {
 	}))
 	rootGoMod := branch("and the root go.mod", with(map[string]string{"go.mod": "module thingfabric.dev/go-fabric\n\ngo 1.27.4\n\nrequire golang.org/x/sys v0.50.0\n"}))
 	notReplaced := branch("a go.mod that does not replace", with(map[string]string{"fixture/go.mod": unreplaced("v0.27.0")}))
+	versionReplaced := branch("a go.mod that replaces another version", with(map[string]string{"versioned/go.mod": versioned("v0.27.0")}))
 	goFile := branch("and a Go file", with(map[string]string{"bridge/x.go": "package bridge\n\nconst x = 2\n"}))
 	binary := branch("and another file", with(map[string]string{".gitignore": "/examples/ble-wifi-light/ble-wifi-light\n"}))
 	deleted := branch("a nested go.mod deleted", map[string]string{"CHANGELOG.md": "# Changelog\n\n- x\n", "fixture/go.mod": ""})
@@ -620,6 +627,7 @@ func TestWorkflowFilterVerdict(t *testing.T) {
 		{"another go.mod line", base, otherLine, "true", "code=true\nrelease_shape=false"},
 		{"the root go.mod", base, rootGoMod, "true", "code=true\nrelease_shape=false"},
 		{"a require the go.mod does not replace", base, notReplaced, "true", "code=true\nrelease_shape=false"},
+		{"a require past a versioned replace", base, versionReplaced, "true", "code=true\nrelease_shape=false"},
 		{"a Go file", base, goFile, "true", "code=true\nrelease_shape=false"},
 		{"a file that is neither", base, binary, "true", "code=true\nrelease_shape=false"},
 		{"a go.mod deleted", base, deleted, "true", "code=true\nrelease_shape=false"},

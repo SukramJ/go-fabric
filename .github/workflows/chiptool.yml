@@ -265,7 +265,9 @@ jobs:
                 shape=false; why="$f changes a line that is not a thingfabric.dev require: $line"; break
               fi
               mod="${BASH_REMATCH[2]}"
-              replace_re="^[[:space:]]*(replace[[:space:]]+)?${mod//./\\.}([[:space:]]+v[^[:space:]]+)?[[:space:]]+=>[[:space:]]+\.\.?/"
+              # Unversioned only: a versioned replace applies to its version
+              # alone, and the raised require would leave it (P10-sup-7004).
+              replace_re="^[[:space:]]*(replace[[:space:]]+)?${mod//./\\.}[[:space:]]+=>[[:space:]]+\.\.?/"
               if ! grep -Eq "$replace_re" <<<"$head_mod"; then
                 shape=false; why="$f does not replace $mod with a local path"; break
               fi
