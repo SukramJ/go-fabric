@@ -1288,7 +1288,7 @@ func (n *Node) observedFabricUpdated(ctx context.Context, fabricIndex uint8) {
 // store now holds it. matter.js reports these as an "updated" fabric, the
 // fabric's persist emitting its replaced event (FabricManager.ts:265-278 at
 // db91886c), which the node hands on as fabricsChanged
-// (CommissioningServer.ts:118-142 at db91886c).
+// (CommissioningServer.ts:118-141 at db91886c).
 func (n *Node) observedFabricChanged(ctx context.Context, fabricIndex uint8) {
 	n.notifyFabricUpdated(ctx, fabricIndex)
 }
