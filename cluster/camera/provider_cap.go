@@ -374,7 +374,8 @@ func (q *endQueue) reserve(fabric uint8, bound int) bool {
 // release gives back a slot of fabric whose End will not be sent, or was.
 func (q *endQueue) release(fabric uint8) {
 	q.mu.Lock()
-	if q.held[fabric]--; q.held[fabric] == 0 {
+	q.held[fabric]--
+	if q.held[fabric] == 0 {
 		delete(q.held, fabric)
 	}
 	q.mu.Unlock()

@@ -535,7 +535,7 @@ func TestProviderEvictEndQueuePerFabric(t *testing.T) {
 		t.Fatal("fabric 2's evicted entry went without its End: fabric 1's Ends held the queue")
 	}
 	close(r.peers.gate)
-	var got []uint16
+	got := make([]uint16, 0, 3)
 	for range 3 {
 		got = append(got, r.nextEnd(t).req.WebRtcSessionId)
 	}
