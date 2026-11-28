@@ -210,6 +210,9 @@ func (a *AccessControl) syncAuxiliaryAs(ctx, actor context.Context, emit bool, d
 	}
 	a.mu.Lock()
 	prev := a.auxApplied
+	// A nil prev is the baseline no run has applied yet: the initial
+	// synchronisation failed (P10-err-6102).
+	baseline := prev == nil
 	a.auxApplied = next
 	emitter, endpoint := a.emitter, a.endpoint
 	a.mu.Unlock()
@@ -247,6 +250,10 @@ func (a *AccessControl) syncAuxiliaryAs(ctx, actor context.Context, emit bool, d
 			admin = adminNodeIDOf(own) //nolint:contextcheck // own is the deferred change's request context, read for its subject only
 		case accessing == fabric:
 			admin = adminNodeIDOf(actor)
+		case baseline:
+			// Applying the baseline, a fabric no context names is the
+			// registration's state, which emits no event.
+			continue
 		}
 		emitter.MatterEmitEvent(endpoint, accessControlClusterID, accessControlEventAuxiliaryAccessUpd,
 			AuxiliaryAccessUpdatedEvent{AdminNodeID: admin, FabricIndex: fabric}, contract.EventPriorityInfo)
