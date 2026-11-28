@@ -25,7 +25,7 @@ contribution and carry full responsibility for it — including correctness, lic
 
 Contributions created autonomously by AI agents — pull requests or issues opened without a human
 having reviewed and understood the content — are not accepted and will be closed. This includes
-contributions that bypass or ignore the issue and pull request templates.
+contributions that bypass or ignore the pull request template.
 
 **Exception:** Deterministic automation configured by the maintainers (e.g. Dependabot,
 release workflows) is not an autonomous AI agent and is explicitly allowed.
@@ -66,7 +66,7 @@ and consider including your original text in a `<details>` block so reviewers ca
 Every contribution — human-written, AI-assisted, or anything in between — must pass the same
 gates: `go vet ./...`, `gofumpt` formatting, `golangci-lint run ./...`, and the race-enabled
 test suite (`go test -race -count=1 ./...`) — bundled locally as `make ci` and `make race` and enforced by
-CI on every pull request. AI assistance does not lower the bar.
+CI on every pull request into `main`. AI assistance does not lower the bar.
 
 ## How this project itself uses AI
 
