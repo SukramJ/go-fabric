@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -338,7 +339,7 @@ func TestWorkflowLongOnBaseVerdict(t *testing.T) {
 		return out
 	}
 	long := []string{longJob}
-	narrowed := append(legs[:7:7], familiesJobName(t, wf, custom[1], false))
+	narrowed := slices.Concat(legs[:7], []string{familiesJobName(t, wf, custom[1], false)})
 	for _, tc := range []struct {
 		name  string
 		shape string
@@ -426,7 +427,7 @@ func TestWorkflowLongOnBaseVerdict(t *testing.T) {
 // (P10-sup-7001).
 func familiesJobName(t *testing.T, wf, group string, update bool) string {
 	t.Helper()
-	m := regexp.MustCompile(`(?m)^  chip-families:\n(?:    #.*\n)*    name: (.+)$`).FindStringSubmatch(wf)
+	m := regexp.MustCompile(`(?m)^ {2}chip-families:\n(?: {4}#.*\n)* {4}name: (.+)$`).FindStringSubmatch(wf)
 	if m == nil {
 		t.Fatal("chiptool.yml's chip-families job has no name before its other keys")
 	}
