@@ -621,7 +621,8 @@ type takenCall struct {
 // one that still cannot run — Stop, a crash, a store that refuses it —
 // is finished at the next [New] before the host adds anything (decision
 // 726). An erasure whose record cannot be written is its Forget's
-// [BatchCallError], applied: make the Forget again. Until the next
+// [BatchCallError], applied: it still runs with the next batch; make the
+// Forget again only if the node may stop first. Until the next
 // reassembly succeeds a removed device is still bound, so an Add of the
 // same instance is refused at the call with [device.ErrAddedElsewhere];
 // the batch that refuses it heals when its reassembly succeeds and then
