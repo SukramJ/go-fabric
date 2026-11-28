@@ -37,7 +37,7 @@ func (b *lockedBufferW2B10) String() string {
 // TestReportSenderPanicDropsTheReportNotTheProcessW2B10: a panic while a
 // subscription's report is built or sent — a host value's EncodeTLV runs
 // on this goroutine — is logged at ERROR with the subscription id and the
-// panic value, and the report is dropped. The process lives, the
+// panic value's type, and the report is dropped. The process lives, the
 // subscription stays and reports again on its next change, and the
 // engine's bookkeeping is released: Stop returns. Red before the
 // backstop: the test binary dies of the panic.
@@ -73,7 +73,7 @@ func TestReportSenderPanicDropsTheReportNotTheProcessW2B10(t *testing.T) {
 	if !strings.Contains(line, "level=ERROR") ||
 		!strings.Contains(line, "msg=im.subscription.report_panic") ||
 		!strings.Contains(line, "subscription_id="+strconv.FormatUint(uint64(sub.ID), 10)) ||
-		!strings.Contains(line, `panic="host encoder left a container open"`) {
+		!strings.Contains(line, `panic="string: (redacted)"`) {
 		t.Fatalf("log after the panic = %q, want one ERROR im.subscription.report_panic with subscription_id and panic", line)
 	}
 	if sub.IsClosed() {
@@ -130,7 +130,7 @@ func TestFlushSenderPanicDropsTheFlushNotTheProcessW2B10(t *testing.T) {
 	if !strings.Contains(line, "level=ERROR") ||
 		!strings.Contains(line, "msg=im.subscription.report_panic") ||
 		!strings.Contains(line, "subscription_id="+strconv.FormatUint(uint64(sub.ID), 10)) ||
-		!strings.Contains(line, `panic="host encoder left a container open"`) {
+		!strings.Contains(line, `panic="string: (redacted)"`) {
 		t.Fatalf("log after the flush panic = %q, want one ERROR im.subscription.report_panic with subscription_id and panic", line)
 	}
 	if sub.IsClosed() {

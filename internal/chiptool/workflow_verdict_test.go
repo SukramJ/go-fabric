@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -293,13 +294,25 @@ func TestWorkflowGroupsSelection(t *testing.T) {
 // base commit passed every job the pull request takes from there —
 // `certification families (long)` for a documentation-only release pull
 // request, every chip-tool leg, Go-TH group and family group of the
-// release matrix for one in release shape (issue 632).
+// release matrix for one in release shape (issue 632). A dispatched run
+// with update_fixtures relaxes the family groups' drift checks and is no
+// such verdict (P10-sup-7001): the event `workflow_dispatch+update` stands
+// for it, its family jobs named as chip-families' name renders them in
+// such a run. A dispatch that names families runs them as one group under
+// its own name, and is no such verdict either.
 func TestWorkflowLongOnBaseVerdict(t *testing.T) {
 	if _, err := exec.LookPath("jq"); err != nil {
 		t.Fatalf("jq, which gh's --jq and the step run, is not on PATH: %v", err)
 	}
-	script := runBlockAfter(t, chiptoolWorkflow(t), "  long-on-base:")
+	wf := chiptoolWorkflow(t)
+	script := runBlockAfter(t, wf, "  long-on-base:")
 	const families = `{"include":[{"group":"core-su","families":"SU"},{"group":"long","families":"DGGEN"}]}`
+	coreSU, longJob := familiesJobName(t, wf, "core-su", false), familiesJobName(t, wf, "long", false)
+	updated := map[string]string{coreSU: familiesJobName(t, wf, "core-su", true), longJob: familiesJobName(t, wf, "long", true)}
+	custom := regexp.MustCompile(`\[\{group: "([a-z]+)", families: \$f\}\]`).FindStringSubmatch(wf)
+	if custom == nil {
+		t.Fatal("chiptool.yml's groups step has no group for a dispatch that names families")
+	}
 	legs := []string{
 		"chip-tool commissions the reference daemon",
 		"chip-tool control leg (CHIP app, no go-fabric)",
@@ -308,8 +321,8 @@ func TestWorkflowLongOnBaseVerdict(t *testing.T) {
 		"Go-TH certification cases (gocert-cadmin)",
 		"Go-TH certification cases (gocert-dd)",
 		"Go-TH certification cases (gocert-rest)",
-		"certification families (core-su)",
-		"certification families (long)",
+		coreSU,
+		longJob,
 	}
 	type run struct {
 		id, event string
@@ -325,7 +338,8 @@ func TestWorkflowLongOnBaseVerdict(t *testing.T) {
 		}
 		return out
 	}
-	long := []string{"certification families (long)"}
+	long := []string{longJob}
+	narrowed := slices.Concat(legs[:7], []string{familiesJobName(t, wf, custom[1], false)})
 	for _, tc := range []struct {
 		name  string
 		shape string
@@ -334,7 +348,7 @@ func TestWorkflowLongOnBaseVerdict(t *testing.T) {
 	}{
 		{"docs only, passed", "false", []run{{"11", "schedule", long, nil}}, 0},
 		{"docs only, failed", "false", []run{{"11", "schedule", nil, long}}, 1},
-		{"docs only, no long job", "false", []run{{"11", "schedule", []string{"certification families (core-su)"}, nil}}, 1},
+		{"docs only, no long job", "false", []run{{"11", "schedule", []string{coreSU}, nil}}, 1},
 		{"docs only, no run", "false", nil, 1},
 		{"docs only, second run passed", "false", []run{{"11", "schedule", nil, long}, {"12", "workflow_dispatch", long, nil}}, 0},
 		{"docs only, a pull request's run", "false", []run{{"11", "pull_request", long, nil}}, 1},
@@ -342,11 +356,16 @@ func TestWorkflowLongOnBaseVerdict(t *testing.T) {
 		{"release shape, dispatched", "true", []run{{"11", "workflow_dispatch", legs, nil}}, 0},
 		{"release shape, long alone", "true", []run{{"11", "schedule", long, nil}}, 1},
 		{"release shape, a Go-TH group failed", "true", []run{{"11", "schedule", without("Go-TH certification cases (gocert-dd)"), []string{"Go-TH certification cases (gocert-dd)"}}}, 1},
-		{"release shape, a family group missing", "true", []run{{"11", "schedule", without("certification families (core-su)"), nil}}, 1},
+		{"release shape, a family group missing", "true", []run{{"11", "schedule", without(coreSU), nil}}, 1},
 		{"release shape, the control leg missing", "true", []run{{"11", "schedule", without("chip-tool control leg (CHIP app, no go-fabric)"), nil}}, 1},
 		{"release shape, split over two runs", "true", []run{{"11", "schedule", legs[:4], nil}, {"12", "schedule", legs[4:], nil}}, 1},
 		{"release shape, second run passed", "true", []run{{"11", "schedule", legs[1:], nil}, {"12", "workflow_dispatch", legs, nil}}, 0},
 		{"release shape, a pull request's run", "true", []run{{"11", "pull_request", legs, nil}}, 1},
+		{"docs only, a dispatched fixture update", "false", []run{{"11", "workflow_dispatch+update", long, nil}}, 1},
+		{"release shape, a dispatched fixture update", "true", []run{{"11", "workflow_dispatch+update", legs, nil}}, 1},
+		{"release shape, a fixture update, then a full dispatch", "true", []run{{"11", "workflow_dispatch+update", legs, nil}, {"12", "workflow_dispatch", legs, nil}}, 0},
+		{"docs only, a dispatch that names families", "false", []run{{"11", "workflow_dispatch", narrowed, nil}}, 1},
+		{"release shape, a dispatch that names families", "true", []run{{"11", "workflow_dispatch", narrowed, nil}}, 1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -356,13 +375,20 @@ func TestWorkflowLongOnBaseVerdict(t *testing.T) {
 			}
 			var runsJSON []string
 			for _, r := range tc.runs {
-				runsJSON = append(runsJSON, `{"id":`+r.id+`,"event":"`+r.event+`"}`)
+				event, update := strings.CutSuffix(r.event, "+update")
+				runsJSON = append(runsJSON, `{"id":`+r.id+`,"event":"`+event+`"}`)
+				name := func(n string) string {
+					if u, ok := updated[n]; ok && update {
+						return u
+					}
+					return n
+				}
 				var jobs []string
 				for _, n := range r.passed {
-					jobs = append(jobs, `{"name":`+strconv.Quote(n)+`,"conclusion":"success"}`)
+					jobs = append(jobs, `{"name":`+strconv.Quote(name(n))+`,"conclusion":"success"}`)
 				}
 				for _, n := range r.failed {
-					jobs = append(jobs, `{"name":`+strconv.Quote(n)+`,"conclusion":"failure"}`)
+					jobs = append(jobs, `{"name":`+strconv.Quote(name(n))+`,"conclusion":"failure"}`)
 				}
 				jobs = append(jobs, `{"name":"code touched","conclusion":"success"}`)
 				if err := os.WriteFile(filepath.Join(dir, r.id+".json"), []byte(`{"jobs":[`+strings.Join(jobs, ",")+`]}`), 0o600); err != nil {
@@ -392,6 +418,27 @@ func TestWorkflowLongOnBaseVerdict(t *testing.T) {
 			}
 		})
 	}
+}
+
+// familiesJobName renders chip-families' name for group, in a run with
+// update_fixtures set or not: the name its check reports under. The name
+// must carry a suffix that only update_fixtures adds, so a fixture
+// update's family jobs never report under a name long-on-base reads
+// (P10-sup-7001).
+func familiesJobName(t *testing.T, wf, group string, update bool) string {
+	t.Helper()
+	m := regexp.MustCompile(`(?m)^ {2}chip-families:\n(?: {4}#.*\n)* {4}name: (.+)$`).FindStringSubmatch(wf)
+	if m == nil {
+		t.Fatal("chiptool.yml's chip-families job has no name before its other keys")
+	}
+	f := regexp.MustCompile(`^(.*)\$\{\{ matrix\.group \}\}(.*)\$\{\{ github\.event\.inputs\.update_fixtures == 'true' && '([^']+)' \|\| '' \}\}$`).FindStringSubmatch(m[1])
+	if f == nil {
+		t.Fatalf("chip-families' name %q carries no suffix for update_fixtures: a fixture update's family jobs report under the names long-on-base reads (P10-sup-7001)", m[1])
+	}
+	if update {
+		return f[1] + group + f[2] + f[3]
+	}
+	return f[1] + group + f[2]
 }
 
 // TestWorkflowLongOnBaseNamesEveryLeg holds the release-shape path to the
@@ -461,8 +508,9 @@ func TestWorkflowLongOnBaseNamesEveryLeg(t *testing.T) {
 // require lines of thingfabric.dev/go-fabric… modules it replaces with a
 // local path. Its boundaries are code: a go.sum, a replace, a require of
 // another module, any other go.mod line, the root go.mod, a go.mod that
-// does not replace the module it raises, any other file — and a pull
-// request that is not a release one.
+// does not replace the module it raises (a versioned replace applies to
+// its version alone, P10-sup-7004), any other file — and a pull request
+// that is not a release one.
 func TestWorkflowFilterVerdict(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Fatalf("git, which the filter step runs, is not on PATH: %v", err)
@@ -515,6 +563,10 @@ func TestWorkflowFilterVerdict(t *testing.T) {
 	unreplaced := func(v string) string {
 		return "module example.invalid/fixture\n\ngo 1.27.4\n\nrequire thingfabric.dev/go-fabric " + v + "\n"
 	}
+	versioned := func(v string) string {
+		return "module example.invalid/versioned\n\ngo 1.27.4\n\nrequire thingfabric.dev/go-fabric " + v +
+			"\n\nreplace thingfabric.dev/go-fabric v0.26.0 => ../..\n"
+	}
 	git("init", "-q")
 	write("bridge/x.go", "package bridge\n\n// A file long enough for git to see its move as a rename.\nconst x = 1\n")
 	write("docs/index.md", "# docs\n")
@@ -524,6 +576,7 @@ func TestWorkflowFilterVerdict(t *testing.T) {
 	write("ble/bluez/go.sum", "github.com/godbus/dbus/v5 v5.2.4 h1:x=\n")
 	write("examples/ble-wifi-light/go.mod", example("v0.26.0"))
 	write("fixture/go.mod", unreplaced("v0.26.0"))
+	write("versioned/go.mod", versioned("v0.26.0"))
 	base := commit("base")
 	// branch commits one change set on top of base and returns to base.
 	branch := func(msg string, files map[string]string) string {
@@ -568,6 +621,7 @@ func TestWorkflowFilterVerdict(t *testing.T) {
 	}))
 	rootGoMod := branch("and the root go.mod", with(map[string]string{"go.mod": "module thingfabric.dev/go-fabric\n\ngo 1.27.4\n\nrequire golang.org/x/sys v0.50.0\n"}))
 	notReplaced := branch("a go.mod that does not replace", with(map[string]string{"fixture/go.mod": unreplaced("v0.27.0")}))
+	versionReplaced := branch("a go.mod that replaces another version", with(map[string]string{"versioned/go.mod": versioned("v0.27.0")}))
 	goFile := branch("and a Go file", with(map[string]string{"bridge/x.go": "package bridge\n\nconst x = 2\n"}))
 	binary := branch("and another file", with(map[string]string{".gitignore": "/examples/ble-wifi-light/ble-wifi-light\n"}))
 	deleted := branch("a nested go.mod deleted", map[string]string{"CHANGELOG.md": "# Changelog\n\n- x\n", "fixture/go.mod": ""})
@@ -591,6 +645,7 @@ func TestWorkflowFilterVerdict(t *testing.T) {
 		{"another go.mod line", base, otherLine, "true", "code=true\nrelease_shape=false"},
 		{"the root go.mod", base, rootGoMod, "true", "code=true\nrelease_shape=false"},
 		{"a require the go.mod does not replace", base, notReplaced, "true", "code=true\nrelease_shape=false"},
+		{"a require past a versioned replace", base, versionReplaced, "true", "code=true\nrelease_shape=false"},
 		{"a Go file", base, goFile, "true", "code=true\nrelease_shape=false"},
 		{"a file that is neither", base, binary, "true", "code=true\nrelease_shape=false"},
 		{"a go.mod deleted", base, deleted, "true", "code=true\nrelease_shape=false"},
@@ -610,5 +665,118 @@ func TestWorkflowFilterVerdict(t *testing.T) {
 				t.Errorf("GITHUB_OUTPUT %q, want %q", got, tc.want)
 			}
 		})
+	}
+}
+
+// TestMutateWorkflowWideInput runs mutate.yml's input checks (the plan
+// step up to the shards check) on -wide values: script/mutate hands each
+// element to go test as an argument, so an element that opens with `-`
+// is a flag and an empty one is the module root (P10-sup-7003).
+func TestMutateWorkflowWideInput(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", "mutate.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := runBlockAfter(t, string(data), "- name: list and shard the files")
+	cut := strings.Index(script, `if [[ ! "$SHARDS"`)
+	if cut < 0 {
+		t.Fatal("mutate.yml's plan step has no shards check")
+	}
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "src", "bridge"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	script = "cd \"" + dir + "\"\n" + script[:cut] + "exit 0\n"
+	for _, tc := range []struct {
+		wide string
+		want int
+	}{
+		{"", 0},
+		{"./node/", 0},
+		{"./node/,./im/,bridge", 0},
+		{"-exec", 1},
+		{"./node/,-v", 1},
+		{"a,,b", 1},
+		{"./node/,", 1},
+		{",./node/", 1},
+	} {
+		t.Run(tc.wide, func(t *testing.T) {
+			if got := runStepScript(t, script, []string{"PKG=bridge", "WIDE=" + tc.wide}); got != tc.want {
+				t.Errorf("wide %q: exit %d, want %d", tc.wide, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestWorkflowNoGoCacheOverACheckedOutRef holds every workflow: a job
+// that checks out a ref of its own at the workspace root (not the
+// event's tree) builds and tests that ref there, so its setup-go steps
+// set `cache: false` — the post step would otherwise save the caches
+// that ref's run left (P10-sup-7002, mutate.yml's shard job). A ref
+// checked out under a `path:` is not built at the root and is not held.
+func TestWorkflowNoGoCacheOverACheckedOutRef(t *testing.T) {
+	files, err := filepath.Glob(filepath.Join("..", "..", ".github", "workflows", "*.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	jobHeader := regexp.MustCompile(`(?m)^ {2}[A-Za-z0-9_-]+:$`)
+	stepHeader := regexp.MustCompile(`(?m)^ {6}- `)
+	ref := regexp.MustCompile(`(?m)^ +ref: `)
+	path := regexp.MustCompile(`(?m)^ +path: `)
+	cache := regexp.MustCompile(`(?m)^ +cache: (\S+)$`)
+	held := 0
+	for _, f := range files {
+		data, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		wf := string(data)
+		at := strings.Index(wf, "\njobs:\n")
+		if at < 0 {
+			continue
+		}
+		jobs := wf[at:]
+		heads := jobHeader.FindAllStringIndex(jobs, -1)
+		for i, h := range heads {
+			end := len(jobs)
+			if i+1 < len(heads) {
+				end = heads[i+1][0]
+			}
+			job := jobs[h[0]:end]
+			starts := stepHeader.FindAllStringIndex(job, -1)
+			foreign := false
+			var caches []string
+			for j, s := range starts {
+				stop := len(job)
+				if j+1 < len(starts) {
+					stop = starts[j+1][0]
+				}
+				step := job[s[0]:stop]
+				switch {
+				case strings.Contains(step, "uses: actions/checkout@"):
+					if ref.MatchString(step) && !path.MatchString(step) {
+						foreign = true
+					}
+				case strings.Contains(step, "uses: actions/setup-go@"):
+					c := "(unset)"
+					if m := cache.FindStringSubmatch(step); m != nil {
+						c = m[1]
+					}
+					caches = append(caches, c)
+				}
+			}
+			if !foreign {
+				continue
+			}
+			held++
+			for _, c := range caches {
+				if c != "false" {
+					t.Errorf("%s job %s checks out a ref of its own at the root and runs setup-go with cache %s; want cache: false", filepath.Base(f), strings.TrimSpace(jobs[h[0]:h[1]]), c)
+				}
+			}
+		}
+	}
+	if held == 0 {
+		t.Fatal("no workflow job checks out a ref of its own at the root; mutate.yml's shard job did — the parser no longer sees it")
 	}
 }

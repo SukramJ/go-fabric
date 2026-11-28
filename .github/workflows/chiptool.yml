@@ -259,7 +259,9 @@ jobs:
                 shape=false; why="$f changes a line that is not a thingfabric.dev require: $line"; break
               fi
               mod="${BASH_REMATCH[2]}"
-              replace_re="^[[:space:]]*(replace[[:space:]]+)?${mod//./\\.}([[:space:]]+v[^[:space:]]+)?[[:space:]]+=>[[:space:]]+\.\.?/"
+              # Unversioned only: a versioned replace applies to its version
+              # alone, and the raised require would leave it (P10-sup-7004).
+              replace_re="^[[:space:]]*(replace[[:space:]]+)?${mod//./\\.}[[:space:]]+=>[[:space:]]+\.\.?/"
               if ! grep -Eq "$replace_re" <<<"$head_mod"; then
                 shape=false; why="$f does not replace $mod with a local path"; break
               fi
@@ -690,7 +692,10 @@ jobs:
         run: make chiptool-ble-cases
 
   chip-families:
-    name: certification families (${{ matrix.group }})
+    # update_fixtures relaxes the drift checks, so a fixture update's jobs
+    # carry a suffix and never report under a name long-on-base reads
+    # (P10-sup-7001); a dispatch that names families runs group `custom`.
+    name: certification families (${{ matrix.group }})${{ github.event.inputs.update_fixtures == 'true' && ' (fixture update)' || '' }}
     needs: changes
     # A release pull request in release shape reads this job's verdict on
     # its base commit instead (job long-on-base, issue 632).
@@ -906,7 +911,7 @@ jobs:
             fi
             echo "run $id: not passed: $(printf '%s; ' "${missing[@]}")"
           done
-          echo "::error::no run on the base commit $BASE in which every job above passed (runs looked at: ${runs:-none}); dispatch chiptool.yml without families on main while main is $BASE, or wait for the nightly run"
+          echo "::error::no run on the base commit $BASE in which every job above passed (runs looked at: ${runs:-none}); dispatch chiptool.yml without families and without update_fixtures on main while main is $BASE, or wait for the nightly run"
           exit 1
 
   # The required status check for the certification families. Branch

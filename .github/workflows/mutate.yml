@@ -102,7 +102,9 @@ jobs:
             echo "::error::package '$PKG' is not a directory of the module"
             exit 1
           fi
-          if [[ ! "$WIDE" =~ ^[A-Za-z0-9_./,-]*$ ]]; then
+          # No element is empty or opens with `-`: go test reads the one as
+          # the module root, the other as a flag (P10-sup-7003).
+          if [[ ! "$WIDE" =~ ^([A-Za-z0-9_.][A-Za-z0-9_./-]*(,[A-Za-z0-9_.][A-Za-z0-9_./-]*)*)?$ ]]; then
             echo "::error::wide '$WIDE' is not a comma-separated package list"
             exit 1
           fi
@@ -167,10 +169,12 @@ jobs:
         with:
           persist-credentials: false
           ref: ${{ needs.plan.outputs.sha }}
+      # The sampled ref may be any commit, and its tests run here: no Go
+      # cache in this job (P10-sup-7002).
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-          cache: true
+          cache: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: mutate-tool

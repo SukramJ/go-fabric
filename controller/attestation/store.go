@@ -31,7 +31,8 @@ type PAA struct {
 // DclCertificateService the validator uses (DeviceAttestationValidator.ts:
 // 321-486 at db021da0): getCertificate / getCertificateAsDer by subject key
 // identifier with test certificates considered, acceptsTestCertificates,
-// lookupCdSigner.
+// lookupCdSigner. Its methods take no context: a call may still run after
+// the Commission that started it was canceled and returned.
 type PAAStore interface {
 	// PAA returns the root whose subject key identifier is skid.
 	PAA(skid []byte) (PAA, bool)
@@ -52,6 +53,8 @@ type PAAStore interface {
 // Revocations is the optional revocation check of a [PAAStore] —
 // matter.js DclCertificateService.isRevoked(authorityKeyId, serialNumber,
 // issuerDnHex) (DAV:477-498). A store without it reports nothing revoked.
+// Like a [PAAStore]'s, its call may still run after a canceled Commission
+// returned.
 type Revocations interface {
 	// IsRevoked reports whether the certificate with serial (the DER
 	// INTEGER content) issued under akid by the issuer whose DER DN is

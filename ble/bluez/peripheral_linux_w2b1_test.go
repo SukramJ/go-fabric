@@ -301,6 +301,45 @@ func TestPeripheralLogsRetriedRegistrationsW2B1(t *testing.T) {
 	}
 }
 
+// TestPeripheralSupersededRetryLogsNoHeldP10 holds P10-doc-6302: a work
+// whose earlier round failed, superseded while its retried
+// RegisterApplication is in flight, leaves the advertisement to its
+// successor and so does not log that the registrations held.
+func TestPeripheralSupersededRetryLogsNoHeldP10(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		p, b, h := newLoggedPeripheralW2B1(t)
+		advertiseAndServe(t, p, b)
+		before := callsOf(b, regApp)
+		b.failWith(regApp, dbus.Error{Name: "org.bluez.Error.Failed", Body: []any{"one"}})
+		p.handle(addedSignal(testAdapter))
+		synctest.Wait()
+		if n := callsOf(b, regApp) - before; n != 1 {
+			t.Fatalf("RegisterApplication calls %d, want the refused one", n)
+		}
+		release := b.hold(regApp)
+		defer release()
+		b.clearErr(regApp)
+		time.Sleep(p.pause)
+		synctest.Wait()
+		if n := callsOf(b, regApp) - before; n != 2 {
+			t.Fatalf("RegisterApplication calls %d, want the retry in flight", n)
+		}
+		p.handle(partialAdded(testAdapter, ifaceAdvertising))
+		synctest.Wait()
+		release()
+		p.readvertising.Wait()
+
+		for _, m := range h.at(slog.LevelInfo) {
+			if strings.Contains(m, "after a retry") {
+				t.Fatalf("Info record %q from the superseded work", m)
+			}
+		}
+		if !advertised(p, b) {
+			t.Fatalf("the successor did not register the advertisement; calls %q", b.called())
+		}
+	})
+}
+
 // TestPeripheralLogsPoweredEdgesW2B1 holds #610 rows 1 and 2 (decision
 // 678): Powered false is logged at Warn on its edge, its return at Info;
 // neither writes Powered nor registers anything.
@@ -363,6 +402,45 @@ func TestPeripheralCloseBoundsItsWaitForAdvMuW2B1(t *testing.T) {
 		}
 		if !slices.Contains(b.calledBeforeClose(), string(testAdapter)+" "+ifaceGattManager+".UnregisterApplication") {
 			t.Fatalf("Close did not unregister the application: %q", b.calledBeforeClose())
+		}
+	})
+}
+
+// TestPeripheralWorkRegistersNoAdvertisementAfterCloseP10 holds
+// P10-doc-6304: a work past its closed test whose calls outlast Close's
+// StopAdvertising does not register the advertisement after Close gave up
+// withdrawing it.
+func TestPeripheralWorkRegistersNoAdvertisementAfterCloseP10(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		p, b := newTestPeripheral(t)
+		data := btp.EncodeAdvertisementData(3840, 0xFFF1, 0x8001, false, false)
+		if err := p.Advertise(context.Background(), contract.BLEAdvertisement{Data: data}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := p.RegisterService(context.Background(), nil); err != nil {
+			t.Fatal(err)
+		}
+		releaseUnreg := b.hold(ifaceAdvertising + ".UnregisterAdvertisement")
+		defer releaseUnreg()
+		releaseApp := b.hold(regApp)
+		defer releaseApp()
+		p.handle(addedSignal(testAdapter))
+		synctest.Wait() // the work holds advMu in dropAdvertisement
+		time.Sleep(time.Second)
+		closed := make(chan error, 1)
+		go func() { closed <- p.Close() }()
+		synctest.Wait()
+		time.Sleep(peripheralTimeout - 2*time.Second)
+		releaseUnreg()
+		synctest.Wait() // the work's RegisterApplication in flight
+		time.Sleep(3 * time.Second)
+		n := callsOf(b, regAdv) // Close's StopAdvertising gave up
+		releaseApp()
+		if err := <-closed; err != nil {
+			t.Fatal(err)
+		}
+		if got := callsOf(b, regAdv); got != n {
+			t.Fatalf("RegisterAdvertisement calls %d after Close's StopAdvertising gave up, want %d; calls %q", got, n, b.called())
 		}
 	})
 }

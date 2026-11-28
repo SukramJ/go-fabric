@@ -41,8 +41,10 @@
 //	verdict  wide-verdict  note  file:line  kind  source line
 //
 // The verdict is KILLED (the tests failed), SURVIVED (they passed),
-// INVALID (the mutant did not build) or NOTRUN (not started within
-// -budget). The wide verdict is empty unless the own-package tests let the
+// INVALID (the mutant did not build), NOTRUN (not started within
+// -budget) or NOTBUILT (the file is outside the package's build for this
+// GOOS, GOARCH and build tags, as `go list` with CGO_ENABLED=0 answers, so
+// no test would compile the mutant; it is not run). The wide verdict is empty unless the own-package tests let the
 // mutant survive and -wide is set. The note is "timeout" (killed by the
 // test deadline), "memory" (killed by the watchdog below) or "nospace" (the
 // volume ran out of space; the line is INVALID and says nothing about the
@@ -282,6 +284,16 @@ func parseFlags(args []string, stderr io.Writer) (config, bool) {
 		logf(stderr, "mutate: -p must be at least 1")
 		return c, false
 	}
+	// A -wide entry reaches go test as an argument: an empty one or one
+	// that starts with - (a go test flag such as -exec) is refused.
+	if c.wide != "" {
+		for _, p := range strings.Split(c.wide, ",") {
+			if p == "" || strings.HasPrefix(p, "-") {
+				logf(stderr, "mutate: -wide entry %q is not a package", p)
+				return c, false
+			}
+		}
+	}
 	c.files = fs.Args()
 	return c, true
 }
@@ -317,23 +329,54 @@ func run(args []string, stderr io.Writer) int {
 	}
 	c.root = root
 	var all []mutant
+	var notBuilt []result
 	srcs := map[string][]byte{}
+	built := map[string]map[string]bool{} // by directory
 	for _, rel := range c.files {
 		ms, src, err := collect(c.root, rel)
+		dir := filepath.Dir(rel)
+		if err == nil && built[dir] == nil {
+			built[dir], err = builtFiles(c.root, dir)
+		}
 		if err != nil {
 			logf(stderr, "mutate: %v", err)
 			return 2
 		}
 		srcs[rel] = src
+		if !built[dir][filepath.Base(rel)] {
+			for _, m := range ms {
+				notBuilt = append(notBuilt, result{m: m, own: "NOTBUILT"})
+			}
+			continue
+		}
 		all = append(all, ms...)
 	}
-	logf(stderr, "%d mutants in %d files", len(all), len(srcs))
-	results := mutateAll(c, all, srcs, stderr)
+	logf(stderr, "%d mutants in %d files", len(all)+len(notBuilt), len(srcs))
+	results := append(mutateAll(c, all, srcs, stderr), notBuilt...)
 	if err := os.WriteFile(c.out, tsv(results), 0o600); err != nil {
 		logf(stderr, "mutate: %v", err)
 		return 1
 	}
 	return 0
+}
+
+// builtFiles is the set of file names go test compiles for the package in
+// dir — its GoFiles, TestGoFiles and XTestGoFiles — under the environment
+// goTest runs it in (CGO_ENABLED=0).
+func builtFiles(root, dir string) (map[string]bool, error) {
+	cmd := exec.CommandContext(context.Background(), "go", "list", "-e", "-f", //nolint:gosec // the go tool, with the caller's directory
+		"{{range .GoFiles}}{{println .}}{{end}}{{range .TestGoFiles}}{{println .}}{{end}}{{range .XTestGoFiles}}{{println .}}{{end}}", "./"+dir)
+	cmd.Dir = root
+	cmd.Env = append(os.Environ(), "CGO_ENABLED=0")
+	b, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("go list ./%s: %w", dir, err)
+	}
+	set := map[string]bool{}
+	for _, f := range strings.Fields(string(b)) {
+		set[f] = true
+	}
+	return set, nil
 }
 
 // mutateAll runs every mutant on c.workers workers and returns the

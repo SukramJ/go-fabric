@@ -73,9 +73,11 @@ type ClusterServer interface {
 	// and it does not keep the *tlv.Encoder past its return: the encoder
 	// may be reset and reused for the next value (tlv.Encoder.Reset), so a
 	// write on a kept encoder lands in another value. One that
-	// panics, leaves a container open or writes no element or more than
-	// one answers FAILURE (an AttributeStatusIB) for its own path, logged
-	// at ERROR; the rest of the read, the priming report or the
+	// panics, leaves a container open, writes no element or more than
+	// one, or tags a container's members against the container's rule — a
+	// Structure's members carry a context or profile tag, an Array's are
+	// anonymous — answers FAILURE (an AttributeStatusIB) for its own
+	// path, logged at ERROR; the rest of the read, the priming report or the
 	// subscription's report goes out, and the subscription stays.
 	//
 	// It takes no context on purpose: a read answers from memory —
@@ -119,9 +121,11 @@ type ClusterServer interface {
 	// own (a response checked against a hand-written form is written once
 	// more for the check, in the same isolation), so its encoder must be
 	// deterministic and free of side effects: one whose encoder panics,
-	// leaves a container open or writes other than one element answers
-	// FAILURE (a CommandStatusIB on the request's path)
-	// for that command, logged at ERROR, the other commands of the
+	// leaves a container open, writes other than one element or tags a
+	// container's members against the container's rule — a Structure's
+	// members carry a context or profile tag, an Array's are anonymous —
+	// answers FAILURE (a CommandStatusIB on the request's path) for that
+	// command, logged at ERROR, the other commands of the
 	// invoke unaffected. The command has run by then, and nothing undoes
 	// what it did: a controller that retries runs it again.
 	MatterInvoke(ctx context.Context, cmdID uint32, fields any) (response any, err error)
@@ -1148,9 +1152,11 @@ const (
 // encoder must be deterministic and free of side effects; like an
 // attribute's, it does not keep the *tlv.Encoder past its return (the
 // encoder may be reset and reused for the next value). A payload whose
-// encoder panics, leaves a container open or writes other than one
-// element is not recorded (no event number is consumed, no subscriber
-// hears of it) and is logged at ERROR; the call returns normally.
+// encoder panics, leaves a container open, writes other than one element
+// or tags a container's members against the container's rule (a
+// Structure's carry a context or profile tag, an Array's are anonymous)
+// is not recorded (no event number is consumed, no subscriber hears of
+// it) and is logged at ERROR; the call returns normally.
 // `priority` is the priority the event is recorded and reported with. It
 // does not decide when a subscriber is told: an event is reported with
 // the subscription's next report, and it asks for one itself only when

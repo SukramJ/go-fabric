@@ -1353,7 +1353,8 @@ func readCluster(_ context.Context, d im.Dispatcher, key invokedCluster) map[uin
 //
 // Every response is resolved once first, in isolation
 // ([reportchunk.ResolveInvoke]): one whose encoder panics, leaves a
-// container open or writes other than one element is answered FAILURE on
+// container open, writes other than one element or tags a container's
+// members against the container's rule is answered FAILURE on
 // req's command path with its CommandRef and logged at ERROR on logger
 // (nil: not logged); the command has run and its effect stays (#625).
 func chunkInvokeResponse(logger *slog.Logger, req im.InvokeRequest, resp im.InvokeResponse, budget, hardCap int) ([][]byte, error) { //nolint:unparam // the budget is the caller's; the tests pin the split at the production one

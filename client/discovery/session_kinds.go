@@ -609,11 +609,20 @@ func (k *raceKind[W]) onStop(*Session[W]) {
 // reports false, and the cancel interrupts the discovery. Mirrors matter.js
 // packages/node/src/behavior/system/controller/discovery/ParallelPaseDiscovery.ts:178-185
 // at db91886c (onCancel; the winner's AbortController kept at :102).
+//
+// Once the winner's attempt has returned, a cancel is taken without effect
+// and logged at DEBUG only (P10-api-6702).
 func (k *raceKind[W]) onCancel(s *Session[W], reason error) bool {
 	k.mu.Lock()
 	defer k.mu.Unlock()
 	if k.winnerCancel == nil {
 		return false
+	}
+	select {
+	case <-k.winnerDone:
+		s.log.Debug("matter.controller.discovery.cancel_after_outcome", slog.String("discovery", s.description), slog.Any("reason", reason))
+		return true
+	default:
 	}
 	s.log.Info("matter.controller.discovery.cancel_to_winner", slog.String("discovery", s.description), slog.Any("reason", reason))
 	k.winnerCancel(reason)

@@ -411,8 +411,6 @@ func (g *generator) fields(vs []*value, owner string) ([]*fieldInfo, error) {
 
 // resolve maps a value to its Go type. anonName names an anonymous struct
 // the value states inline.
-//
-//nolint:funlen // one case per matter.js metatype
 func (g *generator) resolve(v *value, anonName string) (typeInfo, error) {
 	t := typeInfo{name: v.Type}
 	if err := g.declareDefinitionValues(v); err != nil {
@@ -1419,7 +1417,7 @@ func (g *generator) writeAttribute(w *writer, a *element) {
 	}
 	if lit := typedDefault(t, v); lit != "" {
 		w.p("\t\t\tDefault: %s,", lit)
-	} else if lit := structDefault(t); lit != "" {
+	} else if lit := structDefault(t); lit != "" && !v.Quality["nullable"] {
 		w.p("\t\t\tDefault: %s,", lit)
 	}
 	if v.IsSecret {
@@ -2368,9 +2366,9 @@ func sortedClusterNames(s *snapshot) []string {
 // a string set to it; empty when the type is no struct or no such field
 // states a default. A nullable struct or bitmap attribute without a stated
 // default is null in matter.js, not built from its fields
-// (SelectDefaultValue.ts:145-152); no nullable attribute of the snapshot
-// gets a struct default here either, so the narrowing differs from
-// matter.js for a non-nullable struct only.
+// (SelectDefaultValue.ts:145-152); writeAttribute does not use this for a
+// nullable attribute either, so the narrowing differs from matter.js for a
+// non-nullable struct only.
 func structDefault(t typeInfo) string {
 	if t.kind != kindStruct || t.dt == nil {
 		return ""

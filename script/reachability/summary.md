@@ -1,15 +1,15 @@
 # Exported-API reachability summary
 
 Root set: test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)
-Entry points: 11061 across 293 test packages, and 374 package initializers.
+Entry points: 11090 across 293 test packages, and 374 package initializers.
 
 ## Overview
 
 | Metric | Count |
 |---|---|
-| Total exported | 28801 |
-| Reached by a test | 22372 |
-| Whitelisted | 6407 |
+| Total exported | 28813 |
+| Reached by a test | 22377 |
+| Whitelisted | 6414 |
 | **Unreached** | **22** |
 
 ## Top-20 packages by unreached exported identifiers
@@ -34,7 +34,7 @@ Entry points: 11061 across 293 test packages, and 374 package initializers.
 |---|---|---|---|
 | bdx | ServerSession.InitType | bdx/responder.go | 571 |
 | bdx | ServerSession.Scope | bdx/responder.go | 565 |
-| bridge | Bridge.ControllerRTT | bridge/bridge.go | 3372 |
+| bridge | Bridge.ControllerRTT | bridge/bridge.go | 3382 |
 | bridge | Bridge.SubscriptionFlushReporter | bridge/subscribe.go | 407 |
 | client/exchange | Manager.LocalFixedMrpBackoff | client/exchange/manager.go | 254 |
 | cluster/core | AccessControl.NotifyLocalEntryInstalled | cluster/core/access_control.go | 1716 |

@@ -313,8 +313,13 @@ var (
 // closure composes its own walk with the [endpoint.Assembler] it owns:
 //
 //	func(ctx context.Context) (*endpoint.Topology, error) {
-//	    return assembler.Assemble(ctx, walkTheRegistry(ctx)) // []endpoint.Snapshot
+//	    return assembler.AssemblePending(ctx, walkTheRegistry(ctx)) // []endpoint.Snapshot
 //	}
+//
+// The bridge commits the topology ([endpoint.Topology.Commit]) when it
+// swaps it in, so one it refuses — a device-type refusal, a Stop meanwhile
+// — leaves the assembler's per-key state as the served topology's. A
+// topology from [endpoint.Assembler.Assemble] is committed already.
 //
 // The topology must come from an [endpoint.Assembler] over the host's
 // [endpoint.Spec]s: a host's "own assembler" is its own Spec producer, not
@@ -1597,6 +1602,11 @@ func (b *Bridge) reassembleLocked(ctx context.Context, run *uint64) error { //no
 	b.switchUnsubscribers = switchUnsubs
 	hook := b.onReassembled
 	b.mu.Unlock()
+	// The topology is served: its assembly's commit runs now, before the
+	// next assembly can take a snapshot. Outside b.mu: releasing a removed
+	// key's state closes its Identify, which waits for a countdown whose
+	// listeners may re-enter the bridge.
+	topology.Commit()
 
 	// The value listeners follow the swap, outside the lock: the host's
 	// notifiers are called to unregister and to register, and their

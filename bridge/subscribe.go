@@ -575,8 +575,9 @@ func (b *Bridge) reportEventsWith(ctx context.Context, sub *subscription.Subscri
 // spec (e.g. 0x00 InitialPress).
 //
 // The payload is encoded once, in isolation, before the event is
-// recorded: a payload whose encoder panics, leaves a container open or
-// writes other than one element is not recorded at all — no event number
+// recorded: a payload whose encoder panics, leaves a container open,
+// writes other than one element or tags a container's members against
+// the container's rule is not recorded at all — no event number
 // is consumed, no subscriber is told — and is logged at ERROR. As chip,
 // which encodes the payload when the event is logged and vends the number
 // only on success (src/app/EventManagement.cpp:468-469, :473-478, :479-483

@@ -28,7 +28,9 @@ type WebRTCRequestorConfig struct {
 	// gets it unasked: the fabric's administrator grants the access, or the
 	// host returns true here for the fabrics its cameras signal on. The node
 	// asks at Start, after each CommissioningComplete and after each
-	// successful reassembly of a started node, on the calling goroutine.
+	// successful reassembly of a started node, on the calling goroutine;
+	// after a reassembly it asks once the reassembly has released the
+	// Aggregator, so GrantFabric may call the Aggregator.
 	//
 	// A grant only ever adds the entry. Withdrawing it — false for a fabric
 	// granted before, or GrantFabric left nil — removes nothing: the entry
@@ -79,9 +81,9 @@ func (n *Node) ensureRequestorACL(ctx context.Context) {
 	}
 	fabrics, err := n.st.ListFabrics(ctx)
 	if err != nil {
-		// No entry is written until the next Start or
-		// CommissioningComplete: a granted camera refused meanwhile is
-		// refused for this (review II, R2-C2-err-2456).
+		// No entry is written until the next Start, CommissioningComplete
+		// or reassembly: a granted camera refused meanwhile is refused for
+		// this (review II, R2-C2-err-2456, P10-doc-6002).
 		n.logger.Warn("webrtc.requestor.acl_list_failed", slog.Any("err", err))
 		return
 	}

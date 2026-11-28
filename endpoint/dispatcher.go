@@ -364,7 +364,7 @@ func (d *TopologyDispatcher) AttributePathStatus(ctx context.Context, path im.Co
 // grant drives no read of the server (R2-P6-bound-0405). matter.js
 // authorises a location before it reads the value
 // (packages/protocol/src/action/server/AttributeReadResponse.ts:250, :272
-// at b25ed960). A request without a stamped check — PASE, a local caller,
+// at db91886c). A request without a stamped check — PASE, a local caller,
 // an im without an ACL checker — is not asked here; im's per-result check
 // stays the gate of what is reported.
 func (d *TopologyDispatcher) readAuthorized(ctx context.Context, path im.ConcreteAttributePath) bool {
@@ -383,7 +383,7 @@ func (d *TopologyDispatcher) readAuthorized(ctx context.Context, path im.Concret
 // check's: UNSUPPORTED_ACCESS on a fully concrete path, the attribute
 // skipped under a wildcard — matter.js AttributeReadResponse.ts:272 with
 // :474-476 (concrete path: UNSUPPORTED_ACCESS) and :408-415 (wildcard:
-// the attribute is skipped) at b25ed960, and chip
+// the attribute is skipped) at db91886c, and chip
 // src/app/reporting/Engine.cpp:81-88.
 func readAllowed(ctx context.Context, srv contract.ClusterServer, attrID uint32) bool {
 	decl, ok := srv.(contract.ReadAccessDeclarer)
@@ -424,7 +424,7 @@ func (d *TopologyDispatcher) ReadAtEndpoint(ctx context.Context, path im.Concret
 // the cluster answers UnsupportedCluster; under a wildcard endpoint it is
 // skipped, and so is an attribute whose read does not succeed
 // (AttributeReadResponse.ts:259-261, :342-345, :387-388, :408-415 and
-// :420-425 at b25ed960).
+// :420-425 at db91886c).
 func (d *TopologyDispatcher) readAt(ctx context.Context, ep *Endpoint, path im.ConcreteAttributePath, wildcardEndpoint bool, results []im.ReadResult) []im.ReadResult {
 	ePath := path
 	ePath.Endpoint = ep.ID
@@ -1546,7 +1546,7 @@ func hostStatusError(err error) (contract.StatusError, bool) {
 // attributes (review II, R2-P3-admin-02). matter.js authorizes every read
 // against the attribute's limits.readLevel
 // (packages/protocol/src/action/server/AttributeReadResponse.ts:272, and
-// :409-412 on the wildcard path, at b25ed960).
+// :409-412 on the wildcard path, at db91886c).
 //
 // A path that does not resolve — no such endpoint, no such cluster on it,
 // an attribute the cluster does not list — takes no floor from the data

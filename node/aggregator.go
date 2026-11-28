@@ -159,6 +159,56 @@ type Aggregator struct {
 	instances map[string]*servedInstance
 	touched   map[string]uint64
 	touchSeq  uint64
+	// staged is what the last assembled snapshot makes of instances,
+	// touched and retired. It applies once the bridge serves that
+	// snapshot's topology ([Aggregator.applyStagedLocked]) and never for
+	// one the bridge refused: a refused topology changes no node state
+	// (review II, P10F-fsm-6405). a.mu guards it.
+	staged *stagedSnapshot
+}
+
+// stagedSnapshot is the node state an assembled snapshot stands for:
+// the instances it handed the assembler, the writes of a key's place it
+// read (key → touchSeq) and the retired scopes it erased.
+type stagedSnapshot struct {
+	topo      *endpoint.Topology
+	instances map[string]*servedInstance
+	touched   map[string]uint64
+	retired   []string
+}
+
+// applyStagedLocked applies the staged snapshot when served is its
+// topology — the bridge took it; a.mu is held. A stage for another
+// topology is dropped only when settled is true: the snapshotter calls
+// it inside the bridge's assembly slot, where the served topology is the
+// previous assembly's verdict. After a reassembly returned (settled
+// false) a mismatch is left for that hook: a concurrent
+// Bridge().Reassemble may have staged a snapshot the bridge is about to
+// take (review II, P10F-fsm-6405). A write of a key's place since that
+// snapshot read the set stays recorded for the next one; a scope
+// retired again since stays retired.
+func (a *Aggregator) applyStagedLocked(served *endpoint.Topology, settled bool) {
+	st := a.staged
+	if st == nil {
+		return
+	}
+	if served == nil || st.topo != served {
+		if settled {
+			a.staged = nil
+		}
+		return
+	}
+	a.staged = nil
+	a.instances = st.instances
+	for key, seq := range st.touched {
+		if a.touched[key] == seq {
+			delete(a.touched, key)
+		}
+	}
+	if len(st.retired) > 0 {
+		// Erased: the names are forgotten.
+		a.retired = slices.DeleteFunc(a.retired, func(s string) bool { return slices.Contains(st.retired, s) })
+	}
 }
 
 // servedInstance is the [endpoint.Spec.Instance] the node hands the
@@ -234,6 +284,11 @@ func (a *Aggregator) partLocked(scope string) *partition {
 		}
 	}
 	a.retired = slices.DeleteFunc(a.retired, func(s string) bool { return s == scope })
+	if a.staged != nil {
+		// The staged erasure took the old partition's numbers; the new
+		// one is not forgotten by it.
+		a.staged.retired = slices.DeleteFunc(a.staged.retired, func(s string) bool { return s == scope })
+	}
 	p := &partition{scope: scope}
 	a.parts = append(a.parts, p)
 	return p
@@ -621,7 +676,8 @@ type takenCall struct {
 // one that still cannot run — Stop, a crash, a store that refuses it —
 // is finished at the next [New] before the host adds anything (decision
 // 726). An erasure whose record cannot be written is its Forget's
-// [BatchCallError], applied: make the Forget again. Until the next
+// [BatchCallError], applied: it still runs with the next batch; make the
+// Forget again only if the node may stop first. Until the next
 // reassembly succeeds a removed device is still bound, so an Add of the
 // same instance is refused at the call with [device.ErrAddedElsewhere];
 // the batch that refuses it heals when its reassembly succeeds and then
@@ -739,8 +795,9 @@ func (p *Partition) Batch(ctx context.Context, fn func(b *Batch) error) error {
 // as a forget in progress, with keep (decision 568), so a Stop, a crash
 // or a store failure before it runs leaves it to the next New
 // ([Aggregator.finishForgets], decision 726); an erasure whose record
-// cannot be written is its Forget's error in calls (applied: the Forget
-// is to be made again), or returned when it is no call's.
+// cannot be written is its Forget's error in calls (applied: it still
+// runs with the next batch; make the Forget again only if the node may
+// stop first), or returned when it is no call's.
 func (a *Aggregator) leave(ctx context.Context, detach []func(), erase []reservationOp, keep []string, calls *callErrors) (bool, error) {
 	a.mu.Lock()
 	closed := a.closed
@@ -1627,9 +1684,15 @@ func (a *Aggregator) setStarted() {
 }
 
 func (a *Aggregator) reassemble(ctx context.Context) error {
-	a.reassembleMu.Lock()
-	defer a.reassembleMu.Unlock()
-	return a.reassembleLocked(ctx)
+	err := func() error {
+		a.reassembleMu.Lock()
+		defer a.reassembleMu.Unlock()
+		return a.reassembleLocked(ctx)
+	}()
+	if err == nil {
+		a.ensureRequestorACL(ctx)
+	}
+	return err
 }
 
 // reassembleIfBehind reassembles if the last reassembly failed
@@ -1640,12 +1703,18 @@ func (a *Aggregator) reassembleIfBehind(ctx context.Context) error {
 	if !a.behind.Load() {
 		return nil
 	}
-	a.reassembleMu.Lock()
-	defer a.reassembleMu.Unlock()
-	if !a.behind.Load() {
-		return nil
+	ran, err := func() (bool, error) {
+		a.reassembleMu.Lock()
+		defer a.reassembleMu.Unlock()
+		if !a.behind.Load() {
+			return false, nil
+		}
+		return true, a.reassembleLocked(ctx)
+	}()
+	if ran && err == nil {
+		a.ensureRequestorACL(ctx)
 	}
-	return a.reassembleLocked(ctx)
+	return err
 }
 
 // reassembleLocked installs a new topology; reassembleMu is held.
@@ -1655,19 +1724,33 @@ func (a *Aggregator) reassembleLocked(ctx context.Context) error {
 		return fmt.Errorf("node: reassemble: %w", err)
 	}
 	a.behind.Store(false)
+	served := a.n.br.Topology()
+	a.mu.Lock()
+	a.applyStagedLocked(served, false)
+	a.mu.Unlock()
 	a.n.attachCameraPeers()
-	// Mirrors matter.js packages/node/src/behaviors/web-rtc-transport-requestor/
-	// WebRtcTransportRequestorServer.ts:126-128 at db91886c: initialize runs
-	// #nodeOnline (:143-181) at once for a requestor endpoint added to a node
-	// that is online. Reassembly runs only after Start (a.started), so this is
-	// the online case; before Start, camerasOnline installs the entry. The
-	// topology is served already, so the entry's write does not depend on the
-	// caller's context staying alive (as storeConfigVersions).
-	a.n.ensureRequestorACL(context.WithoutCancel(ctx))
 	a.n.announceSurface(ctx)
 	a.reassemblies.Add(1)
 	a.n.count(MetricAggregatorReassemblies)
 	return nil
+}
+
+// ensureRequestorACL runs after a successful reassembly, with reassembleMu
+// released: GrantFabric is the host's and may call the Aggregator, whose
+// reassembly takes that lock (review II, P10-conc-6501, P10-conc-6003).
+// The entry is written after the surface is announced, and the ensures of
+// two reassemblies may interleave; the duplicate check runs under the
+// AccessControl write lock (addLocalOperateEntry).
+//
+// Mirrors matter.js packages/node/src/behaviors/web-rtc-transport-requestor/
+// WebRtcTransportRequestorServer.ts:126-128 at db91886c: initialize runs
+// #nodeOnline (:143-181) at once for a requestor endpoint added to a node
+// that is online. Reassembly runs only after Start (a.started), so this is
+// the online case; before Start, camerasOnline installs the entry. The
+// topology is served already, so the entry's write does not depend on the
+// caller's context staying alive (as storeConfigVersions).
+func (a *Aggregator) ensureRequestorACL(ctx context.Context) {
+	a.n.ensureRequestorACL(context.WithoutCancel(ctx))
 }
 
 // snapshot is the bridge's Snapshotter: one snapshot per partition, the
@@ -1681,7 +1764,12 @@ func (a *Aggregator) snapshot(ctx context.Context) (*endpoint.Topology, error) {
 		scope string
 		eps   []Endpoint
 	}
+	// The snapshot before is applied if the bridge took it: the bridge
+	// calls the Snapshotter inside its assembly slot, after the previous
+	// assembly's swap or refusal, so the topology it serves is settled.
+	served := a.n.br.Topology()
 	a.mu.Lock()
+	a.applyStagedLocked(served, true)
 	a.partLocked(Scope)
 	parts := make([]part, 0, len(a.parts))
 	for _, p := range a.parts {
@@ -1736,27 +1824,18 @@ func (a *Aggregator) snapshot(ctx context.Context) (*endpoint.Topology, error) {
 		}
 		snaps = append(snaps, endpoint.Snapshot{Scope: p.scope, Endpoints: specs})
 	}
-	topo, err := a.n.assembler.Assemble(ctx, snaps)
+	topo, err := a.n.assembler.AssemblePending(ctx, snaps)
 	if err != nil {
 		return nil, err
 	}
-	// The assembler holds these instances now: the next snapshot judges
-	// against them. A write of a key's place since this snapshot read
-	// the set stays recorded for the next one.
+	// The assembler holds these instances once the bridge serves topo:
+	// staged until then, applied by the next snapshot or the reassembly
+	// that installed topo (applyStagedLocked). A refused topo leaves
+	// instances, touched and retired as they were, so the next snapshot
+	// judges against the instances still served.
 	a.mu.Lock()
-	a.instances = instances
-	for key, seq := range touched {
-		if a.touched[key] == seq {
-			delete(a.touched, key)
-		}
-	}
+	a.staged = &stagedSnapshot{topo: topo, instances: instances, touched: touched, retired: retired}
 	a.mu.Unlock()
-	if len(retired) > 0 {
-		// Erased: the names are forgotten.
-		a.mu.Lock()
-		a.retired = slices.DeleteFunc(a.retired, func(s string) bool { return slices.Contains(retired, s) })
-		a.mu.Unlock()
-	}
 	placeOTAProvider(topo)
 	return topo, nil
 }

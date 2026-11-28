@@ -77,10 +77,11 @@ type RequestorConfig struct {
 // removes it on the peer's side. While the host asks a provider for a new
 // session, it keeps a [Requestor.HoldUnknownSignals] hold for that
 // provider, so the signalling that arrives before the provider's response
-// waits for the registration instead of being refused. An End's removal
-// waits for the Offer, Answer and IceCandidates calls at the port, so the
-// port sees no signal for a session after its End; a port that blocks in
-// one of them holds back every End meanwhile, and may itself call
+// waits for the registration instead of being refused. An End's removal,
+// and a fabric's ([Requestor.MatterDropFabric]), waits for the Offer,
+// Answer and IceCandidates calls at the port, so the port sees no signal
+// for a session after its End; a port that blocks in one of them holds
+// back every End and fabric removal meanwhile, and may itself call
 // UpsertSession or RemoveSession. The node installs
 // the Operate entry the peer needs in the fabrics its host grants
 // (node.WebRTCRequestorConfig.GrantFabric, node/webrtc_requestor_acl.go;
@@ -99,9 +100,9 @@ type Requestor struct {
 
 	// deliver orders a signal's delivery against End's removal: Offer,
 	// Answer and IceCandidates hold it shared from the session's lookup
-	// through the port call, End holds it exclusively while it removes the
-	// session, so the port never sees a signal for a session after its
-	// End (matter.js holds the behaviour lock from the lookup through the
+	// through the port call, End and MatterDropFabric hold it exclusively
+	// while they remove sessions, so the port never sees a signal for a
+	// session after its End (matter.js holds the behaviour lock from the lookup through the
 	// event, #lockSession WebRtcTransportRequestorServer.ts:317-318, and
 	// End removes under the same lock, :294-296). It is not pub: a port
 	// may call UpsertSession or RemoveSession from inside a signal. The
