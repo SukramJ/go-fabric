@@ -74,16 +74,28 @@ func PanicStack(err error) []byte {
 	return nil
 }
 
-// newPanicError is the [*PanicError] of the recovered value r.
-func newPanicError(r any) *PanicError {
+// NewPanicError is the [*PanicError] of the recovered value r. For a
+// recover outside this package that logs what it caught.
+func NewPanicError(r any) *PanicError {
 	msg := "(redacted)"
 	if re, ok := r.(runtime.Error); ok {
-		msg = re.Error()
+		msg = runtimeErrorMessage(re)
 		if len(msg) > maxPanicMessage {
 			msg = msg[:maxPanicMessage]
 		}
 	}
 	return &PanicError{Type: fmt.Sprintf("%T", r), Message: msg, Stack: debug.Stack()}
+}
+
+// runtimeErrorMessage is re.Error(), or a fixed message when that panics:
+// a host type can implement [runtime.Error] (P10F-err-6404).
+func runtimeErrorMessage(re runtime.Error) (msg string) {
+	defer func() {
+		if recover() != nil {
+			msg = "(Error panicked)"
+		}
+	}()
+	return re.Error()
 }
 
 // Encode runs write on a fresh encoder and returns the one anonymous TLV
@@ -170,7 +182,7 @@ func encodeOn(enc *tlv.Encoder, write func(enc *tlv.Encoder, tag tlv.Tag)) (elem
 func run(write func(enc *tlv.Encoder, tag tlv.Tag), enc *tlv.Encoder) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			pe := newPanicError(r)
+			pe := NewPanicError(r)
 			notePanic(r, pe)
 			err = pe
 		}
