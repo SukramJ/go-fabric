@@ -159,6 +159,47 @@ type Aggregator struct {
 	instances map[string]*servedInstance
 	touched   map[string]uint64
 	touchSeq  uint64
+	// staged is what the last assembled snapshot makes of instances,
+	// touched and retired. It applies once the bridge serves that
+	// snapshot's topology ([Aggregator.applyStagedLocked]) and never for
+	// one the bridge refused: a refused topology changes no node state
+	// (review II, P10F-fsm-6405). a.mu guards it.
+	staged *stagedSnapshot
+}
+
+// stagedSnapshot is the node state an assembled snapshot stands for:
+// the instances it handed the assembler, the writes of a key's place it
+// read (key → touchSeq) and the retired scopes it erased.
+type stagedSnapshot struct {
+	topo      *endpoint.Topology
+	instances map[string]*servedInstance
+	touched   map[string]uint64
+	retired   []string
+}
+
+// applyStagedLocked applies the staged snapshot when served is its
+// topology — the bridge took it — and drops it otherwise; a.mu is held.
+// A write of a key's place since that snapshot read the set stays
+// recorded for the next one; a scope retired again since stays retired.
+func (a *Aggregator) applyStagedLocked(served *endpoint.Topology) {
+	st := a.staged
+	if st == nil {
+		return
+	}
+	a.staged = nil
+	if served == nil || st.topo != served {
+		return
+	}
+	a.instances = st.instances
+	for key, seq := range st.touched {
+		if a.touched[key] == seq {
+			delete(a.touched, key)
+		}
+	}
+	if len(st.retired) > 0 {
+		// Erased: the names are forgotten.
+		a.retired = slices.DeleteFunc(a.retired, func(s string) bool { return slices.Contains(st.retired, s) })
+	}
 }
 
 // servedInstance is the [endpoint.Spec.Instance] the node hands the
@@ -234,6 +275,11 @@ func (a *Aggregator) partLocked(scope string) *partition {
 		}
 	}
 	a.retired = slices.DeleteFunc(a.retired, func(s string) bool { return s == scope })
+	if a.staged != nil {
+		// The staged erasure took the old partition's numbers; the new
+		// one is not forgotten by it.
+		a.staged.retired = slices.DeleteFunc(a.staged.retired, func(s string) bool { return s == scope })
+	}
 	p := &partition{scope: scope}
 	a.parts = append(a.parts, p)
 	return p
@@ -1669,6 +1715,10 @@ func (a *Aggregator) reassembleLocked(ctx context.Context) error {
 		return fmt.Errorf("node: reassemble: %w", err)
 	}
 	a.behind.Store(false)
+	served := a.n.br.Topology()
+	a.mu.Lock()
+	a.applyStagedLocked(served)
+	a.mu.Unlock()
 	a.n.attachCameraPeers()
 	a.n.announceSurface(ctx)
 	a.reassemblies.Add(1)
@@ -1705,7 +1755,12 @@ func (a *Aggregator) snapshot(ctx context.Context) (*endpoint.Topology, error) {
 		scope string
 		eps   []Endpoint
 	}
+	// The snapshot before is applied if the bridge took it: the bridge
+	// calls the Snapshotter inside its assembly slot, after the previous
+	// assembly's swap or refusal, so the topology it serves is settled.
+	served := a.n.br.Topology()
 	a.mu.Lock()
+	a.applyStagedLocked(served)
 	a.partLocked(Scope)
 	parts := make([]part, 0, len(a.parts))
 	for _, p := range a.parts {
@@ -1764,23 +1819,14 @@ func (a *Aggregator) snapshot(ctx context.Context) (*endpoint.Topology, error) {
 	if err != nil {
 		return nil, err
 	}
-	// The assembler holds these instances now: the next snapshot judges
-	// against them. A write of a key's place since this snapshot read
-	// the set stays recorded for the next one.
+	// The assembler holds these instances once the bridge serves topo:
+	// staged until then, applied by the next snapshot or the reassembly
+	// that installed topo (applyStagedLocked). A refused topo leaves
+	// instances, touched and retired as they were, so the next snapshot
+	// judges against the instances still served.
 	a.mu.Lock()
-	a.instances = instances
-	for key, seq := range touched {
-		if a.touched[key] == seq {
-			delete(a.touched, key)
-		}
-	}
+	a.staged = &stagedSnapshot{topo: topo, instances: instances, touched: touched, retired: retired}
 	a.mu.Unlock()
-	if len(retired) > 0 {
-		// Erased: the names are forgotten.
-		a.mu.Lock()
-		a.retired = slices.DeleteFunc(a.retired, func(s string) bool { return slices.Contains(retired, s) })
-		a.mu.Unlock()
-	}
 	placeOTAProvider(topo)
 	return topo, nil
 }
