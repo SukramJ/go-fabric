@@ -396,6 +396,50 @@ func TestProviderEndLostPeerCountsTheEndedSessions(t *testing.T) {
 	}
 }
 
+// hookEndPort runs onEnd before it records an EndSession.
+type hookEndPort struct {
+	*mockProvider
+	onEnd func(id uint16)
+}
+
+func (h *hookEndPort) EndSession(ctx context.Context, id uint16, reason uint8) error {
+	h.onEnd(id)
+	return h.mockProvider.EndSession(ctx, id, reason)
+}
+
+// TestProviderEndLostPeerCountsOnlyWhatItRemoved (review II,
+// P10-err-6603): a host RemoveSession of one of the pair's two sessions
+// while EndLostPeer runs — here from the port's EndSession of the other —
+// leaves that session out of the count, and the port is not told its end
+// a second time.
+func TestProviderEndLostPeerCountsOnlyWhatItRemoved(t *testing.T) {
+	t.Parallel()
+	hook := &hookEndPort{}
+	p, m := newProvider(t, nil, func(cfg *camera.ProviderConfig) {
+		hook.mockProvider = cfg.Port.(*mockProvider)
+		cfg.Port = hook
+	})
+	hook.onEnd = func(id uint16) {
+		if id == 1 {
+			p.RemoveSession(3)
+		}
+	}
+	p.AttachPeerConnector(&fakePeers{})
+	goneSessions(t, p)
+	if ended, ran, err := p.EndLostPeer(context.Background(), 1, 7, unknownReason, nil); err != nil || !ran || ended != 1 {
+		t.Fatalf("EndLostPeer = %d, %v, %v; want 1, ran", ended, ran, err)
+	}
+	m.mu.Lock()
+	got := slices.Clone(m.ended)
+	m.mu.Unlock()
+	if !slices.Equal(got, []uint16{1}) {
+		t.Errorf("port ended %v, want [1]", got)
+	}
+	if got := sessionIDs(p); !slices.Equal(got, []uint16{2, 4}) {
+		t.Errorf("sessions %v, want [2 4]", got)
+	}
+}
+
 // TestProviderPeerGoneKeepsItsBehaviour: the deprecated PeerGone is
 // EndLostPeer without the count, for its window (decision 679).
 func TestProviderPeerGoneKeepsItsBehaviour(t *testing.T) {
