@@ -276,7 +276,7 @@ const citecheckDriftRatchet = 415
 // report interruption, the commissioner's cancel and expiry); the forward-gate
 // citations are gone with the gate; P1-G moves the WebRtcTransportRequestorServer.ts
 // citations of controller/serve.go, controller/camera and node/ from db021da0 to the pin: 3305 (measured after merging P1-G).
-const citecheckOffPinRatchet = 3305
+const citecheckOffPinRatchet = 3293
 
 // offPinRowRE reads the off-pin row of summary.md.
 var offPinRowRE = regexp.MustCompile(`(?m)^\| ` + regexp.QuoteMeta(offPinRow) + ` \| (\d+) \|$`)
