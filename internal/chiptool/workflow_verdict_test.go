@@ -649,3 +649,43 @@ func TestWorkflowFilterVerdict(t *testing.T) {
 		})
 	}
 }
+
+// TestMutateWorkflowWideInput runs mutate.yml's input checks (the plan
+// step up to the shards check) on -wide values: script/mutate hands each
+// element to go test as an argument, so an element that opens with `-`
+// is a flag and an empty one is the module root (P10-sup-7003).
+func TestMutateWorkflowWideInput(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", "mutate.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := runBlockAfter(t, string(data), "- name: list and shard the files")
+	cut := strings.Index(script, `if [[ ! "$SHARDS"`)
+	if cut < 0 {
+		t.Fatal("mutate.yml's plan step has no shards check")
+	}
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "src", "bridge"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	script = "cd \"" + dir + "\"\n" + script[:cut] + "exit 0\n"
+	for _, tc := range []struct {
+		wide string
+		want int
+	}{
+		{"", 0},
+		{"./node/", 0},
+		{"./node/,./im/,bridge", 0},
+		{"-exec", 1},
+		{"./node/,-v", 1},
+		{"a,,b", 1},
+		{"./node/,", 1},
+		{",./node/", 1},
+	} {
+		t.Run(tc.wide, func(t *testing.T) {
+			if got := runStepScript(t, script, []string{"PKG=bridge", "WIDE=" + tc.wide}); got != tc.want {
+				t.Errorf("wide %q: exit %d, want %d", tc.wide, got, tc.want)
+			}
+		})
+	}
+}

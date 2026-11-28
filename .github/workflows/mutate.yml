@@ -102,7 +102,9 @@ jobs:
             echo "::error::package '$PKG' is not a directory of the module"
             exit 1
           fi
-          if [[ ! "$WIDE" =~ ^[A-Za-z0-9_./,-]*$ ]]; then
+          # No element is empty or opens with `-`: go test reads the one as
+          # the module root, the other as a flag (P10-sup-7003).
+          if [[ ! "$WIDE" =~ ^([A-Za-z0-9_.][A-Za-z0-9_./-]*(,[A-Za-z0-9_.][A-Za-z0-9_./-]*)*)?$ ]]; then
             echo "::error::wide '$WIDE' is not a comma-separated package list"
             exit 1
           fi
