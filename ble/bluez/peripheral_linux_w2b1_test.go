@@ -406,6 +406,45 @@ func TestPeripheralCloseBoundsItsWaitForAdvMuW2B1(t *testing.T) {
 	})
 }
 
+// TestPeripheralWorkRegistersNoAdvertisementAfterCloseP10 holds
+// P10-doc-6304: a work past its closed test whose calls outlast Close's
+// StopAdvertising does not register the advertisement after Close gave up
+// withdrawing it.
+func TestPeripheralWorkRegistersNoAdvertisementAfterCloseP10(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		p, b := newTestPeripheral(t)
+		data := btp.EncodeAdvertisementData(3840, 0xFFF1, 0x8001, false, false)
+		if err := p.Advertise(context.Background(), contract.BLEAdvertisement{Data: data}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := p.RegisterService(context.Background(), nil); err != nil {
+			t.Fatal(err)
+		}
+		releaseUnreg := b.hold(ifaceAdvertising + ".UnregisterAdvertisement")
+		defer releaseUnreg()
+		releaseApp := b.hold(regApp)
+		defer releaseApp()
+		p.handle(addedSignal(testAdapter))
+		synctest.Wait() // the work holds advMu in dropAdvertisement
+		time.Sleep(time.Second)
+		closed := make(chan error, 1)
+		go func() { closed <- p.Close() }()
+		synctest.Wait()
+		time.Sleep(peripheralTimeout - 2*time.Second)
+		releaseUnreg()
+		synctest.Wait() // the work's RegisterApplication in flight
+		time.Sleep(3 * time.Second)
+		n := callsOf(b, regAdv) // Close's StopAdvertising gave up
+		releaseApp()
+		if err := <-closed; err != nil {
+			t.Fatal(err)
+		}
+		if got := callsOf(b, regAdv); got != n {
+			t.Fatalf("RegisterAdvertisement calls %d after Close's StopAdvertising gave up, want %d; calls %q", got, n, b.called())
+		}
+	})
+}
+
 // TestPeripheralServeEndBoundsItsWaitForAdvMuW2B1 holds the follow-up of
 // #610 rows 3-5 (Fable N3): Serve's end while a host Advertise without a
 // deadline waits on an unanswered bus call still returns, and unregisters
