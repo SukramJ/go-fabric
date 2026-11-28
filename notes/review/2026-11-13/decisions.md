@@ -1144,3 +1144,31 @@ questions Q-a to Q-e are decisions 686–690). Rows and their outcome in
 | 727 | Owner (wizard, recommended; `F5`) | same instance re-added before heal → ErrAddedElsewhere: accept, godoc sentence, two-round convergence test. |
 | 728 | Owner (wizard, recommended) | a held Replace refused at commit by a withheld declaration that already took the served endpoint off the wire reports Applied=true; Applied = "the call changed state". |
 | 729 | Owner (wizard, recommended; `fable-read-nb-node.md §Repair re-read`) | L4: a deferred erasure is judged with the batch that runs it (one rule: an erasure spares what is served when it runs); one clause in Batch godoc + a test pinning it. |
+
+## 2026-11-27, review II phase 9 (pin lift b25ed960 → db91886c)
+
+Phase 9 is pull request #640 (plan `phase-9/plan.md`, local; the coordinator's
+own calls C1–C4 and the P2 review's L1/N1–N3 are recorded in
+`phase-9/decisions-p9.md`, local). Released as v0.29.0.
+
+| # | Subject | Decision |
+| --- | --- | --- |
+| 730 | Owner (wizard, against the recommendation) | One combined pull request for the pin lift (P0 + all P1 units + the dependency update). Recommendation was a P0 pin pull request and a wave pull request, to keep the mechanical diff apart from the behaviour diff so the security-path reviews stay small. Consequence: the Fable reads of P1-A/C/D are scoped to their unit's commits, not the whole diff. |
+| 731 | Owner (wizard, recommended) | Extension ID `BD-chip-Thermostat-Schedules`: accepted as a no-op for the deprecation window, with a CHANGELOG line and a migration note. |
+| 732 | Owner (wizard, recommended) | Reference daemon `--thermostat-schedules` stays off by default; no fixture run for it. |
+| 733 | Owner (wizard, recommended) | The sender side of the request flags is mirrored now (`requestFlagsForSending` + `OmitFalseFlags`, inert at IM revision 12). |
+| 734 | Owner (wizard, recommended) | Busy hold: adopt matter.js's hold value, jitter and handler independence; the proven-address restriction stays as the remaining divergence (R2-P1-net-05). |
+| 735 | Owner (wizard, recommended) | WebRTC early signals: hold on the served requestor; the controller keeps arrival-time registration, recorded. |
+| 736 | Owner (wizard, recommended) | Cancel after PASE: adopt matter.js's 2 s disarm wait, the CommissioningComplete cut-off and the cancel cause; `BD-chip-Commissioner-AbortDisarmsFailSafe` closes. |
+| 737 | Owner (wizard, recommended) | Release v0.29.0 at the close-out; a nested release only if apidiff or the nested diff requires one. |
+| 738 | Owner (wizard, recommended) | The dependency update (branch `phase9/deps`) goes into the combined pull request; dependabot #531 and #541 close as superseded. |
+| 739 | Owner (wizard, recommended) | `script/ble-virtual` `@matter/*` → 0.18.1 (published release); `make ble-virtual-test` green. |
+| 740 | Owner (wizard, recommended; P0 Fable notes) | P1-F: a retired-extension-ID list (additive, `surface`/`node`): `BD-chip-Thermostat-Schedules` is known with no effect; it drops out of `Report.Extensions` and `Policies.Digest` (the digest moves once at the upgrade); hosts validating against `node.AheadRows()` keep starting. |
+| 741 | Owner (wizard, recommended; P0 Fable notes) | P1-A: `im.WriteRequest` gains `HasSuppressResponse` (the Has… convention); a literal `WriteRequest{}` to `HandleGroupWrite` now means absent → true; CHANGELOG line. |
+| 742 | Owner (wizard, recommended; P0 Fable notes) | P1-B: `OmitFalseFlags` also on `groups.RequestOptions` (`groups/` joins P1-B's paths). |
+| 743 | Owner (wizard, recommended; P0 Fable notes) | P1-C: an attempt-local deadline of the raw Busy delay at every address; the remaining divergence is only the hold's scope (proven address, Peer-wide) — `BD-Matter-PeerBusyDeadline` rewritten. |
+| 744 | Owner (wizard, recommended; P0 Fable notes) | P1-G: `HoldUnknownSignals` is a method on `*camera.Requestor` (additive); `wrdef.Host` unchanged (citation only). The session-turn release hook from `bridge/` is required (`bridge/` joins P1-G's paths, narrowly). |
+| 745 | Owner (wizard, recommended; P0 Fable notes) | P1-G: the wait outcome of a refused held signal is a `by_design` sentence, no interface change. |
+| 746 | Owner (wizard, recommended; P0 Fable notes) | P1-H: chip's arithmetic — the blind period in truncated whole seconds (elapsed >= 0 && < blind). |
+| 747 | Owner (wizard, recommended; P2 review M1) | Signals held by `Requestor.HoldUnknownSignals` carry no order after the registration — matter.js's allowance (`WebRtcTransportRequestorServer.ts` :428-429, its test comment :1337-1338); one doc sentence and one `by_design` sentence, no FIFO. |
+| 748 | Owner (wizard, recommended; P2 review) | Host issues now: openccu-loom#1191 and go-fabric-server#87 — `BD-chip-Thermostat-Schedules` leaves `Surface().Extensions` with v0.29.0. |
