@@ -432,14 +432,24 @@ func (s *ICDManagement) Start(ctx context.Context) error {
 	}
 	s.mu.Unlock()
 
-	counter, err := s.loadCounter(ctx)
-	if err != nil {
-		return err
-	}
 	// The load and the swap hold the command lock: a registration
 	// command served in between would otherwise be overwritten by the
-	// older list (review II, R4-conc-4056).
+	// older list (review II, R4-conc-4056). A Start that waited for it
+	// behind another finds the server started and loads nothing (review
+	// II, P10-conc-6101).
 	s.cmdMu.Lock()
+	s.mu.Lock()
+	started := s.started
+	s.mu.Unlock()
+	if started {
+		s.cmdMu.Unlock()
+		return nil
+	}
+	counter, err := s.loadCounter(ctx)
+	if err != nil {
+		s.cmdMu.Unlock()
+		return err
+	}
 	clients, err := s.loadClients(ctx)
 	if err != nil {
 		s.cmdMu.Unlock()
