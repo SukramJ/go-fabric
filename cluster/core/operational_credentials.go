@@ -1033,16 +1033,6 @@ func (o *OperationalCredentials) reportRolledBack(ctx context.Context, added, up
 	}
 }
 
-// ackOwedFabricEvents acknowledges the owed events of kind the store holds
-// for fabricIndex ([store.Fabrics.AckOwedFabricEvent]): the consequences
-// of that rollback ran. It runs after them, so a crash before it leaves
-// the event owed and the node's next start runs them again — at least
-// once. A failed read or acknowledgement is logged and leaves the event
-// owed.
-func (o *OperationalCredentials) ackOwedFabricEvents(ctx context.Context, kind store.FabricPending, fabricIndex uint8) {
-	o.ackOwedFabricEventIDs(ctx, fabricIndex, o.owedFabricEventIDs(ctx, kind, fabricIndex))
-}
-
 // owedFabricEventIDs lists the IDs of the owed events of kind the store
 // holds for fabricIndex. A delivery lists them before its hooks run and
 // acknowledges those only ([OperationalCredentials.ackOwedFabricEventIDs]):
@@ -3257,16 +3247,29 @@ func EncodeECDHFromPrivate(priv *ecdsa.PrivateKey) (*ecdh.PrivateKey, error) {
 // (review II, R2-P2-comm-05). The fabric was not announced yet, so the
 // removal the rollback records as owed is acknowledged at once; a crash
 // between the two leaves it owed, and the next start reports the removal
-// of a fabric no hook announced.
+// of a fabric no hook announced. Only that removal is acknowledged: an
+// owed event the store held before the rollback is an earlier rollback's
+// of a reused index, whose delivery may still wait in the node's queue
+// (review II, P10-store-6803). A failed read of the owed events, or a
+// failed acknowledgement, is logged and leaves the removal owed.
 func (o *OperationalCredentials) rollbackFailedAddNOC(ctx context.Context, fabricIndex uint8) {
+	before, listErr := o.store.OwedFabricEvents(context.WithoutCancel(ctx))
 	was, err := o.store.RollbackFabric(context.WithoutCancel(ctx), fabricIndex)
 	if err != nil && !errors.Is(err, store.ErrFabricNotFound) {
 		o.logger().Error("matter.opcreds.addnoc.rollback_failed", slog.Int("fabric_index", int(fabricIndex)), slog.Any("err", err))
 		return
 	}
-	if was == store.FabricPendingAdd {
-		o.ackOwedFabricEvents(ctx, store.FabricPendingAdd, fabricIndex)
+	if was != store.FabricPendingAdd {
+		return
 	}
+	if listErr != nil {
+		o.logger().Warn("matter.opcreds.owed_fabric_event.list_failed", slog.Int("fabric_index", int(fabricIndex)), slog.Any("err", listErr))
+		return
+	}
+	ids := slices.DeleteFunc(o.owedFabricEventIDs(ctx, store.FabricPendingAdd, fabricIndex), func(id uint64) bool {
+		return slices.ContainsFunc(before, func(ev store.OwedFabricEvent) bool { return ev.ID == id })
+	})
+	o.ackOwedFabricEventIDs(ctx, fabricIndex, ids)
 }
 
 // nocVerificationFailure maps a failed NOC chain verification to its
