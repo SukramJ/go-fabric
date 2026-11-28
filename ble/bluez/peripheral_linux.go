@@ -273,7 +273,11 @@ func (p *peripheral) advPath() dbus.ObjectPath { return p.root + "/advertising" 
 
 // Close ends the service's Serve and waits for its teardown — every
 // central disconnected, the application unregistered — for up to
-// 2×peripheralTimeout (one disconnect and the unregister), unregisters a
+// 2×peripheralTimeout. The teardown can take longer: each central's
+// Device1.Disconnect, the wait for advMu (endUnderAdvMu) and the
+// unregister are bounded by peripheralTimeout each; past the bound Close
+// releases the bus under it, and the unregister ends with the bus
+// (unregisterApplication). Close unregisters a
 // service that is registered but not served (nothing else would:
 // RegisterService's ctx bounds the registration only), withdraws the
 // advertisement and releases the bus. A registration still in flight sees
@@ -848,7 +852,9 @@ func (p *peripheral) followAdapter(gen uint64, added, adv bool) {
 			}
 			if err == nil {
 				p.advMu.Unlock()
-				rl.held()
+				if !superseded {
+					rl.held()
+				}
 				return
 			}
 		}
@@ -927,10 +933,12 @@ func (p *peripheral) dropAdvertisement() {
 // owed), nor while the application of a live service is missing: the
 // work that registers it registers the advertisement after it
 // (R4-fsm-4301); nor while the advertising manager is absent: its
-// InterfacesAdded registers it (#610 row 1).
+// InterfacesAdded registers it (#610 row 1); nor once the peripheral
+// closed: Close's StopAdvertising may have given up waiting for advMu
+// (P10-doc-6304).
 func (p *peripheral) restoreAdvertisement() error {
 	p.mu.Lock()
-	register := p.adv != nil && !p.advOwed && !p.registered && !p.appMissing() && !p.advGone
+	register := p.adv != nil && !p.advOwed && !p.registered && !p.appMissing() && !p.advGone && !p.closed
 	p.mu.Unlock()
 	if !register {
 		return nil
