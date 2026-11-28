@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 
 	"thingfabric.dev/go-fabric/contract"
 )
@@ -26,9 +27,10 @@ func (p *Provider) PeerGone(ctx context.Context, fabricIndex uint8, peerNodeID u
 // EndLostPeer ends every session of the requestor (fabricIndex,
 // peerNodeID): the port's EndSession with reason for each, and the session
 // leaves CurrentSessions whatever the port answers; the error is the
-// port's. ended is the number of the pair's sessions it ended; 0 when ran
-// is false or the pair held none, and a caller that reports the end, as
-// the node's log does, reports it only for ended > 0 (review II,
+// port's. ended is the number of the pair's sessions it ended and removed
+// — a session the host removed meanwhile is neither ended nor counted; 0
+// when ran is false or the pair held none, and a caller that reports the
+// end, as the node's log does, reports it only for ended > 0 (review II,
 // R5-doc-5304). No End command is sent: the peer is not reachable. It is
 // [Provider.MatterDropFabric] narrowed to the pair, and like it runs under
 // the provider's command serialisation, so it waits for a command in
@@ -71,12 +73,24 @@ func (p *Provider) EndLostPeer(ctx context.Context, fabricIndex uint8, peerNodeI
 	p.mu.Unlock()
 	var errs []error
 	for _, id := range ids {
+		// The host's RemoveSession takes no op: an id it removed since the
+		// snapshot is neither ended again nor counted (P10-err-6603).
+		p.mu.Lock()
+		held := slices.ContainsFunc(p.sessions, func(s ProviderSession) bool { return s.Id == id })
+		p.mu.Unlock()
+		if !held {
+			continue
+		}
 		if err := p.port.EndSession(ctx, id, reason); err != nil {
 			errs = append(errs, fmt.Errorf("camera: EndSession %d of lost peer %d:%#x: %w", id, fabricIndex, peerNodeID, err))
 		}
-		if err := p.removeSession(contract.OriginUnknown, id); err != nil {
+		removed, err := p.removeSessionReport(contract.OriginUnknown, id)
+		if err != nil {
 			errs = append(errs, err)
 		}
+		if removed {
+			ended++
+		}
 	}
-	return len(ids), true, errors.Join(errs...)
+	return ended, true, errors.Join(errs...)
 }

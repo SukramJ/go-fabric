@@ -79,7 +79,7 @@ type ProviderConfig struct {
 	// SolicitOffer answers DeferredOffer false (decision 621). Its End has
 	// no deadline of its own: the PeerConnector's response timeouts bound
 	// it, and the Ends wait behind one sender in a queue of at most the
-	// bound; at worst a send that never returns holds that sender, and every
+	// bound for each fabric; at worst a send that never returns holds that sender, and every
 	// later over-bound SolicitOffer answers RESOURCE_EXHAUSTED (decision
 	// 620).
 	MaxSessions int
@@ -109,7 +109,7 @@ type ProviderConfig struct {
 	// never does), one entry per offer, and only when that one makes
 	// room: a table over the bound through the host's rows is refused as
 	// without EvictIdle. Without a [PeerConnector], or with the End queue
-	// full, the entry goes without an End. Another fabric's entry is
+	// full for the entry's fabric, the entry goes without an End. Another fabric's entry is
 	// never taken unless [ProviderConfig.EvictAcrossFabrics] is set. 0,
 	// the default, evicts nothing; negative is [ErrNegativeEvictIdle];
 	// without a bound it is inert. connectedhomeip's camera app cleans
