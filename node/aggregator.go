@@ -740,8 +740,9 @@ func (p *Partition) Batch(ctx context.Context, fn func(b *Batch) error) error {
 // as a forget in progress, with keep (decision 568), so a Stop, a crash
 // or a store failure before it runs leaves it to the next New
 // ([Aggregator.finishForgets], decision 726); an erasure whose record
-// cannot be written is its Forget's error in calls (applied: the Forget
-// is to be made again), or returned when it is no call's.
+// cannot be written is its Forget's error in calls (applied: it still
+// runs with the next batch; make the Forget again only if the node may
+// stop first), or returned when it is no call's.
 func (a *Aggregator) leave(ctx context.Context, detach []func(), erase []reservationOp, keep []string, calls *callErrors) (bool, error) {
 	a.mu.Lock()
 	closed := a.closed
