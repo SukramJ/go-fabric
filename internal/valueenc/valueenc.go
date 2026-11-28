@@ -30,6 +30,12 @@ import (
 // tagged element: none, two or more, or one under another tag.
 var ErrNotOneElement = errors.New("valueenc: the encoder did not write exactly one anonymous element")
 
+// ErrMalformed reports an encoder that wrote one complete anonymous
+// element whose tags break the container rules [tlv.Validate] holds: an
+// anonymous tag inside a Structure, a tagged member of an Array. It wraps
+// tlv's error.
+var ErrMalformed = errors.New("valueenc: the encoder wrote a malformed element")
+
 // ErrPanic reports an encoder that panicked. The error is a
 // [*PanicError]: its message names the panic value's type and, for a
 // runtime error, the runtime's message; any other panic value is withheld
@@ -85,9 +91,11 @@ func newPanicError(r any) *PanicError {
 // ([tlv.AnonymousTag]). It fails when write panics (the panic is
 // recovered; [ErrPanic], a [*PanicError]), when it leaves a container open
 // ([tlv.ErrUnbalancedContainer]), and when what it wrote is not exactly
-// one complete, anonymously tagged element ([ErrNotOneElement]). A surplus
-// EndContainer writes nothing on an encoder of its own ([tlv.Encoder]
-// refuses it), so it cannot close a container of the message.
+// one complete, anonymously tagged element ([ErrNotOneElement]), or when
+// that element breaks the tag rules of its containers ([ErrMalformed]). A
+// surplus EndContainer writes nothing on an encoder of its own
+// ([tlv.Encoder] refuses it), so it cannot close a container of the
+// message.
 //
 // The element is the caller's to keep; [tlv.Encoder.PutRawElement] writes
 // it back under the tag the message needs.
@@ -151,6 +159,9 @@ func encodeOn(enc *tlv.Encoder, write func(enc *tlv.Encoder, tag tlv.Tag)) (elem
 	}
 	if err := oneElement(out); err != nil {
 		return nil, err
+	}
+	if err := tlv.Validate(out); err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrMalformed, err)
 	}
 	return out, nil
 }
