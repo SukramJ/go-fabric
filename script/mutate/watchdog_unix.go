@@ -17,9 +17,14 @@ const watchSupported = true
 
 // ownGroup starts cmd as the leader of a new process group, whose id is
 // then its pid; the go tool's children — the compiler, the linker and the
-// test binary — join it.
+// test binary — join it. A cancelled context kills the whole group, not
+// only cmd's own pid.
 func ownGroup(cmd *exec.Cmd) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Cancel = func() error {
+		killGroup(cmd.Process.Pid)
+		return nil
+	}
 }
 
 // killGroup sends SIGKILL to every process of group pgid and waits, at
