@@ -4,11 +4,13 @@
 package camera_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"log/slog"
 	"reflect"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -494,6 +496,51 @@ func TestProviderEvictWithoutEnd(t *testing.T) {
 	}
 	if c := q.nextEnd(t); c.req.WebRtcSessionId != again.WebRtcSessionId {
 		t.Fatalf("End %+v, want the second refusal's (%d): the eviction sent one", c, again.WebRtcSessionId)
+	}
+}
+
+// TestProviderEvictEndQueuePerFabric (review II, P10-bound-6602, decision
+// 761): the End queue is reserved per fabric, so the Ends of one fabric's
+// refused SolicitOffers, held by a requestor that does not answer, do not
+// cost another fabric's evicted entry its End; a fabric's own full share
+// still evicts without one (decision 707, TestProviderEvictWithoutEnd).
+func TestProviderEvictEndQueuePerFabric(t *testing.T) {
+	t.Parallel()
+	a, b := peer(1, 0x55), peer(2, 0x66)
+	var logs bytes.Buffer
+	r := newEvictRig(t, func(c *camera.ProviderConfig) {
+		bounds(2, 1)(c)
+		c.Logger = slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	})
+	r.peers.gate = make(chan struct{})
+	evicted := r.open(b, t)
+	r.open(a, t)
+	refused := make([]uint16, 0, 2)
+	for range 2 { // fabric 1's Ends fill a queue of two
+		resp, err := solicitNew(a, t, r.p, 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		refused = append(refused, resp.WebRtcSessionId)
+	}
+	if _, err := solicitNew(a, t, r.p, 1); statusOf(err) != im.StatusResourceExhausted {
+		t.Fatalf("a third refusal of fabric 1 = %v, want RESOURCE_EXHAUSTED: its share of the queue is full", err)
+	}
+	r.clk.Advance(evictIdle)
+	if _, err := provideNew(b, t, r.p); err != nil {
+		t.Fatal(err)
+	}
+	wantEnded(t, r.port, evicted)
+	if strings.Contains(logs.String(), "camera.provider.evict.no_end") {
+		t.Fatal("fabric 2's evicted entry went without its End: fabric 1's Ends held the queue")
+	}
+	close(r.peers.gate)
+	var got []uint16
+	for range 3 {
+		got = append(got, r.nextEnd(t).req.WebRtcSessionId)
+	}
+	if want := append(slices.Clone(refused), evicted); !slices.Equal(got, want) {
+		t.Fatalf("Ends %v, want %v", got, want)
 	}
 }
 

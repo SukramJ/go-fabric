@@ -259,7 +259,7 @@ func (p *Provider) evict(ctx context.Context, victim ProviderSession) (removed b
 	p.mu.Lock()
 	peers := p.peers
 	p.mu.Unlock()
-	if peers == nil || !p.ends.reserve(p.endQueueBound()) {
+	if peers == nil || !p.ends.reserve(victim.FabricIndex, p.endQueueBound()) {
 		log.Debug("camera.provider.evict.no_end", attrs...)
 		return true, nil
 	}
@@ -273,8 +273,10 @@ func (p *Provider) evict(ctx context.Context, victim ProviderSession) (removed b
 // errSessionBound is a new session refused at a bound.
 var errSessionBound = spec.Errorf(im.StatusResourceExhausted, "WebRtcTransportProvider: at the session bound")
 
-// endQueueBound is how many Ends of refused SolicitOffers and evicted
-// sessions may wait: the provider's bound, else the fabric's.
+// endQueueBound is how many Ends of one fabric's refused SolicitOffers
+// and evicted sessions may wait: the provider's bound, else the fabric's.
+// It is counted per fabric, so one fabric's Ends never cost another's
+// (P10-bound-6602, decision 761).
 func (p *Provider) endQueueBound() int {
 	if p.cfg.MaxSessions > 0 {
 		return p.cfg.MaxSessions
@@ -293,12 +295,12 @@ func (p *Provider) refuseSolicitOffer(ctx context.Context, req wpdef.SolicitOffe
 	p.mu.Lock()
 	peers := p.peers
 	p.mu.Unlock()
-	if peers == nil || !p.ends.reserve(p.endQueueBound()) {
+	if peers == nil || !p.ends.reserve(fabric, p.endQueueBound()) {
 		return nil, errSessionBound
 	}
 	id, err := p.generateSessionID()
 	if err != nil {
-		p.ends.release()
+		p.ends.release(fabric)
 		return nil, err
 	}
 	end := pendingEnd{peers: peers, fabric: fabric, node: node, endpoint: req.OriginatingEndpointId, id: id}
@@ -340,11 +342,12 @@ func (e pendingEnd) send(ctx context.Context) {
 
 // endQueue sends the Ends of refused SolicitOffers and evicted sessions
 // one at a time, from at most one goroutine, which ends when the queue
-// drains. held counts the Ends reserved and not yet sent — awaiting
-// their response, queued or in flight — and is bounded by the caller.
+// drains. held counts, per fabric, the Ends reserved and not yet sent —
+// awaiting their response, queued or in flight — and is bounded by the
+// caller.
 type endQueue struct {
 	mu      sync.Mutex
-	held    int
+	held    map[uint8]int
 	queue   []queuedEnd
 	running bool
 }
@@ -354,21 +357,26 @@ type queuedEnd struct {
 	end pendingEnd
 }
 
-// reserve takes a slot when fewer than bound are held.
-func (q *endQueue) reserve(bound int) bool {
+// reserve takes a slot of fabric when it holds fewer than bound.
+func (q *endQueue) reserve(fabric uint8, bound int) bool {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	if q.held >= bound {
+	if q.held[fabric] >= bound {
 		return false
 	}
-	q.held++
+	if q.held == nil {
+		q.held = map[uint8]int{}
+	}
+	q.held[fabric]++
 	return true
 }
 
-// release gives back a slot whose End will not be sent.
-func (q *endQueue) release() {
+// release gives back a slot of fabric whose End will not be sent, or was.
+func (q *endQueue) release(fabric uint8) {
 	q.mu.Lock()
-	q.held--
+	if q.held[fabric]--; q.held[fabric] == 0 {
+		delete(q.held, fabric)
+	}
 	q.mu.Unlock()
 }
 
@@ -395,6 +403,6 @@ func (q *endQueue) run() {
 		q.queue = q.queue[1:]
 		q.mu.Unlock()
 		next.end.send(next.ctx)
-		q.release()
+		q.release(next.end.fabric)
 	}
 }
