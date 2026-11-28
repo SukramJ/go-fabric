@@ -164,7 +164,8 @@ func f(a, b int, err error) int {
 	}
 }
 
-// TestRunRefusesBadInput: a missing file and a bad -p are usage errors.
+// TestRunRefusesBadInput: a missing file, a bad -p and a -wide entry that
+// is empty or a go test flag (P10-sup-6902) are usage errors.
 func TestRunRefusesBadInput(t *testing.T) {
 	var stderr bytes.Buffer
 	if code := run([]string{"-root", t.TempDir(), "-o", filepath.Join(t.TempDir(), "x.tsv"), "missing.go"}, &stderr); code != 2 {
@@ -175,5 +176,10 @@ func TestRunRefusesBadInput(t *testing.T) {
 	}
 	if code := run([]string{"-nosuchflag"}, &stderr); code != 2 {
 		t.Errorf("unknown flag: exit %d, want 2", code)
+	}
+	for _, wide := range []string{"-exec,./x", "./p,", ",./p", "./p,-run=X"} {
+		if code := run([]string{"-wide", wide, "-o", filepath.Join(t.TempDir(), "x.tsv")}, &stderr); code != 2 {
+			t.Errorf("-wide %q: exit %d, want 2", wide, code)
+		}
 	}
 }

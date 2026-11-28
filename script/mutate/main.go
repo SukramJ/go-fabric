@@ -282,6 +282,16 @@ func parseFlags(args []string, stderr io.Writer) (config, bool) {
 		logf(stderr, "mutate: -p must be at least 1")
 		return c, false
 	}
+	// A -wide entry reaches go test as an argument: an empty one or one
+	// that starts with - (a go test flag such as -exec) is refused.
+	if c.wide != "" {
+		for _, p := range strings.Split(c.wide, ",") {
+			if p == "" || strings.HasPrefix(p, "-") {
+				logf(stderr, "mutate: -wide entry %q is not a package", p)
+				return c, false
+			}
+		}
+	}
 	c.files = fs.Args()
 	return c, true
 }
