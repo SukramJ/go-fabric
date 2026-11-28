@@ -15,7 +15,8 @@ import (
 // encodeValueIsolated is v as [defaultAttributeValueWriter] writes it, one
 // anonymous element, written on an encoder of its own under a recover
 // ([valueenc.Encode]): a value whose encoder panics, leaves a container
-// open or writes other than one element is an error, never a broken
+// open, writes other than one element or tags a container's members
+// against the container's rule is an error, never a broken
 // message (#625).
 func encodeValueIsolated(v im.AttributeValue) ([]byte, error) {
 	return valueenc.Encode(func(enc *tlv.Encoder, tag tlv.Tag) {

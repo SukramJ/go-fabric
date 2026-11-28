@@ -125,7 +125,8 @@ func MaskFabricScoped(element []byte, scope FabricScope) (masked []byte, ok bool
 
 // scopeAttributeValue encodes v with write as one anonymous element, in
 // isolation ([valueenc.Encode]: a write that panics, leaves a container
-// open or writes other than one element fails), and applies scope to it
+// open, writes other than one element or tags a container's members
+// against the container's rule fails), and applies scope to it
 // ([MaskFabricScoped]); ok is false when the value cannot be encoded or
 // scoped, and the path then answers FAILURE.
 func scopeAttributeValue(v AttributeValue, scope FabricScope, write AttributeValueWriter) (element []byte, ok bool) {

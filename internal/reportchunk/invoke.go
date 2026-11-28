@@ -30,7 +30,8 @@ func CommandWriter(write im.CommandFieldsWriter) im.CommandFieldsWriter {
 // ResolveInvoke is resp with every command response resolved once
 // ([Encoded]): written by write alone, on an encoder of its own under a
 // recover ([valueenc.Encode]). A response whose encoder panics, leaves a
-// container open or writes other than one element is answered by a
+// container open, writes other than one element or tags a container's
+// members against the container's rule is answered by a
 // CommandStatusIB FAILURE on the request's command path with its
 // CommandRef — the command has run, its effect stays — and failed, when
 // not nil, hears of it. As connectedhomeip, which on a failing response
