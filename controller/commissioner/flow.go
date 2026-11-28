@@ -1099,6 +1099,14 @@ func (f *flow) validateAttestation(ctx context.Context, actx attestation.Context
 	}
 	done := make(chan outcome, 1)
 	go func() {
+		// A panic in the host's store ends the validation with an error,
+		// which becomes the ValidationError finding the policy judges
+		// (review II, P10-err-6202); the value is named by type only.
+		defer func() {
+			if r := recover(); r != nil {
+				done <- outcome{err: fmt.Errorf("commissioner: attestation validation panicked (%T)", r)}
+			}
+		}()
 		res, err := attestation.Validate(actx, data)
 		done <- outcome{res, err}
 	}()
