@@ -172,7 +172,7 @@ func (a *AccessControl) settleOwedAuxiliary(ctx context.Context) {
 // it overrides the epoch noted at this run's own take. The failure is
 // logged at Warn when nothing was owed before the run and at Debug when
 // the run failed to settle a debt already owed (#621).
-func (a *AccessControl) syncAuxiliaryAs(ctx, actor context.Context, emit bool, deferred map[uint8]context.Context, noted map[uint8]uint64) {
+func (a *AccessControl) syncAuxiliaryAs(ctx, actor context.Context, emit bool, deferred map[uint8]context.Context, noted map[uint8]uint64) { //nolint:funlen // one sequence: take the owed contexts, read, apply, emit per changed fabric
 	a.mu.RLock()
 	src := a.auxSource
 	a.mu.RUnlock()
@@ -210,9 +210,6 @@ func (a *AccessControl) syncAuxiliaryAs(ctx, actor context.Context, emit bool, d
 	}
 	a.mu.Lock()
 	prev := a.auxApplied
-	// A nil prev is the baseline no run has applied yet: the initial
-	// synchronisation failed (P10-err-6102).
-	baseline := prev == nil
 	a.auxApplied = next
 	emitter, endpoint := a.emitter, a.endpoint
 	a.mu.Unlock()
@@ -250,9 +247,11 @@ func (a *AccessControl) syncAuxiliaryAs(ctx, actor context.Context, emit bool, d
 			admin = adminNodeIDOf(own) //nolint:contextcheck // own is the deferred change's request context, read for its subject only
 		case accessing == fabric:
 			admin = adminNodeIDOf(actor)
-		case baseline:
-			// Applying the baseline, a fabric no context names is the
-			// registration's state, which emits no event.
+		case prev == nil:
+			// A nil prev is the baseline no run has applied yet (the
+			// initial synchronisation failed): a fabric no context names
+			// is the registration's state, which emits no event
+			// (P10-err-6102).
 			continue
 		}
 		emitter.MatterEmitEvent(endpoint, accessControlClusterID, accessControlEventAuxiliaryAccessUpd,
