@@ -448,7 +448,7 @@ func phaseOf(res stepResult) StepPhase {
 }
 
 // afterStep is the failsafe bookkeeping after a successful step
-// (:397-424); it reports whether it re-armed.
+// (:429-455 at db91886c); it reports whether it re-armed.
 func (f *flow) afterStep(ctx context.Context, s step) (bool, error) {
 	end, expiry := f.failsafeTimes()
 	if end.IsZero() {
