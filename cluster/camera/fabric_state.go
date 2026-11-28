@@ -83,6 +83,7 @@ func (p *Provider) MatterHeldFabrics() []uint8 {
 // so the host tears the stream down.
 func (r *Requestor) MatterDropFabric(ctx context.Context, fabricIndex uint8) error {
 	var gone []WebRTCSession
+	r.deliver.Lock() // after the fabric's signals at the port, as End (P10-conc-6601)
 	err := r.change(contract.OriginUnknown, func(sessions []WebRTCSession) ([]WebRTCSession, bool) {
 		kept := slices.DeleteFunc(slices.Clone(sessions), func(s WebRTCSession) bool {
 			if s.FabricIndex == fabricIndex {
@@ -93,6 +94,7 @@ func (r *Requestor) MatterDropFabric(ctx context.Context, fabricIndex uint8) err
 		})
 		return kept, len(gone) > 0
 	})
+	r.deliver.Unlock()
 	if err != nil {
 		return err
 	}

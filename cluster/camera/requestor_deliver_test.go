@@ -120,6 +120,38 @@ func TestRequestorEndWaitsForSignalAtPort(t *testing.T) {
 	})
 }
 
+// TestRequestorDropFabricWaitsForSignalAtPort: a fabric's removal while
+// an Offer of that fabric's session is at the port tells the port its End
+// after the Offer, as a peer's End does (review II, P10-conc-6601).
+func TestRequestorDropFabricWaitsForSignalAtPort(t *testing.T) {
+	port := newGatedPort()
+	r := newRequestor(t, port)
+	upsert(t, r, makeSession(withID(7), withPeer(peerNode), withFabric(fabric1)))
+	offered := make(chan error, 1)
+	go func() { offered <- commandCases[0].invoke(peer(fabric1, peerNode), r, 7) }()
+	wait(t, port.entered)
+	dropped := make(chan error, 1)
+	go func() { dropped <- r.MatterDropFabric(context.Background(), fabric1) }()
+	pending(t, dropped)
+	if got := ids(r.Sessions()); !slices.Equal(got, []uint16{7}) {
+		t.Fatalf("sessions %v while the offer is at the port", got)
+	}
+
+	close(port.gate)
+	if err := settled(t, offered); err != nil {
+		t.Fatal(err)
+	}
+	if err := settled(t, dropped); err != nil {
+		t.Fatal(err)
+	}
+	if got := port.order(); !slices.Equal(got, []string{"offer", "end"}) {
+		t.Fatalf("port order %v", got)
+	}
+	if got := r.Sessions(); len(got) != 0 {
+		t.Fatalf("sessions %+v", got)
+	}
+}
+
 // TestRequestorHeldSignalAfterRegisterAndRemove: a held signal whose
 // session is registered and removed again before it looks leaves its
 // wait — the registration committed — and is refused NOT_FOUND at once,
