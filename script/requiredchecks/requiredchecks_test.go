@@ -115,7 +115,7 @@ var notRequired = []decision{
 			"its result on a release pull request.",
 	},
 	{
-		"chiptool.yml", "certification families (${{ matrix.group }})", advisory,
+		"chiptool.yml", "certification families (${{ matrix.group }})${{ github.event.inputs.update_fixtures == 'true' && ' (fixture update)' || '' }}", advisory,
 		"a matrix job cannot serve as a required check: \"its check names depend on the groups an event runs, and a " +
 			"skipped matrix job reports under its unexpanded name\" (the comment over chip-families-gate in chiptool.yml); " +
 			"the gate job reports for it under one required name.",
