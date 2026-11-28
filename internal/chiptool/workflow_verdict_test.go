@@ -689,3 +689,76 @@ func TestMutateWorkflowWideInput(t *testing.T) {
 		})
 	}
 }
+
+// TestWorkflowNoGoCacheOverACheckedOutRef holds every workflow: a job
+// that checks out a ref of its own at the workspace root (not the
+// event's tree) builds and tests that ref there, so its setup-go steps
+// set `cache: false` — the post step would otherwise save the caches
+// that ref's run left (P10-sup-7002, mutate.yml's shard job). A ref
+// checked out under a `path:` is not built at the root and is not held.
+func TestWorkflowNoGoCacheOverACheckedOutRef(t *testing.T) {
+	files, err := filepath.Glob(filepath.Join("..", "..", ".github", "workflows", "*.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	jobHeader := regexp.MustCompile(`(?m)^  [A-Za-z0-9_-]+:$`)
+	stepHeader := regexp.MustCompile(`(?m)^      - `)
+	ref := regexp.MustCompile(`(?m)^ +ref: `)
+	path := regexp.MustCompile(`(?m)^ +path: `)
+	cache := regexp.MustCompile(`(?m)^ +cache: (\S+)$`)
+	held := 0
+	for _, f := range files {
+		data, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		wf := string(data)
+		at := strings.Index(wf, "\njobs:\n")
+		if at < 0 {
+			continue
+		}
+		jobs := wf[at:]
+		heads := jobHeader.FindAllStringIndex(jobs, -1)
+		for i, h := range heads {
+			end := len(jobs)
+			if i+1 < len(heads) {
+				end = heads[i+1][0]
+			}
+			job := jobs[h[0]:end]
+			starts := stepHeader.FindAllStringIndex(job, -1)
+			foreign := false
+			var caches []string
+			for j, s := range starts {
+				stop := len(job)
+				if j+1 < len(starts) {
+					stop = starts[j+1][0]
+				}
+				step := job[s[0]:stop]
+				switch {
+				case strings.Contains(step, "uses: actions/checkout@"):
+					if ref.MatchString(step) && !path.MatchString(step) {
+						foreign = true
+					}
+				case strings.Contains(step, "uses: actions/setup-go@"):
+					c := "(unset)"
+					if m := cache.FindStringSubmatch(step); m != nil {
+						c = m[1]
+					}
+					caches = append(caches, c)
+				}
+			}
+			if !foreign {
+				continue
+			}
+			held++
+			for _, c := range caches {
+				if c != "false" {
+					t.Errorf("%s job %s checks out a ref of its own at the root and runs setup-go with cache %s; want cache: false", filepath.Base(f), strings.TrimSpace(jobs[h[0]:h[1]]), c)
+				}
+			}
+		}
+	}
+	if held == 0 {
+		t.Fatal("no workflow job checks out a ref of its own at the root; mutate.yml's shard job did — the parser no longer sees it")
+	}
+}
