@@ -178,18 +178,27 @@ type stagedSnapshot struct {
 }
 
 // applyStagedLocked applies the staged snapshot when served is its
-// topology — the bridge took it — and drops it otherwise; a.mu is held.
-// A write of a key's place since that snapshot read the set stays
-// recorded for the next one; a scope retired again since stays retired.
-func (a *Aggregator) applyStagedLocked(served *endpoint.Topology) {
+// topology — the bridge took it; a.mu is held. A stage for another
+// topology is dropped only when settled is true: the snapshotter calls
+// it inside the bridge's assembly slot, where the served topology is the
+// previous assembly's verdict. After a reassembly returned (settled
+// false) a mismatch is left for that hook: a concurrent
+// Bridge().Reassemble may have staged a snapshot the bridge is about to
+// take (review II, P10F-fsm-6405). A write of a key's place since that
+// snapshot read the set stays recorded for the next one; a scope
+// retired again since stays retired.
+func (a *Aggregator) applyStagedLocked(served *endpoint.Topology, settled bool) {
 	st := a.staged
 	if st == nil {
 		return
 	}
-	a.staged = nil
 	if served == nil || st.topo != served {
+		if settled {
+			a.staged = nil
+		}
 		return
 	}
+	a.staged = nil
 	a.instances = st.instances
 	for key, seq := range st.touched {
 		if a.touched[key] == seq {
@@ -1717,7 +1726,7 @@ func (a *Aggregator) reassembleLocked(ctx context.Context) error {
 	a.behind.Store(false)
 	served := a.n.br.Topology()
 	a.mu.Lock()
-	a.applyStagedLocked(served)
+	a.applyStagedLocked(served, false)
 	a.mu.Unlock()
 	a.n.attachCameraPeers()
 	a.n.announceSurface(ctx)
@@ -1760,7 +1769,7 @@ func (a *Aggregator) snapshot(ctx context.Context) (*endpoint.Topology, error) {
 	// assembly's swap or refusal, so the topology it serves is settled.
 	served := a.n.br.Topology()
 	a.mu.Lock()
-	a.applyStagedLocked(served)
+	a.applyStagedLocked(served, true)
 	a.partLocked(Scope)
 	parts := make([]part, 0, len(a.parts))
 	for _, p := range a.parts {

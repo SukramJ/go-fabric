@@ -25,7 +25,8 @@
 // own under a recover ([valueenc.Encode]), and carried on as its bytes
 // ([Encoded]); every later encode — the size measurement, the chunk the
 // caller sends — writes those bytes back. A value whose encoder panics,
-// leaves a container open or writes other than one element answers its
+// leaves a container open, writes other than one element or tags a
+// container's members against the container's rule answers its
 // path FAILURE (an AttributeStatusIB, an EventStatusIB) and the rest of the
 // report goes out, as connectedhomeip's report engine rolls the partial
 // AttributeReportIB back and writes a status for the path

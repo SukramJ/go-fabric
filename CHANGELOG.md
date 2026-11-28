@@ -16,7 +16,7 @@ pseudo-version of `main`.
 
 ### Changed
 
-- `bridge`, client stack: a value encoder (a host's `EncodeTLV`) that writes one element whose members break its containers' tag rules — an anonymous member of a Structure, a tagged member of an Array — now answers FAILURE for its own path (`valueenc.ErrMalformed` inside the module) instead of putting the malformed element on the wire. A host whose encoder mis-tags sees the FAILURE (review II, P10-wire-6402).
+- `bridge`, client stack: a value encoder (a host's `EncodeTLV`) that writes one element whose members break its containers' tag rules — an anonymous member of a Structure, a tagged member of an Array — now answers FAILURE for its own path (`valueenc.ErrMalformed` inside the module) instead of putting the malformed element on the wire; an event payload so written is not recorded and is logged at ERROR, as one whose encoder panics (`Bridge.EmitEvent`). A host whose encoder mis-tags sees the FAILURE (review II, P10-wire-6402).
 - `im/subscription`: a panic in a subscription report's goroutine is no longer logged with its value. The ERROR record `im.subscription.report_panic` carries the subscription id, the fabric index and the panic value's type (for a Go runtime error, its message cut to 160 bytes); the stack moves to a DEBUG record with the same message, so a consumer counting that message at DEBUG sees two per panic. This supersedes the "(subscription id, fabric index, panic value, stack)" of the #625 entry under `[0.27.0]` (review II, P10-sec-6403).
 
 ### Fixed

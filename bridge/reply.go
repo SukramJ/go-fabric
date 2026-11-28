@@ -702,8 +702,9 @@ func EncodesAttributeValue(v any) bool {
 // is TLV null, as on the wire.
 //
 // The value is encoded as a report encodes it: once, on an encoder of its
-// own, under a recover. An encoder that panics, leaves a container open
-// or writes other than one element returns an error here, and answers
+// own, under a recover. An encoder that panics, leaves a container open,
+// writes other than one element or tags a container's members against
+// the container's rule returns an error here, and answers
 // FAILURE for its path in a report — a host tests its EncodeTLV through
 // this function.
 func AttributeValueTLV(v any) ([]byte, error) {
