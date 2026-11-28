@@ -1172,3 +1172,29 @@ own calls C1–C4 and the P2 review's L1/N1–N3 are recorded in
 | 746 | Owner (wizard, recommended; P0 Fable notes) | P1-H: chip's arithmetic — the blind period in truncated whole seconds (elapsed >= 0 && < blind). |
 | 747 | Owner (wizard, recommended; P2 review M1) | Signals held by `Requestor.HoldUnknownSignals` carry no order after the registration — matter.js's allowance (`WebRtcTransportRequestorServer.ts` :428-429, its test comment :1337-1338); one doc sentence and one `by_design` sentence, no FIFO. |
 | 748 | Owner (wizard, recommended; P2 review) | Host issues now: openccu-loom#1191 and go-fabric-server#87 — `BD-chip-Thermostat-Schedules` leaves `Surface().Extensions` with v0.29.0. |
+
+## 2026-11-28, review II phase 10 (the final convergence run and its fix pull request)
+
+Phase 10 is the last convergence run over `d411dbdc5..d1ab4e970` and its fix
+pull request on branch `review2/p10-fix` (plans `phase-10/plan.md` and
+`phase-10/fix-plan.md`, local; the run's rows `phase-10/rows-p10.tsv`,
+local). The dispositions are in `phase-7-register.md` § Phase 10.
+
+| # | Subject | Decision |
+| --- | --- | --- |
+| 749 | Owner (wizard, recommended) | Review II ends with one last convergence run over `d411dbdc5..<freeze>`. |
+| 750 | Owner (wizard, recommended; D1) | Freeze commit: `main` at `d1ab4e970`; the readers work in a detached worktree at it; #639 out. |
+| 751 | Owner (wizard, recommended; D2) | Fable's reach is a targeted lens: o-facade and o-cam stay Opus with needsSecurity flags to Fable's verify; the Fable units add `im/group.go`, `im/fabric_scope.go`, `node/webrtc_requestor_acl.go`. |
+| 752 | Owner (wizard, recommended; D3) | Three workflows in parallel — A (Fable, 4 units), B (Opus, 4), C (Opus, 3) — each at most 10 agents. |
+| 753 | Owner (wizard, recommended; D4) | Reduced non-code delta (workflows, CHANGELOG, README, `docs/**`); the `notes/` registers are not read. |
+| 754 | Run result | Not converged at `d1ab4e970`: 2 medium, P10-err-6401 and P10-wire-6402 → the fix path (as 749). |
+| 755 | Owner (wizard, recommended) | The out-of-delta deadlock (an inline `OnSurfaceChanged` observer that calls `Aggregator.Add`) is a follow-up on `node/`, not in the fix pull request. |
+| 756 | Owner (wizard, recommended) | P10-fsm-6301 (`ble/bluez`, the 3301 → 4301 → 5502 line) stays a note and a follow-up, not in the fix pull request. |
+| 757 | Owner ("Die Folgeissue werden in einem PR vor dem Release behoben!") | The phase's follow-ups are not left open: they are fixed in one pull request before the next release, after the fix pull request; work after the freeze, not counted for convergence. Amends 755 and 756. |
+| 758 | Owner ("Da die folgeissues nicht zu diesem Review gehören danach, der rest jetzt, aber alles vor dem release."), corrects 757 | The run's own lows and notes are fixed now, in the fix pull request (replaces decision 602's issue route and decision 587's low filter for this run). Only 755 and 756 go to one follow-up pull request after the close-out; everything before the next release. |
+| 759 | Owner (wizard, recommended) | Fix pull request scope under 758: the 2 mediums and every **new** low and note of the run (P10-fsm-6301 excepted, 756). The 19 `known` rows keep their register disposition and are not fixed here. |
+| 760 | Owner (wizard, recommended; fix plan Q1) | P10-fsm-6001 fixed now (unit G10): one `Assembler` method and `Topology.Commit`; `Assemble` unchanged. |
+| 761 | Owner (wizard, recommended; fix plan Q2) | P10-bound-6602 fixed (unit G5) with a per-fabric reservation in the camera provider's End queue. |
+| 762 | Owner (wizard, recommended; fix plan Q3) | Wave C (G6–G9) runs in parallel with wave A, two workflows. |
+| 763 | Owner (wizard, recommended) | P10-sup-7001 takes the job-name-suffix shape (checkable in the repository through `script/requiredchecks`), not G9's run-name fallback; a G9 follow-up round with `script/requiredchecks` in its paths. |
+| 764 | Owner (wizard, recommended) | The `valueenc` candidate of `fable-diff-g1.md` note 1 (`newPanicError` called `Error()` on a recovered `runtime.Error` without a recover of its own; inferred) is fixed in G1's follow-up round with P10-sec-6403 and registered as the coordinator row P10F-err-6404. |

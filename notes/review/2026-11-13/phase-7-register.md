@@ -1077,3 +1077,130 @@ Not triaged: the 1165 SURVIVED/SURVIVED rows of the CI run outside the 74
 and shard 10, and the 13 S→B rows (CI's own wide kills; one measured as
 spurious). The targeted re-run of the B2 mutants at the release head
 (decision 668) is still to come.
+
+## Phase 10: the final convergence run and its fix pull request (2026-11-28)
+
+**The run** (decisions 749–753) read `d411dbdc5..d1ab4e970` (F, `main`
+after #642) in three parallel workflows, 11 units, with Fable's verify in
+two stages. Result (decision 754): **not converged** — 0 high, **2
+medium**: P10-err-6401, a fix-regression of #625 (`b89d1b774`), and
+P10-wire-6402, a residual of #625 (the refutation corrected "fix-regression":
+the same bytes went out before `b89d1b774`, inferred). Graded below medium
+by the verify: P10-conc-6501 medium → low (the re-entry deadlock is
+measured, but it deadlocks at `d411dbdc5` too, so not introduced by #642);
+P10-store-6803 low → note; P10-sup-7002 note → low. Guards at F: `make
+ci-net` green; `make ci` green after one rerun of `cover-check` (an `mdns`
+multicast test on `en0`; an environment flake, inferred).
+
+**The fix pull request** ran on branch `review2/p10-fix` from `d1ab4e970`
+(`phase-10/fix-plan.md`, local). Scope (decisions 758, 759): the 2 mediums
+and every new low and note of the run, P10-fsm-6301 excepted (756); the 19
+known rows keep their disposition. Units on disjoint paths: G1 `valueenc`,
+G2 `node` requestor ACL, G3 `cluster/core`, G4 commissioner, G5 camera, G6
+`ble/bluez` and the BLE citations, G7 `client/discovery`, G8 `script/mutate`
+and `script/clustergen`, G9 the workflows, G10 the pending assembly (decision
+760), and the follow-up rounds G1b (P10-sec-6403, P10F-err-6404), G2b
+(`fable-diff-g2.md` N1, N4, N7) and G9b (decision 763). Every fixed row has a
+test that failed before its fix, except where the row says otherwise; Fable
+read the diffs of G1, G1b, G2, G2b, G3, G4, G5 and G10. Merges onto the
+branch: `d0e4675c1` G1, `56edf570b` G2, `86378fde6` G4 (P10F-A);
+`85d11d2ec` G6, `ad32cefeb` G7, `efdc2b08f` G8, `457fa9793` G9 (P10F-C);
+`451616aaf` G3, `01d5adfb0` G5, `32f2f4aaa` G10 (P10F-B); `e76b1ebf1` G1b,
+`8e34fa384` G2b, `c39fdd3e0` G9b (P10F-B2). Severities are the verify's.
+
+### The rows
+
+`ID · severity · disposition · commit`.
+
+| ID | sev | disposition | commit |
+| --- | --- | --- | --- |
+| P10-err-6401 | medium (fix-regression of #625) | fixed: a comparable but unhashable panic value no longer escapes the tripwire's lookup; it costs its own path a FAILURE and counts as undeclared | `6c090256d` |
+| P10-wire-6402 | medium (residual of #625) | fixed: an element whose members break its containers' tag rules is refused as `valueenc.ErrMalformed` and costs its path a FAILURE; `by_design.md` L3-ContainerTypeValidation rewritten | `b728687e2` |
+| P10-sec-6403 | note | fixed: a report panic's log carries the value's type (a runtime error's bounded message), the stack at DEBUG | `882145d0c` |
+| P10F-err-6404 | low (coordinator row, decision 764; inferred by `fable-diff-g1.md` note 1) | fixed: a recovered `runtime.Error` whose `Error` panics is contained | `ba9f73472` |
+| P10-conc-6501 | low (verify: medium → low) | fixed: GrantFabric is asked after the reassembly lock is released; the regression test from the o-facade probe | `34f9bef50`, `a4bbe0c05` |
+| P10-conc-6003 | low | fixed with 6501 | `34f9bef50`, `a4bbe0c05` |
+| P10-doc-6002 | note | fixed (comment) | `34f9bef50` |
+| P10-doc-6503 | note | fixed (citations at `db91886c`) | `b3f35ea5c`, `86477a4e2` |
+| P10-doc-6504 | note | fixed (Batch doc, `leave`'s comment) | `f2d9bfcf2`, `65c28399a` |
+| P10-sec-6502 | note | as the reference (verify-b): the entry is installed behind a duplicate check and never removed (`WebRtcTransportRequestorServer.ts:118-129`, `:143-181` at `db91886c`); `by_design.md` `:9318` names the reassembly re-add | — |
+| P10-err-6102 | low | fixed: after a failed initial auxiliary sync, the first successful sync emits only for fabrics a context names | `9d542f3fa`, `331e74a07` |
+| P10-conc-6101 | note | fixed: `ICDManagement.Start` re-checks `started` under the command lock | `80095ef54` |
+| P10-store-6803 | note (verify: low → note) | fixed: a failed AddNOC acknowledges only the removal its rollback recorded | `09002efe7` |
+| P10-test-6802 | note | fixed (test only) | `c6178ef9d` |
+| P10-doc-6801 | note | fixed (doc) | `3b8e6b1bd` |
+| P10-err-6202 | low | fixed: a panicking attestation store becomes the `ValidationError` finding | `6ad9a46c3` |
+| P10-doc-6201 | note | fixed (doc) | `17258ba11` |
+| P10-doc-6203 | note | fixed (citations at `db91886c`) | `0144ae85d` |
+| P10-conc-6601 | low | fixed: a fabric removal waits for the fabric's signals at the requestor port | `345e6c134` |
+| P10-err-6603 | note | fixed: `EndLostPeer` neither ends again nor counts a session the host removed meanwhile | `944aa346f` |
+| P10-bound-6602 | note | fixed (decision 761): the provider's End queue is reserved per fabric | `16d338477`, `aa840d636` |
+| P10-doc-6302 | note | fixed: the held-retry log only from the work that was not superseded | `f83e922db` |
+| P10-doc-6303 | note | fixed (citations at `db91886c`) | `1c92772f5` |
+| P10-doc-6304 | note | fixed: no advertisement after `Close` | `d6b799ccb` |
+| P10-fsm-6301 | note | follow-up pull request before the release (decisions 756, 757 / 758) | — |
+| P10-api-6702 | note | fixed: a Cancel after the winner's attempt returned is logged at DEBUG as `cancel_after_outcome` | `ec69a9a93` |
+| P10-fsm-6701 | note | as the reference (verify-b §2): matter.js has the same window at `db91886c` — `#maybeStartResolving` returns while `#resolveAbort` is set (`packages/general/src/net/dns-sd/IpServiceStatus.ts:153`), the resolution's `.finally` clears it and starts nothing (`:177-185`), and `connecting()` calls `#maybeStartResolving` once (`:149`); no change owed. Whether another task can run in that gap in practice: unverified | — |
+| P10-fsm-6001 | low | fixed (decision 760): `(*endpoint.Assembler).AssemblePending` and `(*endpoint.Topology).Commit`; the bridge commits the assembly it swaps in | `2b08dce17` |
+| P10-doc-6004 | note | fixed (citations at `db91886c`) | `a1c2ccd99` |
+| P10-conc-6901 | note | fixed: a cancelled mutant run kills its process group | `a87b1c1cd` |
+| P10-sup-6902 | note | fixed: `-wide` refuses an empty or flag-shaped entry | `e335c16ff` |
+| P10-test-6903 | low | fixed: a file outside the build is `NOTBUILT` | `10948ceb4` |
+| P10-doc-6904 | note | fixed (stale directive) | `bf3b0f491` |
+| P10-doc-6905 | note | fixed: no struct default for a nullable attribute; no generated file moved | `cd3bcccb7` |
+| P10-sup-7001 | low | fixed (decision 763): a fixture update's family jobs carry a name suffix; replaces G9's run-name shape (`3e4ef0ab7`) | `577beab09`, `d75a5a60b` |
+| P10-sup-7002 | low (verify: note → low) | fixed: no Go cache in the mutate shard job; a standing workflow guard | `90cfdc663`, `c31d45072` |
+| P10-sup-7003 | note | fixed: the `wide` input refuses empty and `-`-led elements | `5edf425f4` |
+| P10-sup-7004 | note | fixed: the release shape requires an unversioned local replace | `d3cc60bd1` |
+| P10-doc-7005 | note | fixed (doc) | `f16f9115a` |
+| Out-of-delta deadlock (verify-b, no ID) | — | an inline `OnSurfaceChanged` observer that calls `Aggregator.Add` deadlocks the reassembly; pre-existing at `d411dbdc5`. Follow-up pull request before the release (decisions 755, 757 / 758) | — |
+
+**Known rows, unchanged** (decision 759; each re-found open by the run's
+verify, their dispositions as registered):
+
+| ID | sev | known as |
+| --- | --- | --- |
+| P10-acl-6107 | note | `P8-619-actor-residual` (§ Phase 8, wave 2, raised, open) |
+| P10-conc-6105 | note | `P8-acl-admin-entry-mark` |
+| P10-conc-6108 | note | `P8-gkm-read-mark` |
+| P10-conc-6110 | note | `fable-diff-a1` N4 (phase 8) |
+| P10-err-6104 | low | `P8-5201-window` |
+| P10-fsm-6103 | low | `P8-thread-3055-commissioning-complete` |
+| P10-fsm-6106 | low | `P8-wifi-connect-refused-interface-enabled` |
+| P10-test-6109 | note | `P8-reserve-acl-epoch-tests` (the `cluster/core` half) |
+| P10-bound-6005 | note | `phase-9/fable-post-P1-G.md` F7 (decision 744, no fix) |
+| P8-handshake-resume-established | low | as registered |
+| phase-9/p2-review.md N3 | note | as registered |
+| P8-bluez-release-before-removal | note | as registered |
+| P8-esphome-reserve-before-lookup | note | as registered |
+| P8-camera-listener-under-pub | note | as registered |
+| fable-diff-a2 N3 (phase 8) | note | as registered |
+| fable-diff-a2 N4 (phase 8) | note | as registered |
+| P8-ota-5007-residual | low | as registered |
+| P8-5201-window | low | as registered |
+| P8-closure-offgrid-ceiling | note | as registered |
+
+### Raised in the fix pull request, not decided
+
+Notes of the Fable diff reads and the fix reports, none blocking (local
+files under `phase-10/`):
+
+| source | where | what |
+| --- | --- | --- |
+| `fable-diff-g4.md` N3 | `controller/commissioner/flow.go:1301-1302`, `:1335-1336` | still cite `ControllerCommissioningFlow.ts` "at b25ed960"; unchanged lines outside row 6203 — for cite-check's list |
+| `fable-diff-g4.md` N1, N2 | `controller/commissioner/flow.go` | the recovered attestation panic is reported by type only and its stack is logged nowhere; a `runtime.Goexit` in the store sends nothing, so the wait ends only with ctx (unchanged) |
+| `fix-g8.md` Left out | `script/clustergen/gen.go:1324` | `//nolint:funlen` on `writeDefinition` reported unused by `nolintlint` — the class of 6904, no row |
+| `fable-diff-g10.md` 1–4, `fix-g10.md` Left out | `node/aggregator.go` after `AssemblePending`, `bridge/bridge.go` swap → commit | the node's instance map moves even when the bridge refuses the topology; the swap-to-commit window; `commitMu` not ctx-bound; a host assembling outside the bridge voids the served commit (documented) |
+| `fable-diff-g5.md` 1–4 | `cluster/camera` | the End queue keeps head-of-line order; the queue bound is per fabric; `EndLostPeer`'s held check matches the id only; a fabric removal's fan-out now waits on the host's port |
+| `fable-diff-g2.md` N3, N5, N6; `fable-diff-g2b.md` N1, N2 | `node/` requestor ACL | GrantFabric's Start / CommissioningComplete ask re-entering the Aggregator unverified; an ensure may write an entry for an endpoint a later reassembly removed; a GrantFabric that calls the Aggregator on every ask recurses; the ensure after `reassembleIfBehind` is pinned by no test; `leave`'s advice is conservative |
+| `fable-diff-g1.md` 2, 3; `fable-diff-g1b.md` 2, 3, 5, 6 | `internal/valueenc`, `im/subscription` | that no module encoder now answers FAILURE is inferred, not measured; a mis-tagging response writer answers FAILURE through `payload_form.go`; a host `runtime.Error` chooses its own message; the 160-byte cut can split UTF-8; the DEBUG record repeats the message key |
+| `fable-diff-g3.md` N1 | `cluster/core/access_control_auxiliary.go` | a change without a request context of its own fabric in the window between a failed initial sync and the first successful one is now silent for that fabric; the comment states it (this register's commit) |
+
+**Held back (decision 25): 0.** Counted by hand over `phase-10/rows-p10.tsv`
+(58 rows: 19 `known`, 37 `new` including the coordinator row P10F-err-6404,
+2 mediums): the rows whose ID carries `-sec-` are P10-sec-6403 (fixed
+`882145d0c`) and P10-sec-6502 (as the reference); the rows still open after
+this pull request are the 19 known rows, already public in this register or
+the phase notes, P10-fsm-6301 (a BlueZ registration order) and the
+out-of-delta deadlock (a host observer's re-entry) — none an open weakness
+a party on the network could use. No `heldcheck.py` was run for this phase.

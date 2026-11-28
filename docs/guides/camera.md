@@ -96,8 +96,10 @@ fabric's sessions only.
 **The ACL entry.** The camera needs Operate access to the requestor. The
 node writes that entry only into the fabrics the host grants through
 `node.Config.WebRTCRequestor.GrantFabric`, and into no fabric by default.
-At `Start` and after each commissioning the node asks `GrantFabric` for each
-of its fabrics. Into each granted one it adds one Operate entry for CASE
+At `Start`, after each commissioning and after each successful reassembly
+of a started node the node asks `GrantFabric` for each of its fabrics; the
+ask after a reassembly runs once the reassembly has released the
+Aggregator, so that `GrantFabric` may call the Aggregator. Into each granted one it adds one Operate entry for CASE
 with no subject, targeting the requestor's endpoint and cluster, unless the
 fabric's ACL holds it already. Without a grant the fabric's administrator
 writes the access itself. matter.js's `#nodeOnline` writes the entry into
@@ -443,8 +445,9 @@ counts from the `UpsertSession` that entered it — a later
 `UpsertSession` of the row does not count. Only a new session evicts (a re-offer
 never does), one entry per offer, and only when that one makes room: a
 table the host's rows hold over the bound is refused as without
-eviction. Without a `PeerConnector`, or with the End queue full, the
-entry goes without an `End`. Another fabric's entry is never taken
+eviction. Without a `PeerConnector`, or with the End queue of the
+entry's fabric full (the queue is bounded per fabric), the entry goes
+without an `End`. Another fabric's entry is never taken
 unless `EvictAcrossFabrics` is set (below).
 
 Idle here is signalling-idle, not abandonment: a live view signals

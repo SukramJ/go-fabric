@@ -250,8 +250,9 @@ func (a *AccessControl) syncAuxiliaryAs(ctx, actor context.Context, emit bool, d
 		case prev == nil:
 			// A nil prev is the baseline no run has applied yet (the
 			// initial synchronisation failed): a fabric no context names
-			// is the registration's state, which emits no event
-			// (P10-err-6102).
+			// is taken as the registration's state — a change without a
+			// request context in this window is indistinguishable from
+			// it — and emits no event (P10-err-6102).
 			continue
 		}
 		emitter.MatterEmitEvent(endpoint, accessControlClusterID, accessControlEventAuxiliaryAccessUpd,

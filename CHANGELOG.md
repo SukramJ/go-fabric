@@ -10,8 +10,30 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `endpoint`: `(*Assembler).AssemblePending` and `(*Topology).Commit`. `AssemblePending` assembles like `Assemble` but leaves the topology's per-key state changes — a key's first state, a new instance, a restored NodeLabel or ConfigurationVersion, the release of removed keys — pending until `Commit`; the bridge commits a topology its Snapshotter returns this way only when it swaps the topology in. `Assemble` is unchanged (it commits at once); the `bridge.Snapshotter` doc example now uses `AssemblePending` (review II, P10-fsm-6001, decision 760).
+
+### Changed
+
+- `bridge`, client stack: a value encoder (a host's `EncodeTLV`) that writes one element whose members break its containers' tag rules — an anonymous member of a Structure, a tagged member of an Array — now answers FAILURE for its own path (`valueenc.ErrMalformed` inside the module) instead of putting the malformed element on the wire. A host whose encoder mis-tags sees the FAILURE (review II, P10-wire-6402).
+- `im/subscription`: a panic in a subscription report's goroutine is no longer logged with its value. The ERROR record `im.subscription.report_panic` carries the subscription id, the fabric index and the panic value's type (for a Go runtime error, its message cut to 160 bytes); the stack moves to a DEBUG record with the same message, so a consumer counting that message at DEBUG sees two per panic. This supersedes the "(subscription id, fabric index, panic value, stack)" of the #625 entry under `[0.27.0]` (review II, P10-sec-6403).
+
 ### Fixed
 
+- `bridge`, client stack: a host value encoder that panics with a value of a comparable but unhashable type (a struct whose interface field holds a slice) no longer escapes the per-value containment of #625 — which lost the whole report — but answers FAILURE for its own path like any other panic (review II, P10-err-6401).
+- `bridge`, client stack, `im/subscription`: a host value encoder that panics with a value implementing `runtime.Error` whose `Error` method itself panics no longer escapes the per-value containment: it answers FAILURE for its own path; the report backstop's log has the same protection (review II, P10F-err-6404).
+- `endpoint`, `bridge`, `node`: a topology the bridge refused (a device-type refusal, a Stop during the assembly) no longer releases the state of the endpoints it dropped, so the served endpoint keeps its DataVersion and Identify (review II, P10-fsm-6001).
+- `node`: a `WebRTCRequestorConfig.GrantFabric` that calls the node's Aggregator no longer deadlocks the reassembly that asks it; after a reassembly it is asked once the reassembly lock is released, so the entry is written after the surface change is announced (review II, P10-conc-6501, P10-conc-6003).
+- `cluster/core`: AccessControl — after a failed initial auxiliary-ACL synchronisation, the first successful one fires `AuxiliaryAccessUpdated` only for fabrics a request names, not for every fabric with auxiliary entries; a change without a request context in that window emits no event for its fabric (review II, P10-err-6102).
+- `cluster/core`: ICDManagement — two concurrent `Start` calls load the registrations and the counter once (review II, P10-conc-6101).
+- `cluster/core`: OperationalCredentials — a failed AddNOC acknowledges only the removal its own rollback recorded, so an earlier owed event of a reused fabric index stays owed (review II, P10-store-6803).
+- `controller/commissioner`: a panic in the host's `attestation.PAAStore` or `Revocations` during device attestation no longer ends the process; it becomes one `ValidationError` finding the `OnAttestationFailure` policy judges, the panic value named by its type only (review II, P10-err-6202).
+- `cluster/camera`: `Requestor.MatterDropFabric` waits for an Offer, Answer or IceCandidates call of the fabric in flight at the port before it removes the fabric's sessions, so the port sees no signal after the End (review II, P10-conc-6601).
+- `cluster/camera`: `Provider.EndLostPeer` neither ends again nor counts a session the host removed while it ran (review II, P10-err-6603).
+- `cluster/camera`: the provider's End queue for refused SolicitOffers and evicted sessions is bounded per fabric, so one fabric's unanswered Ends no longer cost another fabric's evicted session its End (review II, P10-bound-6602, decision 761).
+- `client/discovery`: a `Session.Cancel` on a race whose winner's attempt has already returned no longer logs `matter.controller.discovery.cancel_to_winner` at INFO; it is logged as `matter.controller.discovery.cancel_after_outcome` at DEBUG and has no effect (review II, P10-api-6702).
+- `ble/bluez`: the peripheral's adapter-follow work registers no advertisement after `Close` (P10-doc-6304), and a work a later adapter signal superseded no longer logs "registered … after a retry" (review II, P10-doc-6302).
 - `node`: a camera controller (a `camera.Requestor` endpoint) added to a started node now gets the requestor's Operate/CASE ACL entry in each fabric `WebRTCRequestorConfig.GrantFabric` grants with the reassembly that mounts it, as matter.js installs it at once for a requestor added to an online node (`WebRtcTransportRequestorServer.ts:126-128` at db91886c). Before, the entry waited for the next Start or CommissioningComplete and the camera's signals were refused meanwhile (F-db91886c-8).
 
 ## [0.29.0] — 2026-11-27
