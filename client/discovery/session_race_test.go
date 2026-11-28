@@ -7,6 +7,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
+	"strings"
 	"sync"
 	"testing"
 	"testing/synctest"
@@ -572,5 +574,31 @@ func TestRace_OverflowWhileReplacedAttemptsHaveNotReturnedIsBounded(t *testing.T
 		close(stuck)
 		s.Cancel(nil)
 		_, _ = settledOutcome(t, s, clk, time.Second, time.Minute)
+	})
+}
+
+// TestRaceCancelAfterOutcomeIsNotHandedToWinner: a Cancel that arrives after
+// the winner's attempt has returned reaches no attempt, so it is neither
+// logged as handed to the winner nor as an ignored interruption at INFO, and
+// the outcome stays the winner (P10-api-6702).
+func TestRaceCancelAfterOutcomeIsNotHandedToWinner(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		clk := newClock()
+		logged := &logBuffer{}
+		opts := discovery.SessionOptions{Timeout: 30 * time.Second, Logger: slog.New(slog.NewTextHandler(logged, nil))}
+		r := race(context.Background(), clk, opts, winner(nil, nil), newFixed(deviceA))
+		if c, err := outcome(t, r.session, clk); err != nil || c.Device.InstanceID != "device-a" {
+			t.Fatalf("%+v, %v; want the winner", c, err)
+		}
+		r.session.Cancel(errors.New("late"))
+		synctest.Wait()
+		l := logged.String()
+		if strings.Contains(l, "cancel_to_winner") || strings.Contains(l, "interruption_ignored") {
+			t.Fatalf("a cancel after the outcome is logged as reaching an attempt: %q", l)
+		}
+		if c, err := r.session.Wait(context.Background()); err != nil || c.Device.InstanceID != "device-a" {
+			t.Fatalf("%+v, %v; want the winner after the late cancel", c, err)
+		}
 	})
 }
